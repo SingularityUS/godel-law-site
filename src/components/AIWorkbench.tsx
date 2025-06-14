@@ -19,7 +19,8 @@ import { MODULE_DEFINITIONS, AIModuleDefinition, ModuleKind } from "@/data/modul
 
 import "@xyflow/react/dist/style.css";
 
-interface HelperNodeData {
+// Add index signature for compatibility
+interface HelperNodeData extends Record<string, unknown> {
   moduleType: ModuleKind;
   promptOverride?: string;
 }
@@ -50,8 +51,8 @@ const initialNodes: HelperNode[] = [
 ];
 
 const initialEdges: Edge[] = [
-  { id: "e1-2", source: "1", target: "2", animated: true, label: "JSON", type: "smoothstep" },
-  { id: "e2-3", source: "2", target: "3", animated: true, label: "JSON", type: "smoothstep" },
+  { id: "e1-2", source: "1", target: "2", animated: true, type: "smoothstep", data: { label: "JSON" } },
+  { id: "e2-3", source: "2", target: "3", animated: true, type: "smoothstep", data: { label: "JSON" } },
 ];
 
 const HelperNodeComponent = ({ data, selected }: { data: HelperNodeData; selected?: boolean }) => {
@@ -63,7 +64,9 @@ const HelperNodeComponent = ({ data, selected }: { data: HelperNodeData; selecte
       }`}
     >
       <div className="flex items-center gap-3">
-        <module.icon size={26} className="text-white drop-shadow" />
+        <span className="text-white drop-shadow">
+          <module.icon size={26} />
+        </span>
         <span className="font-semibold text-white">{module.label}</span>
       </div>
       <div className="text-xs text-white/95 mt-2 line-clamp-2 italic">
@@ -121,9 +124,12 @@ const AIWorkbench = ({ onModuleEdit, editingPromptNodeId }: AIWorkbenchProps) =>
   }, []);
 
   // Handle node selection for editing prompts
-  const onNodeClick = useCallback(
-    (_: unknown, node: HelperNode) => {
-      onModuleEdit(node.id, node);
+  const onNodeClick: React.MouseEventHandler = useCallback(
+    (_event: any, node: Node) => {
+      // Only handle our own nodes
+      if ((node as HelperNode).data && (node as HelperNode).data.moduleType) {
+        onModuleEdit(node.id, node as HelperNode);
+      }
     },
     [onModuleEdit]
   );
@@ -142,7 +148,15 @@ const AIWorkbench = ({ onModuleEdit, editingPromptNodeId }: AIWorkbenchProps) =>
 
   // Edge creation and deletion
   const onConnect = useCallback(
-    (connection: Edge | Connection) => setEdges((eds) => addEdge({ ...connection, animated: true, label: "JSON" }, eds)),
+    (connection: Connection) => {
+      // addEdge expects a real Edge. We'll append data for label on the new edge
+      setEdges((eds) =>
+        addEdge(
+          { ...connection, animated: true, type: "smoothstep", data: { label: "JSON" } },
+          eds
+        )
+      );
+    },
     [setEdges]
   );
 
@@ -186,7 +200,7 @@ const AIWorkbench = ({ onModuleEdit, editingPromptNodeId }: AIWorkbenchProps) =>
       >
         <MiniMap 
           nodeColor={(n) =>
-            getModuleDef(n.data.moduleType as ModuleKind).color.replace("bg-", "")
+            getModuleDef((n.data as HelperNodeData).moduleType as ModuleKind).color.replace("bg-", "")
           }
           pannable zoomable
         />

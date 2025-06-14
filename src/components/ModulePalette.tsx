@@ -16,7 +16,9 @@ const ModulePalette = ({ onDragStart }: ModulePaletteProps) => {
           onDragStart={(e) => onDragStart(mod, e)}
           title={mod.label}
         >
-          <mod.icon size={28} className="mb-1 text-white drop-shadow" />
+          <span className="mb-1 text-white drop-shadow">
+            <mod.icon size={28} />
+          </span>
           <span className="text-xs font-semibold text-white">{mod.label}</span>
         </div>
       ))}

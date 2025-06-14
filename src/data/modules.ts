@@ -1,5 +1,5 @@
 
-import { BookOpen, Paragraphs, Check, Link2, BookKey, BadgeCheck, Wand2 } from "lucide-react";
+import { BookOpen, Divide, Check, Link2, BookKey, BadgeCheck, Wand2 } from "lucide-react";
 
 export type ModuleKind =
   | "text-extractor"
@@ -30,7 +30,7 @@ export const MODULE_DEFINITIONS: AIModuleDefinition[] = [
     type: "paragraph-splitter",
     label: "Paragraph Splitter",
     color: "bg-orange-500",
-    icon: Paragraphs,
+    icon: Divide,
     defaultPrompt: "You separate the provided raw text into logical paragraphs. Return a JSON array of paragraph strings.",
   },
   {
