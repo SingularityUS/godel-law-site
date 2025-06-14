@@ -1,9 +1,9 @@
-
 import React, { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { toast } from "@/components/ui/use-toast";
 import { Upload, FileInput } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 type UploadedFile = File & { preview?: string; extractedText?: string };
 
@@ -19,9 +19,18 @@ const ACCEPTED_FILE_TYPES = {
 
 const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesAccepted }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAuth();
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
+      if (!user) {
+        toast({
+          title: "Please sign in",
+          description: "You must be signed in to upload documents.",
+          variant: "destructive",
+        });
+        return;
+      }
       setIsLoading(true);
 
       // Only accept PDF, DOCX, TXT
@@ -43,7 +52,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesAccepted }) => {
       }
 
       const file = files[0];
-      const storagePath = `${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+      const storagePath = `${user.id}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
       let fileUrl = "";
       let uploadError = null;
       let docId: string | undefined = undefined;
@@ -66,7 +75,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesAccepted }) => {
 
       fileUrl = supabase.storage.from("documents").getPublicUrl(storagePath).data.publicUrl;
 
-      // Insert metadata into documents table
+      // Insert metadata into documents table (include user_id)
       const { data: docRow, error: insertError } = await supabase
         .from("documents")
         .insert([
@@ -76,7 +85,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesAccepted }) => {
             mime_type: file.type,
             size: file.size,
             preview_url: fileUrl,
-            // user_id: undefined, // You can fill this if you add auth in the future
+            user_id: user.id,
           },
         ])
         .select()
@@ -92,7 +101,6 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesAccepted }) => {
         return;
       }
 
-      // Attach preview_url to file type
       const uploadedFile: UploadedFile = Object.assign(file, { preview: fileUrl });
       onFilesAccepted([uploadedFile]);
 
@@ -103,7 +111,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesAccepted }) => {
 
       setIsLoading(false);
     },
-    [onFilesAccepted]
+    [onFilesAccepted, user]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -137,4 +145,3 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesAccepted }) => {
 };
 
 export default DocumentUpload;
-

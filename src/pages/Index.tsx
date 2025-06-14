@@ -1,4 +1,3 @@
-
 import { useCallback, useState } from "react";
 import AIWorkbench from "@/components/AIWorkbench";
 import ModulePalette from "@/components/ModulePalette";
@@ -11,6 +10,9 @@ const getModuleDef = (type: ModuleKind) =>
   MODULE_DEFINITIONS.find((m) => m.type === type)!;
 
 export type UploadedFile = File & { preview?: string; extractedText?: string };
+
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
 
 const Index = () => {
   // Manage which module node is being edited
@@ -53,6 +55,8 @@ const Index = () => {
     drawerPromptOverride = editingNode.data.promptOverride ?? "";
   }
 
+  const { user, signOut } = useAuth();
+
   return (
     <div className="flex flex-col w-full min-h-screen bg-gradient-to-br from-blue-100 via-slate-50 to-white">
       <header className="flex justify-between items-center py-8 px-8 border-b bg-white/80">
@@ -62,6 +66,14 @@ const Index = () => {
         </div>
         <div className="text-gray-600 font-semibold text-base">
           Visual workflow to compose document-processing AI agents
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="text-sm text-gray-700">
+            {user?.email}
+          </div>
+          <Button size="sm" variant="outline" onClick={() => signOut()}>
+            Log out
+          </Button>
         </div>
       </header>
 
