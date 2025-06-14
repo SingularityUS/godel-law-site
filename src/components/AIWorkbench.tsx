@@ -1,4 +1,3 @@
-
 import {
   ReactFlow,
   MiniMap,
@@ -124,8 +123,8 @@ const AIWorkbench = ({ onModuleEdit, editingPromptNodeId }: AIWorkbenchProps) =>
   }, []);
 
   // Handle node selection for editing prompts
-  const onNodeClick: React.MouseEventHandler = useCallback(
-    (_event: any, node: Node) => {
+  const onNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
       // Only handle our own nodes
       if ((node as HelperNode).data && (node as HelperNode).data.moduleType) {
         onModuleEdit(node.id, node as HelperNode);
