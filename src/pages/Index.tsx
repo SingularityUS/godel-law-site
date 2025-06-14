@@ -1,23 +1,34 @@
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import AIWorkbench from "@/components/AIWorkbench";
 import ModulePalette from "@/components/ModulePalette";
 import PromptDrawer from "@/components/PromptDrawer";
+import DocumentUpload from "@/components/DocumentUpload";
 import { MODULE_DEFINITIONS, ModuleKind } from "@/data/modules";
 import { BookOpen } from "lucide-react";
 
 const getModuleDef = (type: ModuleKind) =>
   MODULE_DEFINITIONS.find((m) => m.type === type)!;
 
+export type UploadedFile = File & { preview?: string; extractedText?: string };
+
 const Index = () => {
   // Manage which module node is being edited
   const [editingNodeId, setEditingNodeId] = useState<string | undefined>();
   const [editingNode, setEditingNode] = useState<any>();
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [promptOverrides, setPromptOverrides] = useState<Record<string, string>>({});
 
   // Drag handler for module palette
   const handlePaletteDragStart = (mod: any, event: React.DragEvent) => {
     event.dataTransfer.setData("application/json", JSON.stringify(mod));
+  };
+
+  // Handle file upload
+  const handleFilesAccepted = (files: UploadedFile[]) => {
+    setUploadedFiles(files);
+    // NOTE: Later, this should trigger a "document input" node creation in the AI graph!
+    //       We'll wire this later after confirming upload integration with you.
   };
 
   // Handle when user selects a node for prompt editing
@@ -29,7 +40,6 @@ const Index = () => {
   // Handle saving prompt override for a module node
   const handlePromptSave = () => {
     if (!editingNodeId) return;
-    // state for prompt override could be managed here for persistence
     setEditingNode(undefined);
     setEditingNodeId(undefined);
   };
@@ -55,6 +65,25 @@ const Index = () => {
         </div>
       </header>
 
+      {/* Document Upload Area */}
+      <div className="px-8 pt-6 w-full max-w-3xl mx-auto">
+        <DocumentUpload onFilesAccepted={handleFilesAccepted} />
+        {uploadedFiles.length > 0 && (
+          <div className="mt-5 bg-white border shadow rounded p-4">
+            <div className="mb-2 font-semibold text-gray-800 flex items-center gap-2">
+              <FilePreviewIcon file={uploadedFiles[0]} />
+              {uploadedFiles[0].name}
+              <span className="text-gray-500 text-xs ml-2">
+                ({Math.round(uploadedFiles[0].size / 1024)} KB)
+              </span>
+            </div>
+            <div className="text-xs text-gray-500">
+              File ready. (Preview & extraction coming soon)
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="px-8 py-6 w-full" style={{maxWidth:1600, margin:"0 auto"}}>
         <ModulePalette onDragStart={handlePaletteDragStart} />
         <div className="h-6" />
@@ -75,7 +104,6 @@ const Index = () => {
         systemPrompt={drawerModuleDef?.defaultPrompt ?? ""}
         promptOverride={drawerPromptOverride}
         onPromptChange={(newPrompt) => {
-          // In real app, would set prompt on the right module node
           if (editingNode && editingNode.data) {
             editingNode.data.promptOverride = newPrompt;
           }
@@ -85,5 +113,20 @@ const Index = () => {
     </div>
   );
 };
+
+// Helper file type icon
+function FilePreviewIcon({ file }: { file: File }) {
+  if (file.type === "application/pdf") {
+    // PDF icon
+    return <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded">PDF</span>;
+  } else if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+    // DOCX icon
+    return <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded">DOCX</span>;
+  } else if (file.type === "text/plain") {
+    // TXT icon
+    return <span className="bg-gray-200 text-gray-800 px-2 py-0.5 rounded">TXT</span>;
+  }
+  return <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">FILE</span>;
+}
 
 export default Index;
