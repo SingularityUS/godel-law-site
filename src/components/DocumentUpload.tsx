@@ -17,6 +17,22 @@ const ACCEPTED_FILE_TYPES = {
   "text/plain": [],
 };
 
+// Function to sanitize filenames: remove or replace any problematic characters
+function sanitizeFilename(filename: string): string {
+  // Extract the extension
+  const extensionMatch = filename.match(/\.([0-9a-z]+)(?:[\?#]|$)/i);
+  const extension = extensionMatch ? '.' + extensionMatch[1] : '';
+  // Remove the extension from filename
+  let nameWithoutExt = extension ? filename.slice(0, -extension.length) : filename;
+  // Replace unsafe characters (keep alphanumerics, dash, dot, underscore)
+  nameWithoutExt = nameWithoutExt
+    .replace(/[^a-zA-Z0-9._-]/g, "_")    // Replace anything not safe with underscore
+    .replace(/_+/g, "_")                  // Collapse adjacent underscores
+    .replace(/^_+|_+$/g, "");             // Remove leading/trailing underscores
+  // Return formatted name
+  return nameWithoutExt + extension;
+}
+
 const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesAccepted }) => {
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
@@ -52,7 +68,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesAccepted }) => {
       }
 
       const file = files[0];
-      const storagePath = `${user.id}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+      const sanitizedFilename = sanitizeFilename(file.name);
+      const storagePath = `${user.id}/${Date.now()}_${sanitizedFilename}`;
       let fileUrl = "";
       let uploadError = null;
       let docId: string | undefined = undefined;
