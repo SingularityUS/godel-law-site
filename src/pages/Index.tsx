@@ -13,6 +13,7 @@ export type UploadedFile = File & { preview?: string; extractedText?: string };
 
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import React from "react";
 
 const Index = () => {
   // Manage which module node is being edited
@@ -57,6 +58,17 @@ const Index = () => {
 
   const { user, signOut } = useAuth();
 
+  // This handler will be called when user wants to add a document input node to the pipeline
+  const handleAddDocumentNode = (file: UploadedFile) => {
+    // We will pass this to AIWorkbench for node creation via imperative prop
+    if (workbenchRef.current && typeof workbenchRef.current.addDocumentNode === "function") {
+      workbenchRef.current.addDocumentNode(file);
+    }
+  };
+
+  // Make an imperative ref to expose document node creation
+  const workbenchRef = React.useRef<any>(null);
+
   return (
     <div className="flex flex-col w-full min-h-screen bg-gradient-to-br from-blue-100 via-slate-50 to-white">
       <header className="flex justify-between items-center py-8 px-8 border-b bg-white/80">
@@ -81,16 +93,30 @@ const Index = () => {
       <div className="px-8 pt-6 w-full max-w-3xl mx-auto">
         <DocumentUpload onFilesAccepted={handleFilesAccepted} />
         {uploadedFiles.length > 0 && (
-          <div className="mt-5 bg-white border shadow rounded p-4">
-            <div className="mb-2 font-semibold text-gray-800 flex items-center gap-2">
-              <FilePreviewIcon file={uploadedFiles[0]} />
-              {uploadedFiles[0].name}
-              <span className="text-gray-500 text-xs ml-2">
-                ({Math.round(uploadedFiles[0].size / 1024)} KB)
-              </span>
-            </div>
-            <div className="text-xs text-gray-500">
-              File ready. (Preview & extraction coming soon)
+          <div>
+            <div className="mt-5 bg-white border shadow rounded p-4">
+              <div className="mb-3 font-semibold text-gray-800 text-sm">Uploaded Documents</div>
+              <div className="flex flex-wrap gap-3">
+                {uploadedFiles.map((file, idx) => (
+                  <div
+                    key={file.name + file.size + idx}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/lovable-document", JSON.stringify(file));
+                    }}
+                    onClick={() => handleAddDocumentNode(file)}
+                    className="flex items-center gap-2 border rounded-md px-3 py-2 bg-slate-50 hover:bg-slate-100 cursor-pointer shadow-sm select-none transition"
+                    title="Click to add to pipeline, or drag onto the flow"
+                    style={{ minWidth: 140 }}
+                  >
+                    <FilePreviewIcon file={file} />
+                    <span className="font-medium text-gray-700 truncate max-w-[80px]">{file.name}</span>
+                    <span className="text-xs text-gray-500 ml-1">
+                      ({Math.round(file.size / 1024)} KB)
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -100,8 +126,10 @@ const Index = () => {
         <ModulePalette onDragStart={handlePaletteDragStart} />
         <div className="h-6" />
         <AIWorkbench
+          ref={workbenchRef}
           onModuleEdit={handleModuleEdit}
           editingPromptNodeId={editingNodeId}
+          uploadedFiles={uploadedFiles}
         />
       </div>
 
@@ -124,7 +152,7 @@ const Index = () => {
       />
     </div>
   );
-};
+}
 
 // Helper file type icon
 function FilePreviewIcon({ file }: { file: File }) {

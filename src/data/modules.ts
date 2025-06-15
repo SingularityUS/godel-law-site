@@ -1,8 +1,8 @@
-
-import { ArrowDown, ArrowUp, Divide } from "lucide-react";
+import { ArrowDown, ArrowUp, Divide, BookOpen } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export type ModuleKind =
+  | "document-input" // NEW
   | "text-extractor"
   | "paragraph-splitter"
   | "grammar-checker"
@@ -21,6 +21,13 @@ export interface AIModuleDefinition {
 
 // For demonstration, use only supported lucide-react icons
 export const MODULE_DEFINITIONS: AIModuleDefinition[] = [
+  {
+    type: "document-input",
+    label: "Document Input",
+    color: "bg-slate-600",
+    icon: BookOpen, // We choose BookOpen as a doc symbol
+    defaultPrompt: "This node represents an uploaded document for processing in the pipeline.",
+  },
   {
     type: "text-extractor",
     label: "Text Extractor",

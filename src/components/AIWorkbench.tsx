@@ -26,6 +26,12 @@ interface HelperNodeData extends Record<string, unknown> {
 
 type HelperNode = Node<HelperNodeData>;
 
+type DocumentInputNodeData = {
+  moduleType: "document-input";
+  documentName: string;
+  file: any;
+};
+
 const getModuleDef = (type: ModuleKind) => MODULE_DEFINITIONS.find((m) => m.type === type)!;
 
 const initialNodes: HelperNode[] = [
@@ -77,24 +83,90 @@ const HelperNodeComponent = ({ data, selected }: { data: HelperNodeData; selecte
   );
 };
 
-const nodeTypes = {
-  helper: HelperNodeComponent,
+// Extend nodeTypes for document-input
+const DocumentInputNodeComponent = ({ data, selected }: { data: DocumentInputNodeData; selected?: boolean }) => {
+  return (
+    <div
+      className={`min-w-[140px] max-w-[220px] p-3 pr-4 rounded-md shadow-lg border-2 cursor-pointer bg-slate-100 ${
+        selected ? "ring-4 ring-blue-300 z-10" : "ring-0"
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        <BookOpen size={22} className="text-blue-800" />
+        <span className="font-semibold text-blue-900 truncate">{data.documentName}</span>
+      </div>
+      <div className="text-xs text-gray-700 mt-2">Document input</div>
+      <Handle type="source" position={Position.Right} className="w-2 h-4 bg-black/80" />
+    </div>
+  );
 };
 
+const nodeTypes = {
+  helper: HelperNodeComponent,
+  "document-input": DocumentInputNodeComponent,
+};
+
+// Props: add uploadedFiles (for document dropping) and expose addDocumentNode via ref
 interface AIWorkbenchProps {
   onModuleEdit: (nodeId: string, node: HelperNode) => void;
   editingPromptNodeId?: string;
+  uploadedFiles?: any[];
 }
+import React, { forwardRef, useImperativeHandle } from "react";
+import { BookOpen } from "lucide-react";
 
-const AIWorkbench = ({ onModuleEdit, editingPromptNodeId }: AIWorkbenchProps) => {
+const AIWorkbench = forwardRef(function AIWorkbench(
+  { onModuleEdit, editingPromptNodeId, uploadedFiles }: AIWorkbenchProps,
+  ref
+) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Module drag-and-drop from palette
+  // Add document node method
+  useImperativeHandle(ref, () => ({
+    addDocumentNode: (file: any) => {
+      // Position new doc nodes at a default pos if not dropped
+      const nodeId = `doc-${Date.now()}-${file.name}`;
+      const position = { x: 80, y: 420 + Math.random() * 100 };
+      const newNode = {
+        id: nodeId,
+        type: "document-input",
+        position,
+        data: { moduleType: "document-input", documentName: file.name, file },
+        draggable: true,
+      };
+      setNodes((nds) => nds.concat(newNode));
+    },
+  }));
+
+  // Drag-and-drop from palette or uploaded document
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
+      const docData = event.dataTransfer.getData("application/lovable-document");
+      if (docData) {
+        // File card dropped: create a document node, position accordingly
+        const file = JSON.parse(docData);
+        const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
+        const pos = reactFlowBounds
+          ? {
+              x: event.clientX - reactFlowBounds.left - 65,
+              y: event.clientY - reactFlowBounds.top - 30,
+            }
+          : { x: 80, y: 420 + Math.random() * 100 };
+        const nodeId = `doc-${Date.now()}-${file.name}`;
+        const newNode = {
+          id: nodeId,
+          type: "document-input",
+          position: pos,
+          data: { moduleType: "document-input", documentName: file.name, file },
+          draggable: true,
+        };
+        setNodes((nds) => nds.concat(newNode));
+        return;
+      }
+      // Otherwise, default: palette module drop
       const transfer = event.dataTransfer.getData("application/json");
       if (!transfer) return;
       const module: AIModuleDefinition = JSON.parse(transfer);
@@ -208,6 +280,6 @@ const AIWorkbench = ({ onModuleEdit, editingPromptNodeId }: AIWorkbenchProps) =>
       </ReactFlow>
     </div>
   );
-};
+});
 
 export default AIWorkbench;
