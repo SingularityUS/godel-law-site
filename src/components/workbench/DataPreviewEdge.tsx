@@ -101,7 +101,7 @@ const DataPreviewEdge: React.FC<DataPreviewEdgeProps> = ({
             }}
             onClick={handleEdgeClick}
           >
-            <div className="w-3 h-3 rounded-full border-2 border-blue-500 hover:border-blue-600 cursor-pointer shadow-sm" />
+            <div className="w-3 h-3 rounded-full border-2 border-gray-400 hover:border-black cursor-pointer shadow-sm" />
           </div>
         </EdgeLabelRenderer>
       )}
