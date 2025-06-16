@@ -18,9 +18,8 @@
  * 4. Navigation: Provides access to major application features
  * 
  * Component Relationships:
- * - AIWorkbench: Main workspace for creating AI workflows
- * - ModulePalette: Drag source for AI processing modules
- * - DocumentUpload: File upload interface for documents
+ * - AppHeader: Main navigation and user controls
+ * - MainWorkspace: Primary workspace with palette and workbench
  * - DocumentLibrary: Modal for browsing uploaded documents
  * - ModuleSettingsDrawer: Side panel for editing module configurations
  * 
@@ -33,15 +32,11 @@
  */
 
 import { useCallback, useState } from "react";
-import AIWorkbench from "@/components/AIWorkbench";
-import ModulePalette from "@/components/ModulePalette";
 import ModuleSettingsDrawer from "@/components/ModuleSettingsDrawer";
-import DocumentUpload from "@/components/DocumentUpload";
 import DocumentLibrary from "@/components/DocumentLibrary";
+import AppHeader from "@/components/layout/AppHeader";
+import MainWorkspace from "@/components/layout/MainWorkspace";
 import { MODULE_DEFINITIONS, ModuleKind } from "@/data/modules";
-import { BookOpen, FolderOpen } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
-import { Button } from "@/components/ui/button";
 import { useDocuments } from "@/hooks/useDocuments";
 import React from "react";
 
@@ -66,8 +61,7 @@ const Index = () => {
   // UI state - controls library modal visibility
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   
-  // External hooks for authentication and document management
-  const { user, signOut } = useAuth();
+  // External hooks for document management
   const { refetch } = useDocuments();
 
   /**
@@ -160,62 +154,20 @@ const Index = () => {
   return (
     <div className="flex flex-col w-full min-h-screen bg-white" style={{ fontFamily: 'Courier New, monospace' }}>
       {/* Application Header */}
-      <header className="flex justify-between items-center py-4 px-8 border-b-2 border-black bg-white">
-        {/* Application Branding */}
-        <div className="flex items-center gap-3">
-          <BookOpen size={32} className="text-black" />
-          <h1 className="text-2xl font-bold tracking-tight text-black">AI PRODUCTION LINE BUILDER</h1>
-        </div>
-        
-        {/* Document Management Controls */}
-        <div className="flex items-center gap-4">
-          <DocumentUpload 
-            onFilesAccepted={handleFilesAccepted} 
-            onUploadComplete={handleUploadComplete}
-          />
-          <button
-            onClick={() => setIsLibraryOpen(true)}
-            className="flex items-center gap-2 border-2 border-black bg-white hover:bg-gray-100 px-3 py-2 text-sm font-bold"
-          >
-            <FolderOpen size={16} />
-            LIBRARY
-          </button>
-        </div>
-
-        {/* User Authentication Section */}
-        <div className="flex items-center gap-4">
-          <div className="text-sm text-black font-bold">
-            {user?.email}
-          </div>
-          <Button 
-            size="sm" 
-            variant="outline" 
-            onClick={() => signOut()}
-            className="border-2 border-black font-bold"
-          >
-            LOG OUT
-          </Button>
-        </div>
-      </header>
+      <AppHeader 
+        onFilesAccepted={handleFilesAccepted}
+        onUploadComplete={handleUploadComplete}
+        onLibraryOpen={() => setIsLibraryOpen(true)}
+      />
 
       {/* Main Application Content */}
-      <div className="px-8 py-6 w-full" style={{maxWidth:1600, margin:"0 auto"}}>
-        {/* Module Palette Section */}
-        <div className="mb-4">
-          <div className="text-sm font-bold text-black mb-2 uppercase">Module Palette</div>
-          <ModulePalette onDragStart={handlePaletteDragStart} />
-        </div>
-        
-        {/* Main Workbench Section */}
-        <div className="border-t-2 border-black pt-4">
-          <AIWorkbench
-            ref={workbenchRef}
-            onModuleEdit={handleModuleEdit}
-            editingPromptNodeId={editingNodeId}
-            uploadedFiles={uploadedFiles}
-          />
-        </div>
-      </div>
+      <MainWorkspace 
+        onPaletteDragStart={handlePaletteDragStart}
+        onModuleEdit={handleModuleEdit}
+        editingPromptNodeId={editingNodeId}
+        uploadedFiles={uploadedFiles}
+        workbenchRef={workbenchRef}
+      />
 
       {/* Modal Components */}
       <DocumentLibrary
