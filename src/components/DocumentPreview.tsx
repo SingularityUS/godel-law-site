@@ -1,6 +1,6 @@
-
 import React, { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { X, FileText, Download } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -23,13 +23,15 @@ import mammoth from "mammoth";
  * - Loading states during content extraction
  * - Error handling for corrupted or unsupported files
  * - Download functionality for all file types
- * - Responsive design with proper scrolling
+ * - Responsive design with proper scrolling using ScrollArea component
+ * - Full scrolling support for multi-page documents
  * 
  * Integration:
  * - Used by AIWorkbench when document nodes are clicked
  * - Receives document data including file content and metadata
  * - Uses mammoth.js for DOCX to HTML conversion
  * - Integrates with toast system for user feedback
+ * - Uses ScrollArea for smooth, cross-browser scrolling experience
  */
 
 interface DocumentPreviewProps {
@@ -137,9 +139,9 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
+      <DialogContent className="max-w-4xl max-h-[90vh] p-0 flex flex-col">
         {/* Document Header with metadata and controls */}
-        <DialogHeader className="px-6 py-4 border-b bg-slate-50">
+        <DialogHeader className="px-6 py-4 border-b bg-slate-50 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <FileText className="h-5 w-5 text-blue-600" />
@@ -176,8 +178,8 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
           </div>
         </DialogHeader>
 
-        {/* Document Content Area */}
-        <div className="flex-1 overflow-hidden">
+        {/* Document Content Area with ScrollArea for proper scrolling */}
+        <div className="flex-1 min-h-0">
           {isLoading ? (
             // Loading state with spinner
             <div className="flex items-center justify-center h-96">
@@ -196,39 +198,41 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
               </div>
             </div>
           ) : (
-            // Document content with Word-like styling
-            <div className="h-full overflow-auto bg-gray-100">
-              <div className="max-w-4xl mx-auto py-8 px-4">
-                <div className="bg-white shadow-lg min-h-[11in] p-16 relative">
-                  <div 
-                    className="prose prose-sm max-w-none"
-                    style={{
-                      fontFamily: 'Calibri, "Segoe UI", Tahoma, Geneva, Verdana, sans-serif',
-                      fontSize: '11pt',
-                      lineHeight: '1.15',
-                      color: '#000000'
-                    }}
-                  >
-                    {document?.type === "text/plain" ? (
-                      // Plain text rendering with preserved formatting
-                      <pre 
-                        style={{ 
-                          whiteSpace: 'pre-wrap', 
-                          fontFamily: 'inherit',
-                          margin: 0,
-                          fontSize: 'inherit'
-                        }}
-                      >
-                        {content}
-                      </pre>
-                    ) : (
-                      // HTML content rendering (for DOCX and other formats)
-                      <div dangerouslySetInnerHTML={{ __html: content }} />
-                    )}
+            // Document content with ScrollArea for smooth scrolling
+            <ScrollArea className="h-full">
+              <div className="bg-gray-100 min-h-full">
+                <div className="max-w-4xl mx-auto py-8 px-4">
+                  <div className="bg-white shadow-lg p-16 relative">
+                    <div 
+                      className="prose prose-sm max-w-none"
+                      style={{
+                        fontFamily: 'Calibri, "Segoe UI", Tahoma, Geneva, Verdana, sans-serif',
+                        fontSize: '11pt',
+                        lineHeight: '1.15',
+                        color: '#000000'
+                      }}
+                    >
+                      {document?.type === "text/plain" ? (
+                        // Plain text rendering with preserved formatting
+                        <pre 
+                          style={{ 
+                            whiteSpace: 'pre-wrap', 
+                            fontFamily: 'inherit',
+                            margin: 0,
+                            fontSize: 'inherit'
+                          }}
+                        >
+                          {content}
+                        </pre>
+                      ) : (
+                        // HTML content rendering (for DOCX and other formats)
+                        <div dangerouslySetInnerHTML={{ __html: content }} />
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </ScrollArea>
           )}
         </div>
       </DialogContent>
