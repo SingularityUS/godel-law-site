@@ -6,6 +6,32 @@ import { X, FileText, Download } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import mammoth from "mammoth";
 
+/**
+ * DocumentPreview Component
+ * 
+ * Purpose: Provides a Word-like document viewing experience within the application
+ * This modal component displays document content in a familiar format, supporting
+ * multiple file types with appropriate rendering for each.
+ * 
+ * Supported File Types:
+ * - TXT: Plain text with preserved formatting
+ * - DOCX: Converted to HTML with basic styling preserved
+ * - PDF: Download prompt (preview not supported)
+ * 
+ * Features:
+ * - Word-like document styling and layout
+ * - Loading states during content extraction
+ * - Error handling for corrupted or unsupported files
+ * - Download functionality for all file types
+ * - Responsive design with proper scrolling
+ * 
+ * Integration:
+ * - Used by AIWorkbench when document nodes are clicked
+ * - Receives document data including file content and metadata
+ * - Uses mammoth.js for DOCX to HTML conversion
+ * - Integrates with toast system for user feedback
+ */
+
 interface DocumentPreviewProps {
   isOpen: boolean;
   onClose: () => void;
@@ -23,16 +49,28 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   onClose,
   document,
 }) => {
+  // Component state for content management
   const [content, setContent] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Effect to extract document content when modal opens
+   * Triggers content extraction based on file type
+   */
   useEffect(() => {
     if (isOpen && document) {
       extractDocumentContent();
     }
   }, [isOpen, document]);
 
+  /**
+   * Extracts and processes document content based on file type
+   * Handles different file formats with appropriate processing:
+   * - TXT: Direct text extraction
+   * - DOCX: HTML conversion using mammoth.js
+   * - PDF: Shows download message
+   */
   const extractDocumentContent = async () => {
     if (!document) return;
 
@@ -42,14 +80,14 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
     try {
       if (document.type === "text/plain") {
-        // Handle TXT files
+        // Handle TXT files - fetch and display as plain text
         if (document.preview) {
           const response = await fetch(document.preview);
           const text = await response.text();
           setContent(text);
         }
       } else if (document.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
-        // Handle DOCX files
+        // Handle DOCX files - convert to HTML using mammoth
         if (document.preview) {
           const response = await fetch(document.preview);
           const arrayBuffer = await response.arrayBuffer();
@@ -57,7 +95,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
           setContent(result.value);
         }
       } else if (document.type === "application/pdf") {
-        // For PDF files, show a message that they need to be downloaded
+        // PDF files - show download message (preview not supported)
         setContent(`
           <div style="text-align: center; padding: 2rem;">
             <p style="color: #666; font-size: 1.1rem;">PDF files cannot be previewed in this format.</p>
@@ -73,6 +111,10 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
     }
   };
 
+  /**
+   * Handles document download by creating a temporary link
+   * Triggers browser download for the document file
+   */
   const handleDownload = () => {
     if (document?.preview) {
       const link = window.document.createElement("a");
@@ -82,6 +124,11 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
     }
   };
 
+  /**
+   * Formats file size in human-readable format
+   * @param bytes - File size in bytes
+   * @returns Formatted file size string
+   */
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
@@ -91,7 +138,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
-        {/* Header */}
+        {/* Document Header with metadata and controls */}
         <DialogHeader className="px-6 py-4 border-b bg-slate-50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -129,9 +176,10 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
           </div>
         </DialogHeader>
 
-        {/* Content Area */}
+        {/* Document Content Area */}
         <div className="flex-1 overflow-hidden">
           {isLoading ? (
+            // Loading state with spinner
             <div className="flex items-center justify-center h-96">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
@@ -139,6 +187,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
               </div>
             </div>
           ) : error ? (
+            // Error state with user-friendly message
             <div className="flex items-center justify-center h-96">
               <div className="text-center">
                 <FileText className="h-16 w-16 text-red-400 mx-auto mb-4" />
@@ -147,11 +196,10 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
               </div>
             </div>
           ) : (
+            // Document content with Word-like styling
             <div className="h-full overflow-auto bg-gray-100">
-              {/* Word-like document container */}
               <div className="max-w-4xl mx-auto py-8 px-4">
                 <div className="bg-white shadow-lg min-h-[11in] p-16 relative">
-                  {/* Word-like content area */}
                   <div 
                     className="prose prose-sm max-w-none"
                     style={{
@@ -162,6 +210,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                     }}
                   >
                     {document?.type === "text/plain" ? (
+                      // Plain text rendering with preserved formatting
                       <pre 
                         style={{ 
                           whiteSpace: 'pre-wrap', 
@@ -173,6 +222,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                         {content}
                       </pre>
                     ) : (
+                      // HTML content rendering (for DOCX and other formats)
                       <div dangerouslySetInnerHTML={{ __html: content }} />
                     )}
                   </div>

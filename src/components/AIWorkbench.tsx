@@ -1,3 +1,5 @@
+
+import React, { forwardRef, useImperativeHandle, useRef, useCallback, useState } from "react";
 import {
   ReactFlow,
   MiniMap,
@@ -5,41 +7,47 @@ import {
   Controls,
   Node,
   Edge,
-  addEdge,
-  useNodesState,
-  useEdgesState,
-  Connection,
-  Handle,
-  Position,
 } from "@xyflow/react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { MODULE_DEFINITIONS, AIModuleDefinition, ModuleKind } from "@/data/modules";
-import { X } from "lucide-react";
+import { MODULE_DEFINITIONS, ModuleKind } from "@/data/modules";
+import DocumentPreview from "./DocumentPreview";
+import HelperNodeComponent, { HelperNode } from "./workbench/HelperNode";
+import DocumentInputNodeComponent, { DocumentInputNode } from "./workbench/DocumentInputNode";
+import { useWorkbenchEvents } from "@/hooks/useWorkbenchEvents";
+import { getModuleDef, getNodeAtScreenPosition } from "@/utils/nodeUtils";
 
 import "@xyflow/react/dist/style.css";
 
-// Add index signature for compatibility
-interface HelperNodeData extends Record<string, unknown> {
-  moduleType: ModuleKind;
-  promptOverride?: string;
-}
+/**
+ * AIWorkbench Component
+ * 
+ * Purpose: Main visual workflow editor for creating AI document processing pipelines
+ * This component provides a drag-and-drop interface where users can connect different
+ * AI modules (text extraction, grammar checking, etc.) to create complex workflows.
+ * 
+ * Key Features:
+ * - Visual node-based workflow editor using React Flow
+ * - Support for helper nodes (AI modules) and document input nodes
+ * - Drag and drop from module palette and uploaded documents
+ * - Document preview functionality
+ * - Node editing and deletion
+ * - Real-time visual feedback for user interactions
+ * 
+ * Architecture:
+ * - Uses custom node components (HelperNode, DocumentInputNode)
+ * - Leverages useWorkbenchEvents hook for complex event handling
+ * - Integrates with DocumentPreview for document viewing
+ * - Exposes imperative API for external document node creation
+ * 
+ * Integration Points:
+ * - Receives uploaded files from parent Index component
+ * - Communicates with PromptDrawer for module editing
+ * - Uses MODULE_DEFINITIONS for node styling and metadata
+ */
 
-type HelperNode = Node<HelperNodeData>;
-
-type DocumentInputNodeData = {
-  moduleType: "document-input";
-  documentName: string;
-  file: any;
-  isDragOver?: boolean;
-};
-
-type DocumentInputNode = Node<DocumentInputNodeData>;
-
-// Union type for all nodes
+// Union type for all supported node types
 type AllNodes = HelperNode | DocumentInputNode;
 
-const getModuleDef = (type: ModuleKind) => MODULE_DEFINITIONS.find((m) => m.type === type)!;
-
+// Default workflow configuration
 const initialNodes: HelperNode[] = [
   {
     id: "1",
@@ -66,150 +74,60 @@ const initialEdges: Edge[] = [
   { id: "e2-3", source: "2", target: "3", animated: true, type: "smoothstep", data: { label: "JSON" } },
 ];
 
-const HelperNodeComponent = ({ 
-  data, 
-  selected, 
-  id 
-}: { 
-  data: HelperNodeData; 
-  selected?: boolean;
-  id: string;
-}) => {
-  const module = getModuleDef(data.moduleType);
-  
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    // Get the setNodes function from the parent context
-    const event = new CustomEvent('deleteNode', { detail: { nodeId: id } });
-    window.dispatchEvent(event);
-  };
-
-  return (
-    <div
-      className={`min-w-[140px] max-w-[180px] p-3 pr-4 rounded-md shadow-lg border-2 cursor-pointer relative ${module.color} ${
-        selected ? "ring-4 ring-primary/80 z-10" : "ring-0"
-      }`}
-    >
-      {/* Delete button */}
-      <button
-        onClick={handleDelete}
-        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md z-20 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity"
-        style={{ opacity: selected ? 1 : undefined }}
-      >
-        <X size={12} />
-      </button>
-      
-      <div className="flex items-center gap-3">
-        <span className="text-white drop-shadow">
-          <module.icon size={26} />
-        </span>
-        <span className="font-semibold text-white">{module.label}</span>
-      </div>
-      <div className="text-xs text-white/95 mt-2 line-clamp-2 italic">
-        {data.promptOverride ? "Custom prompt" : "Default prompt"}
-      </div>
-      <Handle type="target" position={Position.Left} className="w-2 h-4 bg-black/80" />
-      <Handle type="source" position={Position.Right} className="w-2 h-4 bg-black/80" />
-    </div>
-  );
-};
-
-// Extend nodeTypes for document-input
-const DocumentInputNodeComponent = ({ 
-  data, 
-  selected,
-  id 
-}: { 
-  data: DocumentInputNodeData; 
-  selected?: boolean;
-  id: string;
-}) => {
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    // Get the setNodes function from the parent context
-    const event = new CustomEvent('deleteNode', { detail: { nodeId: id } });
-    window.dispatchEvent(event);
-  };
-
-  return (
-    <div
-      className={`min-w-[140px] max-w-[220px] p-3 pr-4 rounded-md shadow-lg border-2 cursor-pointer transition-all duration-200 relative group hover:shadow-xl ${
-        data.isDragOver 
-          ? "bg-blue-200 border-blue-400 ring-2 ring-blue-300" 
-          : "bg-slate-100 border-slate-300 hover:bg-slate-200"
-      } ${
-        selected ? "ring-4 ring-blue-300 z-10" : "ring-0"
-      }`}
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      }}
-      title="Click to preview document"
-    >
-      {/* Delete button */}
-      <button
-        onClick={handleDelete}
-        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md z-20 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity"
-        style={{ opacity: selected ? 1 : undefined }}
-      >
-        <X size={12} />
-      </button>
-
-      <div className="flex items-center gap-2">
-        <BookOpen size={22} className="text-blue-800" />
-        <span className="font-semibold text-blue-900 truncate">{data.documentName}</span>
-      </div>
-      <div className="text-xs text-gray-700 mt-2">
-        {data.isDragOver ? "Drop document here" : `Click to preview • ${data.documentName}`}
-      </div>
-      <Handle type="source" position={Position.Right} className="w-2 h-4 bg-black/80" />
-    </div>
-  );
-};
-
+// Register custom node types with React Flow
 const nodeTypes = {
   helper: HelperNodeComponent,
   "document-input": DocumentInputNodeComponent,
 };
 
-// Props: add uploadedFiles (for document dropping) and expose addDocumentNode via ref
 interface AIWorkbenchProps {
   onModuleEdit: (nodeId: string, node: HelperNode) => void;
   editingPromptNodeId?: string;
   uploadedFiles?: any[];
 }
-import React, { forwardRef, useImperativeHandle } from "react";
-import { BookOpen } from "lucide-react";
-import DocumentPreview from "./DocumentPreview";
 
-const AIWorkbench = forwardRef(function AIWorkbench(
-  { onModuleEdit, editingPromptNodeId, uploadedFiles }: AIWorkbenchProps,
+const AIWorkbench = forwardRef<any, AIWorkbenchProps>(function AIWorkbench(
+  { onModuleEdit, editingPromptNodeId, uploadedFiles },
   ref
 ) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const [nodes, setNodes, onNodesChange] = useNodesState<AllNodes>(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   
-  // Add document preview state
+  // Document preview state
   const [previewDocument, setPreviewDocument] = useState<any>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  // Handle node deletion
-  useEffect(() => {
-    const handleDeleteNode = (event: any) => {
-      const { nodeId } = event.detail;
-      setNodes((nds) => nds.filter((n) => n.id !== nodeId));
-      setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
-    };
+  /**
+   * Helper function to get node at coordinates using DOM elements
+   * This is used for drag-and-drop operations to find target nodes
+   */
+  const getNodeAtPosition = useCallback((x: number, y: number) => {
+    const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
+    return getNodeAtScreenPosition(nodes, x, y, reactFlowBounds);
+  }, []);
 
-    window.addEventListener('deleteNode', handleDeleteNode);
-    return () => window.removeEventListener('deleteNode', handleDeleteNode);
-  }, [setNodes, setEdges]);
+  // Initialize workbench event handling
+  const {
+    nodes,
+    edges,
+    setNodes,
+    onNodesChange,
+    onEdgesChange,
+    onDrop: handleDrop,
+    onDragOver,
+    onDragLeave: handleDragLeave,
+    onConnect
+  } = useWorkbenchEvents({
+    initialNodes,
+    initialEdges,
+    getNodeAtPosition
+  });
 
-  // Add document node method
+  /**
+   * Expose imperative API for adding document nodes from external sources
+   * This allows the parent component to programmatically add documents to the workflow
+   */
   useImperativeHandle(ref, () => ({
     addDocumentNode: (file: any) => {
-      // Position new doc nodes at a default pos if not dropped
       const nodeId = `doc-${Date.now()}-${file.name}`;
       const position = { x: 80, y: 420 + Math.random() * 100 };
       const newNode: DocumentInputNode = {
@@ -223,159 +141,36 @@ const AIWorkbench = forwardRef(function AIWorkbench(
     },
   }));
 
-  // Helper function to get node at coordinates using DOM elements
-  const getNodeAtPosition = useCallback((x: number, y: number) => {
-    const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
-    if (!reactFlowBounds) return null;
-    
-    // Convert screen coordinates to flow coordinates
-    const flowX = x - reactFlowBounds.left;
-    const flowY = y - reactFlowBounds.top;
-    
-    // Find node that contains this point (approximate check)
-    return nodes.find(node => {
-      const nodeWidth = 180; // approximate node width
-      const nodeHeight = 80; // approximate node height
-      return (
-        flowX >= node.position.x &&
-        flowX <= node.position.x + nodeWidth &&
-        flowY >= node.position.y &&
-        flowY <= node.position.y + nodeHeight
-      );
-    });
-  }, [nodes]);
-
-  // Clear drag over states
-  const clearDragOverStates = useCallback(() => {
-    setNodes((nds) =>
-      nds.map((node) => {
-        if (node.type === "document-input") {
-          return {
-            ...node,
-            data: { ...node.data, isDragOver: false }
-          };
-        }
-        return node;
-      })
-    );
-  }, [setNodes]);
-
-  // Drag-and-drop from palette or uploaded document
+  /**
+   * Wraps the drop handler to include container reference
+   */
   const onDrop = useCallback(
-    (event: React.DragEvent) => {
-      event.preventDefault();
-      clearDragOverStates();
-      
-      const docData = event.dataTransfer.getData("application/lovable-document");
-      if (docData) {
-        // File card dropped: check if dropped on existing document node
-        const fileData = JSON.parse(docData);
-        const targetNode = getNodeAtPosition(event.clientX, event.clientY);
-        
-        if (targetNode && targetNode.type === "document-input") {
-          // Update existing document input node
-          setNodes((nds) =>
-            nds.map((node) =>
-              node.id === targetNode.id
-                ? {
-                    ...node,
-                    data: {
-                      ...node.data,
-                      documentName: fileData.name,
-                      file: fileData,
-                      isDragOver: false
-                    }
-                  }
-                : node
-            )
-          );
-          return;
-        }
-        
-        // Otherwise create new node
-        const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
-        const pos = reactFlowBounds
-          ? {
-              x: event.clientX - reactFlowBounds.left - 65,
-              y: event.clientY - reactFlowBounds.top - 30,
-            }
-          : { x: 80, y: 420 + Math.random() * 100 };
-        const nodeId = `doc-${Date.now()}-${fileData.name}`;
-        const newNode: DocumentInputNode = {
-          id: nodeId,
-          type: "document-input",
-          position: pos,
-          data: { moduleType: "document-input" as const, documentName: fileData.name, file: fileData },
-          draggable: true,
-        };
-        setNodes((nds) => [...nds, newNode]);
-        return;
-      }
-      // Otherwise, default: palette module drop
-      const transfer = event.dataTransfer.getData("application/json");
-      if (!transfer) return;
-      const module: AIModuleDefinition = JSON.parse(transfer);
-      const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
-      const pos = reactFlowBounds
-        ? {
-            x: event.clientX - reactFlowBounds.left - 75,
-            y: event.clientY - reactFlowBounds.top - 30,
-          }
-        : { x: 100, y: 100 };
-      const nodeId = (Math.floor(Math.random() * 1e8)).toString();
-      const newNode: HelperNode = {
-        id: nodeId,
-        type: "helper",
-        position: pos,
-        data: { moduleType: module.type },
-      };
-      setNodes((nds) => [...nds, newNode]);
-    },
-    [setNodes, getNodeAtPosition, clearDragOverStates]
+    (event: React.DragEvent) => handleDrop(event, reactFlowWrapper),
+    [handleDrop]
   );
 
-  const onDragOver = useCallback((event: React.DragEvent) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "copy";
-    
-    // Check if dragging a document
-    const docData = event.dataTransfer.types.includes("application/lovable-document");
-    if (docData) {
-      const targetNode = getNodeAtPosition(event.clientX, event.clientY);
-      
-      // Update drag over states
-      setNodes((nds) =>
-        nds.map((node) => {
-          if (node.type === "document-input") {
-            const isDragOver = targetNode?.id === node.id;
-            return {
-              ...node,
-              data: { ...node.data, isDragOver }
-            };
-          }
-          return node;
-        })
-      );
-    }
-  }, [getNodeAtPosition, setNodes]);
+  /**
+   * Wraps the drag leave handler to include container reference
+   */
+  const onDragLeave = useCallback(
+    (event: React.DragEvent) => handleDragLeave(event, reactFlowWrapper),
+    [handleDragLeave]
+  );
 
-  const onDragLeave = useCallback((event: React.DragEvent) => {
-    // Only clear if leaving the entire flow area
-    if (!reactFlowWrapper.current?.contains(event.relatedTarget as HTMLElement)) {
-      clearDragOverStates();
-    }
-  }, [clearDragOverStates]);
-
-  // Handle node selection for editing prompts AND document preview
+  /**
+   * Handles node clicks for both editing and preview functionality
+   * - Helper nodes: Opens prompt editing drawer
+   * - Document nodes: Opens document preview modal
+   */
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
-      if (node.type === "helper" && (node as HelperNode).data && (node as HelperNode).data.moduleType) {
+      if (node.type === "helper" && (node as HelperNode).data?.moduleType) {
         // Handle helper nodes for editing
         onModuleEdit(node.id, node as HelperNode);
       } else if (node.type === "document-input") {
         // Handle document nodes for preview
         const docNode = node as DocumentInputNode;
-        if (docNode.data && docNode.data.file) {
+        if (docNode.data?.file) {
           setPreviewDocument({
             name: docNode.data.documentName,
             type: docNode.data.file.type,
@@ -390,56 +185,24 @@ const AIWorkbench = forwardRef(function AIWorkbench(
     [onModuleEdit]
   );
 
-  // Prompt management
-  const updatePromptOverride = useCallback(
-    (nodeId: string, promptOverride: string) => {
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.id === nodeId ? { ...n, data: { ...n.data, promptOverride } } : n
-        )
-      );
-    },
-    [setNodes]
-  );
-
-  // Edge creation and deletion
-  const onConnect = useCallback(
-    (connection: Connection) => {
-      // addEdge expects a real Edge. We'll append data for label on the new edge
-      setEdges((eds) =>
-        addEdge(
-          { ...connection, animated: true, type: "smoothstep", data: { label: "JSON" } },
-          eds
-        )
-      );
-    },
-    [setEdges]
-  );
-
-  // Delete key deletes selected nodes
-  useEffect(() => {
-    const handleDelete = (ev: KeyboardEvent) => {
-      if (ev.key === "Backspace" || ev.key === "Delete") {
-        setNodes((nds) => nds.filter((n) => !n.selected));
-        setEdges((eds) =>
-          eds.filter(
-            (edge) =>
-              !nodes.find((n) => n.selected && (n.id === edge.source || n.id === edge.target))
-          )
-        );
-      }
-    };
-    window.addEventListener("keydown", handleDelete);
-    return () => window.removeEventListener("keydown", handleDelete);
-  }, [setNodes, setEdges, nodes]);
-
-  // Reveal prompt drawer when node is being edited
-  const selectedNodeId =
-    editingPromptNodeId ?? nodes.find((n) => n.selected)?.id;
+  /**
+   * Determines node color for the minimap based on node type
+   */
+  const getNodeColor = (n: Node) => {
+    const nodeData = n.data as any;
+    if (nodeData.moduleType === "document-input") {
+      return "#e2e8f0"; // slate-200 for document nodes
+    }
+    return getModuleDef(nodeData.moduleType as ModuleKind).color.replace("bg-", "");
+  };
 
   return (
     <>
-      <div ref={reactFlowWrapper} className="w-full grow h-[650px] relative rounded-xl border bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* Main React Flow workspace */}
+      <div 
+        ref={reactFlowWrapper} 
+        className="w-full grow h-[650px] relative rounded-xl border bg-gradient-to-br from-slate-50 to-blue-50"
+      >
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -456,17 +219,17 @@ const AIWorkbench = forwardRef(function AIWorkbench(
           proOptions={{ hideAttribution: true }}
           defaultEdgeOptions={{ type: "smoothstep", animated: true, style: { stroke: "#333" } }}
         >
+          {/* Minimap for navigation */}
           <MiniMap 
-            nodeColor={(n) => {
-              const nodeData = n.data as HelperNodeData | DocumentInputNodeData;
-              if (nodeData.moduleType === "document-input") {
-                return "#e2e8f0"; // slate-200 for document nodes
-              }
-              return getModuleDef(nodeData.moduleType as ModuleKind).color.replace("bg-", "");
-            }}
-            pannable zoomable
+            nodeColor={getNodeColor}
+            pannable 
+            zoomable
           />
+          
+          {/* Flow controls (zoom, pan, etc.) */}
           <Controls />
+          
+          {/* Background grid pattern */}
           <Background gap={20} size={2} color="#cad2e3" />
         </ReactFlow>
       </div>
