@@ -1,7 +1,8 @@
+
 import React, { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { toast } from "@/components/ui/use-toast";
-import { Upload, FileInput } from "lucide-react";
+import { Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -9,6 +10,7 @@ type UploadedFile = File & { preview?: string; extractedText?: string };
 
 interface DocumentUploadProps {
   onFilesAccepted: (files: UploadedFile[]) => void;
+  onUploadComplete?: () => void;
 }
 
 const ACCEPTED_FILE_TYPES = {
@@ -17,23 +19,18 @@ const ACCEPTED_FILE_TYPES = {
   "text/plain": [],
 };
 
-// Function to sanitize filenames: remove or replace any problematic characters
 function sanitizeFilename(filename: string): string {
-  // Extract the extension
   const extensionMatch = filename.match(/\.([0-9a-z]+)(?:[\?#]|$)/i);
   const extension = extensionMatch ? '.' + extensionMatch[1] : '';
-  // Remove the extension from filename
   let nameWithoutExt = extension ? filename.slice(0, -extension.length) : filename;
-  // Replace unsafe characters (keep alphanumerics, dash, dot, underscore)
   nameWithoutExt = nameWithoutExt
-    .replace(/[^a-zA-Z0-9._-]/g, "_")    // Replace anything not safe with underscore
-    .replace(/_+/g, "_")                  // Collapse adjacent underscores
-    .replace(/^_+|_+$/g, "");             // Remove leading/trailing underscores
-  // Return formatted name
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
   return nameWithoutExt + extension;
 }
 
-const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesAccepted }) => {
+const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesAccepted, onUploadComplete }) => {
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
 
@@ -49,7 +46,6 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesAccepted }) => {
       }
       setIsLoading(true);
 
-      // Only accept PDF, DOCX, TXT
       const files = acceptedFiles.filter(
         (file) =>
           file.type === "application/pdf" ||
@@ -70,11 +66,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesAccepted }) => {
       const file = files[0];
       const sanitizedFilename = sanitizeFilename(file.name);
       const storagePath = `${user.id}/${Date.now()}_${sanitizedFilename}`;
-      let fileUrl = "";
-      let uploadError = null;
-      let docId: string | undefined = undefined;
 
-      // Upload file to Supabase Storage bucket
       const { data: uploadData, error: fileError } = await supabase
         .storage
         .from("documents")
@@ -90,9 +82,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesAccepted }) => {
         return;
       }
 
-      fileUrl = supabase.storage.from("documents").getPublicUrl(storagePath).data.publicUrl;
+      const fileUrl = supabase.storage.from("documents").getPublicUrl(storagePath).data.publicUrl;
 
-      // Insert metadata into documents table (include user_id)
       const { data: docRow, error: insertError } = await supabase
         .from("documents")
         .insert([
@@ -120,15 +111,16 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesAccepted }) => {
 
       const uploadedFile: UploadedFile = Object.assign(file, { preview: fileUrl });
       onFilesAccepted([uploadedFile]);
+      onUploadComplete?.();
 
       toast({
         title: "Upload successful",
-        description: "Your document has been uploaded.",
+        description: "Your document has been uploaded to the library.",
       });
 
       setIsLoading(false);
     },
-    [onFilesAccepted, user]
+    [onFilesAccepted, onUploadComplete, user]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -141,21 +133,18 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesAccepted }) => {
   return (
     <div
       {...getRootProps()}
-      className={`flex flex-col gap-3 items-center justify-center border-2 border-dashed rounded-lg bg-white shadow px-6 py-10 cursor-pointer transition-colors ${
-        isDragActive ? "border-blue-500 bg-blue-50" : "border-gray-300"
+      className={`border-2 border-black bg-white cursor-pointer transition-colors p-2 ${
+        isDragActive ? "bg-gray-100" : ""
       } ${isLoading ? "opacity-70 pointer-events-none" : ""}`}
+      style={{ fontFamily: 'Courier New, monospace' }}
       aria-label="File upload dropzone"
     >
       <input {...getInputProps()} />
-      <div className="flex flex-col items-center gap-2">
-        <Upload size={36} className="text-blue-500" />
-        <span className="font-medium text-gray-800">Drag & drop or click to upload</span>
-        <span className="text-xs text-gray-500">
-          PDF, DOCX, or TXT (max 1 file at a time)
+      <div className="flex items-center gap-2">
+        <Upload size={16} className="text-black" />
+        <span className="text-xs font-bold text-black">
+          {isLoading ? "UPLOADING..." : "DROP FILE OR CLICK"}
         </span>
-        {isLoading && (
-          <div className="text-xs text-blue-700 mt-2">Uploading and processing...</div>
-        )}
       </div>
     </div>
   );

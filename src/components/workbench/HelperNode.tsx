@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Handle, Position, Node } from "@xyflow/react";
 import { X, Settings } from "lucide-react";
 import { MODULE_DEFINITIONS, ModuleKind } from "@/data/modules";
@@ -51,24 +51,33 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
 }) => {
   const module = getModuleDef(data.moduleType);
   const { getModuleColor } = useModuleColors();
-  
-  // Use custom color if set, otherwise use default
-  const nodeColor = getModuleColor(id);
-  
-  /**
-   * Handles node deletion by dispatching a custom event
-   * This allows the parent AIWorkbench to handle the actual node removal
-   */
+  const [nodeColor, setNodeColor] = useState(getModuleColor(id));
+
+  // Listen for color change events and update local state
+  useEffect(() => {
+    const handleColorChange = (event: CustomEvent) => {
+      if (event.detail.nodeId === id) {
+        setNodeColor(event.detail.color);
+      }
+    };
+
+    window.addEventListener('moduleColorChanged', handleColorChange as EventListener);
+    return () => {
+      window.removeEventListener('moduleColorChanged', handleColorChange as EventListener);
+    };
+  }, [id]);
+
+  // Update color when getModuleColor result changes
+  useEffect(() => {
+    setNodeColor(getModuleColor(id));
+  }, [id, getModuleColor]);
+
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     const event = new CustomEvent('deleteNode', { detail: { nodeId: id } });
     window.dispatchEvent(event);
   };
 
-  /**
-   * Handles settings button click by dispatching a custom event
-   * This allows the parent to open the settings drawer
-   */
   const handleSettings = (e: React.MouseEvent) => {
     e.stopPropagation();
     const event = new CustomEvent('openNodeSettings', { detail: { nodeId: id } });
@@ -77,46 +86,55 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
 
   return (
     <div
-      className={`min-w-[140px] max-w-[180px] p-3 pr-4 rounded-md shadow-lg border-2 cursor-pointer relative group hover:shadow-xl ${nodeColor} ${
-        selected ? "ring-4 ring-primary/80 z-10" : "ring-0"
+      className={`w-32 h-24 border-2 border-black cursor-pointer relative group hover:shadow-lg ${nodeColor} ${
+        selected ? "ring-4 ring-black z-10" : "ring-0"
       }`}
+      style={{ fontFamily: 'Courier New, monospace' }}
     >
       {/* Action buttons - only visible on hover or when selected */}
       <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" style={{ opacity: selected ? 1 : undefined }}>
         <button
           onClick={handleSettings}
-          className="w-6 h-6 bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center justify-center shadow-md z-20"
+          className="w-5 h-5 bg-black text-white flex items-center justify-center text-xs z-20"
           aria-label="Module settings"
           title="Settings"
         >
-          <Settings size={12} />
+          ⚙
         </button>
         <button
           onClick={handleDelete}
-          className="w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md z-20"
+          className="w-5 h-5 bg-black text-white flex items-center justify-center text-xs z-20"
           aria-label="Delete helper node"
           title="Delete"
         >
-          <X size={12} />
+          ×
         </button>
       </div>
       
-      {/* Module icon and label */}
-      <div className="flex items-center gap-3">
-        <span className="text-white drop-shadow">
-          <module.icon size={26} />
+      {/* Module content */}
+      <div className="flex flex-col items-center justify-center h-full p-2">
+        <span className="text-white drop-shadow text-lg mb-1">
+          <module.icon size={20} />
         </span>
-        <span className="font-semibold text-white">{module.label}</span>
+        <span className="text-xs font-bold text-white text-center leading-tight">{module.label}</span>
       </div>
       
       {/* Prompt status indicator */}
-      <div className="text-xs text-white/95 mt-2 line-clamp-2 italic">
-        {data.promptOverride ? "Custom prompt" : "Default prompt"}
+      <div className="absolute bottom-1 left-1 text-xs text-white/90">
+        {data.promptOverride ? "●" : "○"}
       </div>
       
-      {/* React Flow handles for connecting to other nodes */}
-      <Handle type="target" position={Position.Left} className="w-2 h-4 bg-black/80" />
-      <Handle type="source" position={Position.Right} className="w-2 h-4 bg-black/80" />
+      {/* React Flow handles - square style */}
+      <Handle 
+        type="target" 
+        position={Position.Left} 
+        className="w-3 h-3 bg-black border-none rounded-none" 
+      />
+      <Handle 
+        type="source" 
+        position={Position.Right} 
+        className="w-3 h-3 bg-black border-none rounded-none" 
+      />
     </div>
   );
 };

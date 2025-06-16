@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Handle, Position, Node } from "@xyflow/react";
 import { BookOpen, X } from "lucide-react";
@@ -42,10 +41,6 @@ const DocumentInputNodeComponent: React.FC<DocumentInputNodeProps> = ({
   selected,
   id 
 }) => {
-  /**
-   * Handles node deletion by dispatching a custom event
-   * This allows the parent AIWorkbench to handle the actual node removal
-   */
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     const event = new CustomEvent('deleteNode', { detail: { nodeId: id } });
@@ -54,13 +49,14 @@ const DocumentInputNodeComponent: React.FC<DocumentInputNodeProps> = ({
 
   return (
     <div
-      className={`min-w-[140px] max-w-[220px] p-3 pr-4 rounded-md shadow-lg border-2 cursor-pointer transition-all duration-200 relative group hover:shadow-xl ${
+      className={`w-32 h-24 border-2 border-black cursor-pointer relative group hover:shadow-lg ${
         data.isDragOver 
-          ? "bg-blue-200 border-blue-400 ring-2 ring-blue-300" 
-          : "bg-slate-100 border-slate-300 hover:bg-slate-200"
+          ? "bg-gray-200 ring-2 ring-black" 
+          : "bg-white"
       } ${
-        selected ? "ring-4 ring-blue-300 z-10" : "ring-0"
+        selected ? "ring-4 ring-black z-10" : "ring-0"
       }`}
+      style={{ fontFamily: 'Courier New, monospace' }}
       onDragOver={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -70,26 +66,32 @@ const DocumentInputNodeComponent: React.FC<DocumentInputNodeProps> = ({
       {/* Delete button - only visible on hover or when selected */}
       <button
         onClick={handleDelete}
-        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md z-20 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity"
+        className="absolute -top-2 -right-2 w-5 h-5 bg-black text-white flex items-center justify-center text-xs z-20 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity"
         style={{ opacity: selected ? 1 : undefined }}
         aria-label="Delete document node"
       >
-        <X size={12} />
+        ×
       </button>
 
-      {/* Document icon and name */}
-      <div className="flex items-center gap-2">
-        <BookOpen size={22} className="text-blue-800" />
-        <span className="font-semibold text-blue-900 truncate">{data.documentName}</span>
+      {/* Document content */}
+      <div className="flex flex-col items-center justify-center h-full p-2">
+        <BookOpen size={20} className="text-black mb-1" />
+        <span className="text-xs font-bold text-black text-center leading-tight truncate w-full">
+          {data.documentName}
+        </span>
       </div>
       
-      {/* Status text */}
-      <div className="text-xs text-gray-700 mt-2">
-        {data.isDragOver ? "Drop document here" : `Click to preview • ${data.documentName}`}
+      {/* Status indicator */}
+      <div className="absolute bottom-1 left-1 text-xs text-black">
+        {data.isDragOver ? "●" : "○"}
       </div>
       
-      {/* React Flow handle for connecting to other nodes */}
-      <Handle type="source" position={Position.Right} className="w-2 h-4 bg-black/80" />
+      {/* React Flow handle - square style */}
+      <Handle 
+        type="source" 
+        position={Position.Right} 
+        className="w-3 h-3 bg-black border-none rounded-none" 
+      />
     </div>
   );
 };

@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ModuleKind } from '@/data/modules';
 
 export interface ModuleColorSettings {
@@ -17,6 +17,7 @@ const MODULE_COLORS_KEY = 'lovable-module-colors';
 export const useModuleColors = () => {
   const [moduleColors, setModuleColors] = useState<ModuleColorSettings>({});
   const [recentColors, setRecentColors] = useState<string[]>([]);
+  const [updateTrigger, setUpdateTrigger] = useState(0);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -32,36 +33,50 @@ export const useModuleColors = () => {
     }
   }, []);
 
-  const setModuleColor = (nodeId: string, color: string) => {
+  const forceUpdate = useCallback(() => {
+    setUpdateTrigger(prev => prev + 1);
+  }, []);
+
+  const setModuleColor = useCallback((nodeId: string, color: string) => {
     const newColors = { ...moduleColors, [nodeId]: color };
     setModuleColors(newColors);
     localStorage.setItem(MODULE_COLORS_KEY, JSON.stringify(newColors));
     
     // Add to recent colors
     addToRecentColors(color);
-  };
+    
+    // Force re-render of components using this hook
+    forceUpdate();
+    
+    // Also dispatch a custom event for components that need to update
+    window.dispatchEvent(new CustomEvent('moduleColorChanged', { 
+      detail: { nodeId, color } 
+    }));
+  }, [moduleColors, forceUpdate]);
 
-  const addToRecentColors = (color: string) => {
+  const addToRecentColors = useCallback((color: string) => {
     const newRecent = [color, ...recentColors.filter(c => c !== color)].slice(0, 8);
     setRecentColors(newRecent);
     localStorage.setItem(RECENT_COLORS_KEY, JSON.stringify(newRecent));
-  };
+  }, [recentColors]);
 
-  const getModuleColor = (nodeId: string): string => {
+  const getModuleColor = useCallback((nodeId: string): string => {
     return moduleColors[nodeId] || DEFAULT_COLOR;
-  };
+  }, [moduleColors, updateTrigger]);
 
-  const resetModuleColor = (nodeId: string) => {
+  const resetModuleColor = useCallback((nodeId: string) => {
     const newColors = { ...moduleColors };
     delete newColors[nodeId];
     setModuleColors(newColors);
     localStorage.setItem(MODULE_COLORS_KEY, JSON.stringify(newColors));
-  };
+    forceUpdate();
+  }, [moduleColors, forceUpdate]);
 
-  const resetAllColors = () => {
+  const resetAllColors = useCallback(() => {
     setModuleColors({});
     localStorage.removeItem(MODULE_COLORS_KEY);
-  };
+    forceUpdate();
+  }, [forceUpdate]);
 
   return {
     getModuleColor,
