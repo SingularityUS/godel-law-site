@@ -28,6 +28,8 @@
 import { Node, Edge } from "@xyflow/react";
 import { HelperNode } from "../HelperNode";
 import { DocumentInputNode } from "../DocumentInputNode";
+import HelperNodeComponent from "../HelperNode";
+import DocumentInputNodeComponent from "../DocumentInputNode";
 
 // Union type for all supported node types
 export type AllNodes = HelperNode | DocumentInputNode;
@@ -61,8 +63,8 @@ export const initialEdges: Edge[] = [
 
 // Register custom node types with React Flow
 export const nodeTypes = {
-  helper: require("../HelperNode").default,
-  "document-input": require("../DocumentInputNode").default,
+  helper: HelperNodeComponent,
+  "document-input": DocumentInputNodeComponent,
 };
 
 // Default edge configuration
