@@ -1,3 +1,4 @@
+
 import { useCallback, useState } from "react";
 import AIWorkbench from "@/components/AIWorkbench";
 import ModulePalette from "@/components/ModulePalette";
@@ -102,7 +103,15 @@ const Index = () => {
                     key={file.name + file.size + idx}
                     draggable
                     onDragStart={(e) => {
-                      e.dataTransfer.setData("application/lovable-document", JSON.stringify(file));
+                      // Serialize only the essential file properties to avoid File object serialization issues
+                      const fileData = {
+                        name: file.name,
+                        size: file.size,
+                        type: file.type,
+                        lastModified: file.lastModified,
+                        preview: file.preview
+                      };
+                      e.dataTransfer.setData("application/lovable-document", JSON.stringify(fileData));
                     }}
                     onClick={() => handleAddDocumentNode(file)}
                     className="flex items-center gap-2 border rounded-md px-3 py-2 bg-slate-50 hover:bg-slate-100 cursor-pointer shadow-sm select-none transition"

@@ -1,4 +1,5 @@
 
+
 import {
   ReactFlow,
   MiniMap,
@@ -264,7 +265,7 @@ const AIWorkbench = forwardRef(function AIWorkbench(
       const docData = event.dataTransfer.getData("application/lovable-document");
       if (docData) {
         // File card dropped: check if dropped on existing document node
-        const file = JSON.parse(docData);
+        const fileData = JSON.parse(docData);
         const targetNode = getNodeAtPosition(event.clientX, event.clientY);
         
         if (targetNode && targetNode.type === "document-input") {
@@ -276,8 +277,8 @@ const AIWorkbench = forwardRef(function AIWorkbench(
                     ...node,
                     data: {
                       ...node.data,
-                      documentName: file.name,
-                      file: file,
+                      documentName: fileData.name,
+                      file: fileData,
                       isDragOver: false
                     }
                   }
@@ -295,12 +296,12 @@ const AIWorkbench = forwardRef(function AIWorkbench(
               y: event.clientY - reactFlowBounds.top - 30,
             }
           : { x: 80, y: 420 + Math.random() * 100 };
-        const nodeId = `doc-${Date.now()}-${file.name}`;
+        const nodeId = `doc-${Date.now()}-${fileData.name}`;
         const newNode: DocumentInputNode = {
           id: nodeId,
           type: "document-input",
           position: pos,
-          data: { moduleType: "document-input" as const, documentName: file.name, file },
+          data: { moduleType: "document-input" as const, documentName: fileData.name, file: fileData },
           draggable: true,
         };
         setNodes((nds) => [...nds, newNode]);
