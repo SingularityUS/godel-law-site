@@ -17,6 +17,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
 }) => {
   const { documents, loading, deleteDocument, refetch } = useDocuments();
   const [searchTerm, setSearchTerm] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
 
   const filteredDocuments = documents.filter(doc =>
     doc.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -55,6 +56,9 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   };
 
   const handleDragStart = (e: React.DragEvent, document: any) => {
+    console.log('Drag started for document:', document.name);
+    setIsDragging(true);
+    
     // Convert stored document to the format expected by the workbench
     const file = {
       name: document.name,
@@ -67,13 +71,52 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     // Set the drag data in the same format as the workbench expects
     e.dataTransfer.setData("application/lovable-document", JSON.stringify(file));
     e.dataTransfer.effectAllowed = "copy";
+    
+    console.log('Drag data set:', file);
+  };
+
+  const handleDragEnd = () => {
+    console.log('Drag ended');
+    setIsDragging(false);
+  };
+
+  const handleModalDragOver = (e: React.DragEvent) => {
+    // Prevent default to allow drop
+    e.preventDefault();
+  };
+
+  const handleModalDrop = (e: React.DragEvent) => {
+    // Prevent the modal from handling the drop - let it bubble to the workspace
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('Drop prevented on modal, allowing bubble to workspace');
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-      <div className="bg-white border-2 border-black w-96 max-h-96 flex flex-col font-mono">
+    <div 
+      className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-300 ${
+        isDragging ? 'bg-black bg-opacity-20' : 'bg-black bg-opacity-50'
+      }`}
+      style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
+      onDragOver={handleModalDragOver}
+      onDrop={handleModalDrop}
+    >
+      {/* Workspace highlight overlay - shows through when dragging */}
+      {isDragging && (
+        <div 
+          className="absolute inset-0 bg-blue-100 bg-opacity-30 border-4 border-dashed border-blue-400 animate-pulse"
+          style={{ pointerEvents: 'none' }}
+        />
+      )}
+      
+      <div 
+        className={`bg-white border-2 border-black w-96 max-h-96 flex flex-col font-mono transition-all duration-300 ${
+          isDragging ? 'opacity-40 scale-95' : 'opacity-100 scale-100'
+        }`}
+        style={{ pointerEvents: 'auto' }}
+      >
         <div className="border-b-2 border-black p-3 flex items-center justify-between">
           <h2 className="text-lg font-bold">DOCUMENT LIBRARY</h2>
           <button onClick={onClose} className="hover:bg-gray-100 p-1">
@@ -108,8 +151,9 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                   key={doc.id}
                   draggable
                   onDragStart={(e) => handleDragStart(e, doc)}
+                  onDragEnd={handleDragEnd}
                   onClick={() => handleDocumentClick(doc)}
-                  className="flex items-center justify-between p-2 border border-black mb-2 cursor-grab hover:bg-gray-100 group active:cursor-grabbing"
+                  className="flex items-center justify-between p-2 border border-black mb-2 cursor-grab hover:bg-gray-100 group active:cursor-grabbing transition-colors"
                   title="Click to add to workspace or drag to position"
                 >
                   <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -132,6 +176,13 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
             </div>
           )}
         </div>
+
+        {/* Drop instruction when dragging */}
+        {isDragging && (
+          <div className="border-t-2 border-black p-2 bg-blue-50 text-center text-sm font-bold text-blue-800">
+            DRAG TO WORKSPACE TO ADD DOCUMENT
+          </div>
+        )}
       </div>
     </div>
   );

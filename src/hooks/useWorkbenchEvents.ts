@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect } from "react";
 import { useNodesState, useEdgesState, addEdge, Connection, Node, Edge } from "@xyflow/react";
 
@@ -75,22 +74,23 @@ export const useWorkbenchEvents = ({
     );
   }, [setNodes]);
 
-  /**
-   * Handles drop events for both module palette items and document files
-   * Supports creating new nodes or updating existing document nodes
-   */
   const onDrop = useCallback(
     (event: React.DragEvent, reactFlowWrapper: React.RefObject<HTMLDivElement>) => {
       event.preventDefault();
+      console.log('Drop event received in workbench');
       clearDragOverStates();
       
       // Handle document file drops
       const docData = event.dataTransfer.getData("application/lovable-document");
       if (docData) {
+        console.log('Document data found:', docData);
         const fileData = JSON.parse(docData);
+        console.log('Parsed file data:', fileData);
+        
         const targetNode = getNodeAtPosition(event.clientX, event.clientY);
         
         if (targetNode && targetNode.type === "document-input") {
+          console.log('Updating existing document node:', targetNode.id);
           // Update existing document input node
           setNodes((nds) =>
             nds.map((node) =>
@@ -112,12 +112,17 @@ export const useWorkbenchEvents = ({
         
         // Create new document input node
         const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
+        console.log('React Flow bounds:', reactFlowBounds);
+        console.log('Drop position:', { x: event.clientX, y: event.clientY });
+        
         const pos = reactFlowBounds
           ? {
               x: event.clientX - reactFlowBounds.left - 65,
               y: event.clientY - reactFlowBounds.top - 30,
             }
           : { x: 80, y: 420 + Math.random() * 100 };
+        
+        console.log('Calculated position:', pos);
         
         const nodeId = `doc-${Date.now()}-${fileData.name}`;
         const newNode = {
@@ -127,13 +132,18 @@ export const useWorkbenchEvents = ({
           data: { moduleType: "document-input" as const, documentName: fileData.name, file: fileData },
           draggable: true,
         };
+        
+        console.log('Creating new document node:', newNode);
         setNodes((nds) => [...nds, newNode]);
         return;
       }
       
       // Handle module palette drops
       const transfer = event.dataTransfer.getData("application/json");
-      if (!transfer) return;
+      if (!transfer) {
+        console.log('No transfer data found');
+        return;
+      }
       
       const module = JSON.parse(transfer);
       const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
@@ -156,10 +166,6 @@ export const useWorkbenchEvents = ({
     [setNodes, getNodeAtPosition, clearDragOverStates]
   );
 
-  /**
-   * Handles drag over events to provide visual feedback
-   * Updates document nodes to show drop zones when dragging documents
-   */
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
@@ -183,18 +189,12 @@ export const useWorkbenchEvents = ({
     }
   }, [getNodeAtPosition, setNodes]);
 
-  /**
-   * Handles drag leave events to clean up visual feedback
-   */
   const onDragLeave = useCallback((event: React.DragEvent, reactFlowWrapper: React.RefObject<HTMLDivElement>) => {
     if (!reactFlowWrapper.current?.contains(event.relatedTarget as HTMLElement)) {
       clearDragOverStates();
     }
   }, [clearDragOverStates]);
 
-  /**
-   * Handles edge creation between nodes
-   */
   const onConnect = useCallback(
     (connection: Connection) => {
       setEdges((eds) =>
@@ -207,9 +207,6 @@ export const useWorkbenchEvents = ({
     [setEdges]
   );
 
-  /**
-   * Handles keyboard deletion of selected nodes
-   */
   useEffect(() => {
     const handleDelete = (ev: KeyboardEvent) => {
       if (ev.key === "Backspace" || ev.key === "Delete") {
