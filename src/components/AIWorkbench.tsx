@@ -1,5 +1,5 @@
 
-import React, { forwardRef, useImperativeHandle, useRef, useCallback, useState } from "react";
+import React, { forwardRef, useImperativeHandle, useRef, useCallback, useState, useEffect } from "react";
 import {
   ReactFlow,
   MiniMap,
@@ -14,6 +14,7 @@ import HelperNodeComponent, { HelperNode } from "./workbench/HelperNode";
 import DocumentInputNodeComponent, { DocumentInputNode } from "./workbench/DocumentInputNode";
 import { useWorkbenchEvents } from "@/hooks/useWorkbenchEvents";
 import { getModuleDef, getNodeAtScreenPosition } from "@/utils/nodeUtils";
+import { useModuleColors } from "@/hooks/useModuleColors";
 
 import "@xyflow/react/dist/style.css";
 
@@ -40,7 +41,7 @@ import "@xyflow/react/dist/style.css";
  * 
  * Integration Points:
  * - Receives uploaded files from parent Index component
- * - Communicates with PromptDrawer for module editing
+ * - Communicates with ModuleSettingsDrawer for module editing
  * - Uses MODULE_DEFINITIONS for node styling and metadata
  */
 
@@ -91,6 +92,7 @@ const AIWorkbench = forwardRef<any, AIWorkbenchProps>(function AIWorkbench(
   ref
 ) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const { getModuleColor } = useModuleColors();
   
   // Document preview state
   const [previewDocument, setPreviewDocument] = useState<any>(null);
@@ -121,6 +123,22 @@ const AIWorkbench = forwardRef<any, AIWorkbenchProps>(function AIWorkbench(
     initialEdges,
     getNodeAtPosition
   });
+
+  /**
+   * Listen for settings button clicks from HelperNode components
+   */
+  useEffect(() => {
+    const handleOpenNodeSettings = (event: any) => {
+      const { nodeId } = event.detail;
+      const node = nodes.find(n => n.id === nodeId) as HelperNode;
+      if (node) {
+        onModuleEdit(nodeId, node);
+      }
+    };
+
+    window.addEventListener('openNodeSettings', handleOpenNodeSettings);
+    return () => window.removeEventListener('openNodeSettings', handleOpenNodeSettings);
+  }, [nodes, onModuleEdit]);
 
   /**
    * Expose imperative API for adding document nodes from external sources
@@ -159,15 +177,12 @@ const AIWorkbench = forwardRef<any, AIWorkbenchProps>(function AIWorkbench(
 
   /**
    * Handles node clicks for both editing and preview functionality
-   * - Helper nodes: Opens prompt editing drawer
+   * - Helper nodes: Opens prompt editing drawer via settings button
    * - Document nodes: Opens document preview modal
    */
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
-      if (node.type === "helper" && (node as HelperNode).data?.moduleType) {
-        // Handle helper nodes for editing
-        onModuleEdit(node.id, node as HelperNode);
-      } else if (node.type === "document-input") {
+      if (node.type === "document-input") {
         // Handle document nodes for preview
         const docNode = node as DocumentInputNode;
         if (docNode.data?.file) {
@@ -181,19 +196,37 @@ const AIWorkbench = forwardRef<any, AIWorkbenchProps>(function AIWorkbench(
           setIsPreviewOpen(true);
         }
       }
+      // Note: Helper node editing is now handled via settings button clicks
     },
-    [onModuleEdit]
+    []
   );
 
   /**
-   * Determines node color for the minimap based on node type
+   * Determines node color for the minimap based on node type and custom colors
    */
   const getNodeColor = (n: Node) => {
     const nodeData = n.data as any;
     if (nodeData.moduleType === "document-input") {
       return "#e2e8f0"; // slate-200 for document nodes
     }
-    return getModuleDef(nodeData.moduleType as ModuleKind).color.replace("bg-", "");
+    
+    // Use custom color if available, otherwise use default
+    const customColor = getModuleColor(n.id);
+    const colorClass = customColor.replace("bg-", "");
+    
+    // Convert Tailwind class to hex for minimap
+    const colorMap: { [key: string]: string } = {
+      'slate-600': '#475569',
+      'gray-600': '#4b5563',
+      'red-500': '#ef4444',
+      'blue-500': '#3b82f6',
+      'green-500': '#22c55e',
+      'purple-500': '#a855f7',
+      'orange-500': '#f97316',
+      'yellow-500': '#eab308'
+    };
+    
+    return colorMap[colorClass] || '#475569';
   };
 
   return (

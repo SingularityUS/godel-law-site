@@ -1,8 +1,9 @@
 
 import React from "react";
 import { Handle, Position, Node } from "@xyflow/react";
-import { X } from "lucide-react";
+import { X, Settings } from "lucide-react";
 import { MODULE_DEFINITIONS, ModuleKind } from "@/data/modules";
+import { useModuleColors } from "@/hooks/useModuleColors";
 
 /**
  * HelperNode Component
@@ -13,9 +14,9 @@ import { MODULE_DEFINITIONS, ModuleKind } from "@/data/modules";
  * 
  * Features:
  * - Displays module icon, name, and prompt status
- * - Color-coded based on module type
+ * - Color-coded based on module type or custom user colors
  * - Handles selection states for prompt editing
- * - Includes delete functionality
+ * - Includes delete functionality and settings access
  * 
  * Integration:
  * - Used by AIWorkbench as a custom node type
@@ -49,6 +50,10 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
   id 
 }) => {
   const module = getModuleDef(data.moduleType);
+  const { getModuleColor } = useModuleColors();
+  
+  // Use custom color if set, otherwise use default
+  const nodeColor = getModuleColor(id);
   
   /**
    * Handles node deletion by dispatching a custom event
@@ -60,21 +65,41 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
     window.dispatchEvent(event);
   };
 
+  /**
+   * Handles settings button click by dispatching a custom event
+   * This allows the parent to open the settings drawer
+   */
+  const handleSettings = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const event = new CustomEvent('openNodeSettings', { detail: { nodeId: id } });
+    window.dispatchEvent(event);
+  };
+
   return (
     <div
-      className={`min-w-[140px] max-w-[180px] p-3 pr-4 rounded-md shadow-lg border-2 cursor-pointer relative ${module.color} ${
+      className={`min-w-[140px] max-w-[180px] p-3 pr-4 rounded-md shadow-lg border-2 cursor-pointer relative group hover:shadow-xl ${nodeColor} ${
         selected ? "ring-4 ring-primary/80 z-10" : "ring-0"
       }`}
     >
-      {/* Delete button - only visible on hover or when selected */}
-      <button
-        onClick={handleDelete}
-        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md z-20 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity"
-        style={{ opacity: selected ? 1 : undefined }}
-        aria-label="Delete helper node"
-      >
-        <X size={12} />
-      </button>
+      {/* Action buttons - only visible on hover or when selected */}
+      <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" style={{ opacity: selected ? 1 : undefined }}>
+        <button
+          onClick={handleSettings}
+          className="w-6 h-6 bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center justify-center shadow-md z-20"
+          aria-label="Module settings"
+          title="Settings"
+        >
+          <Settings size={12} />
+        </button>
+        <button
+          onClick={handleDelete}
+          className="w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md z-20"
+          aria-label="Delete helper node"
+          title="Delete"
+        >
+          <X size={12} />
+        </button>
+      </div>
       
       {/* Module icon and label */}
       <div className="flex items-center gap-3">

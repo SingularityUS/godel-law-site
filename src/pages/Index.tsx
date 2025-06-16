@@ -2,7 +2,7 @@
 import { useCallback, useState } from "react";
 import AIWorkbench from "@/components/AIWorkbench";
 import ModulePalette from "@/components/ModulePalette";
-import PromptDrawer from "@/components/PromptDrawer";
+import ModuleSettingsDrawer from "@/components/ModuleSettingsDrawer";
 import DocumentUpload from "@/components/DocumentUpload";
 import { MODULE_DEFINITIONS, ModuleKind } from "@/data/modules";
 import { BookOpen } from "lucide-react";
@@ -142,12 +142,13 @@ const Index = () => {
         />
       </div>
 
-      <PromptDrawer
+      <ModuleSettingsDrawer
         open={drawerOpen}
         onClose={() => {
           setEditingNode(undefined);
           setEditingNodeId(undefined);
         }}
+        nodeId={editingNodeId || ""}
         moduleLabel={drawerModuleDef?.label ?? ""}
         moduleIcon={drawerModuleDef ? <drawerModuleDef.icon size={24} /> : null}
         systemPrompt={drawerModuleDef?.defaultPrompt ?? ""}
