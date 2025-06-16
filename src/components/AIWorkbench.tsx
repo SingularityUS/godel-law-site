@@ -1,4 +1,3 @@
-
 import {
   ReactFlow,
   MiniMap,
@@ -10,7 +9,6 @@ import {
   useNodesState,
   useEdgesState,
   Connection,
-  useReactFlow,
   Handle,
   Position,
 } from "@xyflow/react";
@@ -139,7 +137,6 @@ const AIWorkbench = forwardRef(function AIWorkbench(
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<AllNodes>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const { getIntersectingNodes } = useReactFlow();
 
   // Add document node method
   useImperativeHandle(ref, () => ({
@@ -158,7 +155,7 @@ const AIWorkbench = forwardRef(function AIWorkbench(
     },
   }));
 
-  // Helper function to get node at coordinates
+  // Helper function to get node at coordinates using DOM elements
   const getNodeAtPosition = useCallback((x: number, y: number) => {
     const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
     if (!reactFlowBounds) return null;
