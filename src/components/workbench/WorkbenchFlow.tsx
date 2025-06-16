@@ -1,4 +1,3 @@
-
 import React, { forwardRef, useCallback, useMemo } from "react";
 import { ReactFlow } from "@xyflow/react";
 import { useWorkbenchEvents } from "@/hooks/useWorkbenchEvents";
@@ -115,6 +114,13 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
   }, [hideAllPreviews]);
 
   /**
+   * Handle closing specific edge preview
+   */
+  const handleClosePreview = useCallback((edgeId: string) => {
+    hideAllPreviews();
+  }, [hideAllPreviews]);
+
+  /**
    * Enhance edges with data preview functionality and selection state
    */
   const enhancedEdges = useMemo(() => {
@@ -125,10 +131,11 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
         edgeData: getEdgeData(edge.id),
         onSimulateProcessing: () => simulateProcessing(edge.id),
         isSelected: isEdgeSelected(edge.id),
-        onEdgeClick: toggleEdgePreview
+        onEdgeClick: toggleEdgePreview,
+        onClosePreview: handleClosePreview
       }
     }));
-  }, [edges, getEdgeData, simulateProcessing, isEdgeSelected, toggleEdgePreview]);
+  }, [edges, getEdgeData, simulateProcessing, isEdgeSelected, toggleEdgePreview, handleClosePreview]);
 
   /**
    * Wraps the drop handler to include container reference
