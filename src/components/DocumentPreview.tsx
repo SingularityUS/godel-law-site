@@ -43,7 +43,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] p-0 flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[90vh] p-0 flex flex-col [&>button]:hidden">
         <DocumentHeader document={document} onClose={onClose} />
         
         <div className="flex-1 min-h-0">
