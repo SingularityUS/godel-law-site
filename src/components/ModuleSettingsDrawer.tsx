@@ -66,18 +66,11 @@ const ModuleSettingsDrawer: React.FC<ModuleSettingsDrawerProps> = ({
             <Label className="text-sm font-bold text-black uppercase">Module Color</Label>
             <div className="space-y-3">
               <ColorPicker
-                color={currentColor}
-                onChange={handleColorChange}
+                currentColor={currentColor}
+                onColorChange={handleColorChange}
+                onReset={handleResetColor}
                 recentColors={recentColors}
               />
-              <Button
-                onClick={handleResetColor}
-                variant="outline"
-                size="sm"
-                className="w-full border-2 border-black font-bold text-xs"
-              >
-                RESET TO DEFAULT
-              </Button>
             </div>
           </div>
 
