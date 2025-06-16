@@ -1,3 +1,4 @@
+
 import {
   ReactFlow,
   MiniMap,
@@ -14,6 +15,7 @@ import {
 } from "@xyflow/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MODULE_DEFINITIONS, AIModuleDefinition, ModuleKind } from "@/data/modules";
+import { X } from "lucide-react";
 
 import "@xyflow/react/dist/style.css";
 
@@ -65,14 +67,39 @@ const initialEdges: Edge[] = [
   { id: "e2-3", source: "2", target: "3", animated: true, type: "smoothstep", data: { label: "JSON" } },
 ];
 
-const HelperNodeComponent = ({ data, selected }: { data: HelperNodeData; selected?: boolean }) => {
+const HelperNodeComponent = ({ 
+  data, 
+  selected, 
+  id 
+}: { 
+  data: HelperNodeData; 
+  selected?: boolean;
+  id: string;
+}) => {
   const module = getModuleDef(data.moduleType);
+  
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Get the setNodes function from the parent context
+    const event = new CustomEvent('deleteNode', { detail: { nodeId: id } });
+    window.dispatchEvent(event);
+  };
+
   return (
     <div
-      className={`min-w-[140px] max-w-[180px] p-3 pr-4 rounded-md shadow-lg border-2 cursor-pointer ${module.color} ${
+      className={`min-w-[140px] max-w-[180px] p-3 pr-4 rounded-md shadow-lg border-2 cursor-pointer relative ${module.color} ${
         selected ? "ring-4 ring-primary/80 z-10" : "ring-0"
       }`}
     >
+      {/* Delete button */}
+      <button
+        onClick={handleDelete}
+        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md z-20 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity"
+        style={{ opacity: selected ? 1 : undefined }}
+      >
+        <X size={12} />
+      </button>
+      
       <div className="flex items-center gap-3">
         <span className="text-white drop-shadow">
           <module.icon size={26} />
@@ -89,10 +116,25 @@ const HelperNodeComponent = ({ data, selected }: { data: HelperNodeData; selecte
 };
 
 // Extend nodeTypes for document-input
-const DocumentInputNodeComponent = ({ data, selected }: { data: DocumentInputNodeData; selected?: boolean }) => {
+const DocumentInputNodeComponent = ({ 
+  data, 
+  selected,
+  id 
+}: { 
+  data: DocumentInputNodeData; 
+  selected?: boolean;
+  id: string;
+}) => {
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Get the setNodes function from the parent context
+    const event = new CustomEvent('deleteNode', { detail: { nodeId: id } });
+    window.dispatchEvent(event);
+  };
+
   return (
     <div
-      className={`min-w-[140px] max-w-[220px] p-3 pr-4 rounded-md shadow-lg border-2 cursor-pointer transition-all duration-200 ${
+      className={`min-w-[140px] max-w-[220px] p-3 pr-4 rounded-md shadow-lg border-2 cursor-pointer transition-all duration-200 relative group ${
         data.isDragOver 
           ? "bg-blue-200 border-blue-400 ring-2 ring-blue-300" 
           : "bg-slate-100 border-slate-300"
@@ -104,12 +146,21 @@ const DocumentInputNodeComponent = ({ data, selected }: { data: DocumentInputNod
         e.stopPropagation();
       }}
     >
+      {/* Delete button */}
+      <button
+        onClick={handleDelete}
+        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md z-20 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity"
+        style={{ opacity: selected ? 1 : undefined }}
+      >
+        <X size={12} />
+      </button>
+
       <div className="flex items-center gap-2">
         <BookOpen size={22} className="text-blue-800" />
         <span className="font-semibold text-blue-900 truncate">{data.documentName}</span>
       </div>
       <div className="text-xs text-gray-700 mt-2">
-        {data.isDragOver ? "Drop document here" : "Document input"}
+        {data.isDragOver ? "Drop document here" : `Document: ${data.documentName}`}
       </div>
       <Handle type="source" position={Position.Right} className="w-2 h-4 bg-black/80" />
     </div>
@@ -137,6 +188,18 @@ const AIWorkbench = forwardRef(function AIWorkbench(
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<AllNodes>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Handle node deletion
+  useEffect(() => {
+    const handleDeleteNode = (event: any) => {
+      const { nodeId } = event.detail;
+      setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+      setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
+    };
+
+    window.addEventListener('deleteNode', handleDeleteNode);
+    return () => window.removeEventListener('deleteNode', handleDeleteNode);
+  }, [setNodes, setEdges]);
 
   // Add document node method
   useImperativeHandle(ref, () => ({
