@@ -1,3 +1,4 @@
+
 import {
   ReactFlow,
   MiniMap,
@@ -295,7 +296,7 @@ const AIWorkbench = forwardRef(function AIWorkbench(
 
   const onDragLeave = useCallback((event: React.DragEvent) => {
     // Only clear if leaving the entire flow area
-    if (!reactFlowWrapper.current?.contains(event.relatedTarget as Node)) {
+    if (!reactFlowWrapper.current?.contains(event.relatedTarget as HTMLElement)) {
       clearDragOverStates();
     }
   }, [clearDragOverStates]);
