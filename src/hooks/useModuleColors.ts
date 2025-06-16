@@ -10,7 +10,7 @@ export interface RecentColors {
   colors: string[];
 }
 
-const DEFAULT_COLOR = 'bg-slate-600';
+const DEFAULT_COLOR = 'bg-white';
 const RECENT_COLORS_KEY = 'lovable-recent-colors';
 const MODULE_COLORS_KEY = 'lovable-module-colors';
 

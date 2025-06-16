@@ -15,7 +15,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   isOpen,
   onClose
 }) => {
-  const { documents, loading, deleteDocument } = useDocuments();
+  const { documents, loading, deleteDocument, refetch } = useDocuments();
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredDocuments = documents.filter(doc =>
@@ -26,6 +26,8 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     e.stopPropagation();
     try {
       await deleteDocument(docId, storagePath);
+      // Refresh the library immediately after deletion
+      await refetch();
       toast({
         title: "Document deleted",
         description: "The document has been removed from your library.",
@@ -50,6 +52,21 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     };
     onDocumentSelect(file);
     onClose();
+  };
+
+  const handleDragStart = (e: React.DragEvent, document: any) => {
+    // Convert stored document to the format expected by the workbench
+    const file = {
+      name: document.name,
+      size: document.size,
+      type: document.mime_type,
+      lastModified: new Date(document.uploaded_at).getTime(),
+      preview: document.preview_url
+    };
+    
+    // Set the drag data in the same format as the workbench expects
+    e.dataTransfer.setData("application/lovable-document", JSON.stringify(file));
+    e.dataTransfer.effectAllowed = "copy";
   };
 
   if (!isOpen) return null;
@@ -89,8 +106,11 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
               {filteredDocuments.map((doc) => (
                 <div
                   key={doc.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, doc)}
                   onClick={() => handleDocumentClick(doc)}
-                  className="flex items-center justify-between p-2 border border-black mb-2 cursor-pointer hover:bg-gray-100 group"
+                  className="flex items-center justify-between p-2 border border-black mb-2 cursor-grab hover:bg-gray-100 group active:cursor-grabbing"
+                  title="Click to add to workspace or drag to position"
                 >
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <FileText size={16} />

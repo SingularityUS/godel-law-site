@@ -84,6 +84,11 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
     window.dispatchEvent(event);
   };
 
+  // Determine text color based on background
+  const isWhiteBackground = nodeColor === 'bg-white';
+  const textColor = isWhiteBackground ? 'text-black' : 'text-white';
+  const iconColor = isWhiteBackground ? 'text-black' : 'text-white';
+
   return (
     <div
       className={`w-32 h-24 border-2 border-black cursor-pointer relative group hover:shadow-lg ${nodeColor} ${
@@ -113,14 +118,14 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
       
       {/* Module content */}
       <div className="flex flex-col items-center justify-center h-full p-2">
-        <span className="text-white drop-shadow text-lg mb-1">
+        <span className={`${iconColor} drop-shadow text-lg mb-1`}>
           <module.icon size={20} />
         </span>
-        <span className="text-xs font-bold text-white text-center leading-tight">{module.label}</span>
+        <span className={`text-xs font-bold ${textColor} text-center leading-tight`}>{module.label}</span>
       </div>
       
       {/* Prompt status indicator */}
-      <div className="absolute bottom-1 left-1 text-xs text-white/90">
+      <div className={`absolute bottom-1 left-1 text-xs ${textColor}/90`}>
         {data.promptOverride ? "●" : "○"}
       </div>
       
