@@ -27,7 +27,8 @@
 
 import { useEffect, useCallback, useImperativeHandle } from "react";
 import { Node } from "@xyflow/react";
-import { DocumentInputNode, HelperNode } from "../flow/FlowConfiguration";
+import { DocumentInputNode } from "../DocumentInputNode";
+import { HelperNode } from "../HelperNode";
 
 interface FlowEventHandlersProps {
   nodes: Node[];
