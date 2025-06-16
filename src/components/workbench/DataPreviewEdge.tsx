@@ -28,6 +28,7 @@ interface DataPreviewEdgeProps extends EdgeProps {
     label?: string;
     isSelected?: boolean;
     onEdgeClick?: (edgeId: string) => void;
+    onClosePreview?: (edgeId: string) => void;
   };
 }
 
@@ -60,6 +61,12 @@ const DataPreviewEdge: React.FC<DataPreviewEdgeProps> = ({
     e.stopPropagation();
     if (hasData && data?.onEdgeClick) {
       data.onEdgeClick(id);
+    }
+  };
+
+  const handleClosePreview = () => {
+    if (data?.onClosePreview) {
+      data.onClosePreview(id);
     }
   };
 
@@ -121,6 +128,7 @@ const DataPreviewEdge: React.FC<DataPreviewEdgeProps> = ({
             <DataPreviewBox
               edgeData={data.edgeData}
               onSimulateProcessing={data.onSimulateProcessing}
+              onClose={handleClosePreview}
             />
           </div>
         </EdgeLabelRenderer>

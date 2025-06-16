@@ -8,7 +8,7 @@
  */
 
 import React, { useState } from "react";
-import { Eye, Copy, ChevronDown, ChevronUp } from "lucide-react";
+import { Eye, Copy, ChevronDown, ChevronUp, X } from "lucide-react";
 
 interface DataPreviewBoxProps {
   edgeData: {
@@ -18,11 +18,13 @@ interface DataPreviewBoxProps {
     isProcessing: boolean;
   };
   onSimulateProcessing?: () => void;
+  onClose?: () => void;
 }
 
 const DataPreviewBox: React.FC<DataPreviewBoxProps> = ({ 
   edgeData, 
-  onSimulateProcessing 
+  onSimulateProcessing,
+  onClose 
 }) => {
   const [viewMode, setViewMode] = useState<'input' | 'output'>('output');
   const [isExpanded, setIsExpanded] = useState(false);
@@ -52,28 +54,31 @@ const DataPreviewBox: React.FC<DataPreviewBoxProps> = ({
     }
   };
 
+  const handleClose = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onClose) {
+      onClose();
+    }
+  };
+
   return (
     <div 
-      className="data-preview-box bg-white border-2 border-black p-2 text-xs min-w-32 max-w-48 cursor-pointer hover:shadow-lg transition-shadow"
+      className="data-preview-box bg-white border-2 border-black p-2 text-xs min-w-32 max-w-48 cursor-pointer hover:shadow-lg transition-shadow relative"
       style={{ fontFamily: 'Courier New, monospace' }}
       onClick={handlePreviewClick}
     >
+      {/* Close button in upper right corner */}
+      <button
+        onClick={handleClose}
+        className="absolute -top-1 -right-1 w-4 h-4 bg-black text-white rounded-full flex items-center justify-center hover:bg-gray-800 z-10"
+        title="Close preview"
+      >
+        <X size={8} />
+      </button>
+
       {/* Header with controls */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex gap-1">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setViewMode('input');
-            }}
-            className={`px-1 py-0.5 text-xs border ${
-              viewMode === 'input' 
-                ? 'bg-black text-white border-black' 
-                : 'bg-white text-black border-black hover:bg-gray-100'
-            }`}
-          >
-            IN
-          </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -86,6 +91,19 @@ const DataPreviewBox: React.FC<DataPreviewBoxProps> = ({
             }`}
           >
             OUT
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setViewMode('input');
+            }}
+            className={`px-1 py-0.5 text-xs border ${
+              viewMode === 'input' 
+                ? 'bg-black text-white border-black' 
+                : 'bg-white text-black border-black hover:bg-gray-100'
+            }`}
+          >
+            IN
           </button>
         </div>
         
