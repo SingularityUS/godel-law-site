@@ -1,3 +1,4 @@
+
 import {
   ReactFlow,
   MiniMap,
@@ -31,6 +32,11 @@ type DocumentInputNodeData = {
   documentName: string;
   file: any;
 };
+
+type DocumentInputNode = Node<DocumentInputNodeData>;
+
+// Union type for all nodes
+type AllNodes = HelperNode | DocumentInputNode;
 
 const getModuleDef = (type: ModuleKind) => MODULE_DEFINITIONS.find((m) => m.type === type)!;
 
@@ -120,7 +126,7 @@ const AIWorkbench = forwardRef(function AIWorkbench(
   ref
 ) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [nodes, setNodes, onNodesChange] = useNodesState<AllNodes>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   // Add document node method
@@ -129,14 +135,14 @@ const AIWorkbench = forwardRef(function AIWorkbench(
       // Position new doc nodes at a default pos if not dropped
       const nodeId = `doc-${Date.now()}-${file.name}`;
       const position = { x: 80, y: 420 + Math.random() * 100 };
-      const newNode = {
+      const newNode: DocumentInputNode = {
         id: nodeId,
         type: "document-input",
         position,
-        data: { moduleType: "document-input", documentName: file.name, file },
+        data: { moduleType: "document-input" as const, documentName: file.name, file },
         draggable: true,
       };
-      setNodes((nds) => nds.concat(newNode));
+      setNodes((nds) => [...nds, newNode]);
     },
   }));
 
@@ -156,14 +162,14 @@ const AIWorkbench = forwardRef(function AIWorkbench(
             }
           : { x: 80, y: 420 + Math.random() * 100 };
         const nodeId = `doc-${Date.now()}-${file.name}`;
-        const newNode = {
+        const newNode: DocumentInputNode = {
           id: nodeId,
           type: "document-input",
           position: pos,
-          data: { moduleType: "document-input", documentName: file.name, file },
+          data: { moduleType: "document-input" as const, documentName: file.name, file },
           draggable: true,
         };
-        setNodes((nds) => nds.concat(newNode));
+        setNodes((nds) => [...nds, newNode]);
         return;
       }
       // Otherwise, default: palette module drop
@@ -184,7 +190,7 @@ const AIWorkbench = forwardRef(function AIWorkbench(
         position: pos,
         data: { moduleType: module.type },
       };
-      setNodes((nds) => nds.concat(newNode));
+      setNodes((nds) => [...nds, newNode]);
     },
     [setNodes]
   );
@@ -197,8 +203,8 @@ const AIWorkbench = forwardRef(function AIWorkbench(
   // Handle node selection for editing prompts
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
-      // Only handle our own nodes
-      if ((node as HelperNode).data && (node as HelperNode).data.moduleType) {
+      // Only handle helper nodes for editing
+      if (node.type === "helper" && (node as HelperNode).data && (node as HelperNode).data.moduleType) {
         onModuleEdit(node.id, node as HelperNode);
       }
     },
@@ -270,9 +276,13 @@ const AIWorkbench = forwardRef(function AIWorkbench(
         defaultEdgeOptions={{ type: "smoothstep", animated: true, style: { stroke: "#333" } }}
       >
         <MiniMap 
-          nodeColor={(n) =>
-            getModuleDef((n.data as HelperNodeData).moduleType as ModuleKind).color.replace("bg-", "")
-          }
+          nodeColor={(n) => {
+            const nodeData = n.data as HelperNodeData | DocumentInputNodeData;
+            if (nodeData.moduleType === "document-input") {
+              return "#e2e8f0"; // slate-200 for document nodes
+            }
+            return getModuleDef(nodeData.moduleType as ModuleKind).color.replace("bg-", "");
+          }}
           pannable zoomable
         />
         <Controls />
