@@ -1,4 +1,3 @@
-
 import {
   ReactFlow,
   MiniMap,
@@ -31,6 +30,7 @@ type DocumentInputNodeData = {
   moduleType: "document-input";
   documentName: string;
   file: any;
+  isDragOver?: boolean;
 };
 
 type DocumentInputNode = Node<DocumentInputNodeData>;
@@ -93,15 +93,25 @@ const HelperNodeComponent = ({ data, selected }: { data: HelperNodeData; selecte
 const DocumentInputNodeComponent = ({ data, selected }: { data: DocumentInputNodeData; selected?: boolean }) => {
   return (
     <div
-      className={`min-w-[140px] max-w-[220px] p-3 pr-4 rounded-md shadow-lg border-2 cursor-pointer bg-slate-100 ${
+      className={`min-w-[140px] max-w-[220px] p-3 pr-4 rounded-md shadow-lg border-2 cursor-pointer transition-all duration-200 ${
+        data.isDragOver 
+          ? "bg-blue-200 border-blue-400 ring-2 ring-blue-300" 
+          : "bg-slate-100 border-slate-300"
+      } ${
         selected ? "ring-4 ring-blue-300 z-10" : "ring-0"
       }`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
     >
       <div className="flex items-center gap-2">
         <BookOpen size={22} className="text-blue-800" />
         <span className="font-semibold text-blue-900 truncate">{data.documentName}</span>
       </div>
-      <div className="text-xs text-gray-700 mt-2">Document input</div>
+      <div className="text-xs text-gray-700 mt-2">
+        {data.isDragOver ? "Drop document here" : "Document input"}
+      </div>
       <Handle type="source" position={Position.Right} className="w-2 h-4 bg-black/80" />
     </div>
   );
@@ -128,6 +138,7 @@ const AIWorkbench = forwardRef(function AIWorkbench(
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<AllNodes>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const { getIntersectingNodes } = useReactFlow();
 
   // Add document node method
   useImperativeHandle(ref, () => ({
@@ -146,14 +157,76 @@ const AIWorkbench = forwardRef(function AIWorkbench(
     },
   }));
 
+  // Helper function to get node at coordinates
+  const getNodeAtPosition = useCallback((x: number, y: number) => {
+    const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
+    if (!reactFlowBounds) return null;
+    
+    // Convert screen coordinates to flow coordinates
+    const flowX = x - reactFlowBounds.left;
+    const flowY = y - reactFlowBounds.top;
+    
+    // Find node that contains this point (approximate check)
+    return nodes.find(node => {
+      const nodeWidth = 180; // approximate node width
+      const nodeHeight = 80; // approximate node height
+      return (
+        flowX >= node.position.x &&
+        flowX <= node.position.x + nodeWidth &&
+        flowY >= node.position.y &&
+        flowY <= node.position.y + nodeHeight
+      );
+    });
+  }, [nodes]);
+
+  // Clear drag over states
+  const clearDragOverStates = useCallback(() => {
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.type === "document-input") {
+          return {
+            ...node,
+            data: { ...node.data, isDragOver: false }
+          };
+        }
+        return node;
+      })
+    );
+  }, [setNodes]);
+
   // Drag-and-drop from palette or uploaded document
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
+      clearDragOverStates();
+      
       const docData = event.dataTransfer.getData("application/lovable-document");
       if (docData) {
-        // File card dropped: create a document node, position accordingly
+        // File card dropped: check if dropped on existing document node
         const file = JSON.parse(docData);
+        const targetNode = getNodeAtPosition(event.clientX, event.clientY);
+        
+        if (targetNode && targetNode.type === "document-input") {
+          // Update existing document input node
+          setNodes((nds) =>
+            nds.map((node) =>
+              node.id === targetNode.id
+                ? {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      documentName: file.name,
+                      file: file,
+                      isDragOver: false
+                    }
+                  }
+                : node
+            )
+          );
+          return;
+        }
+        
+        // Otherwise create new node
         const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
         const pos = reactFlowBounds
           ? {
@@ -192,13 +265,40 @@ const AIWorkbench = forwardRef(function AIWorkbench(
       };
       setNodes((nds) => [...nds, newNode]);
     },
-    [setNodes]
+    [setNodes, getNodeAtPosition, clearDragOverStates]
   );
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
-  }, []);
+    
+    // Check if dragging a document
+    const docData = event.dataTransfer.types.includes("application/lovable-document");
+    if (docData) {
+      const targetNode = getNodeAtPosition(event.clientX, event.clientY);
+      
+      // Update drag over states
+      setNodes((nds) =>
+        nds.map((node) => {
+          if (node.type === "document-input") {
+            const isDragOver = targetNode?.id === node.id;
+            return {
+              ...node,
+              data: { ...node.data, isDragOver }
+            };
+          }
+          return node;
+        })
+      );
+    }
+  }, [getNodeAtPosition, setNodes]);
+
+  const onDragLeave = useCallback((event: React.DragEvent) => {
+    // Only clear if leaving the entire flow area
+    if (!reactFlowWrapper.current?.contains(event.relatedTarget as Node)) {
+      clearDragOverStates();
+    }
+  }, [clearDragOverStates]);
 
   // Handle node selection for editing prompts
   const onNodeClick = useCallback(
@@ -268,6 +368,7 @@ const AIWorkbench = forwardRef(function AIWorkbench(
         onConnect={onConnect}
         onDrop={onDrop}
         onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
         onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
         fitView
