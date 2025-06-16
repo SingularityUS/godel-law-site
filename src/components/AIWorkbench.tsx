@@ -1,5 +1,3 @@
-
-
 import {
   ReactFlow,
   MiniMap,
@@ -135,10 +133,10 @@ const DocumentInputNodeComponent = ({
 
   return (
     <div
-      className={`min-w-[140px] max-w-[220px] p-3 pr-4 rounded-md shadow-lg border-2 cursor-pointer transition-all duration-200 relative group ${
+      className={`min-w-[140px] max-w-[220px] p-3 pr-4 rounded-md shadow-lg border-2 cursor-pointer transition-all duration-200 relative group hover:shadow-xl ${
         data.isDragOver 
           ? "bg-blue-200 border-blue-400 ring-2 ring-blue-300" 
-          : "bg-slate-100 border-slate-300"
+          : "bg-slate-100 border-slate-300 hover:bg-slate-200"
       } ${
         selected ? "ring-4 ring-blue-300 z-10" : "ring-0"
       }`}
@@ -146,6 +144,7 @@ const DocumentInputNodeComponent = ({
         e.preventDefault();
         e.stopPropagation();
       }}
+      title="Click to preview document"
     >
       {/* Delete button */}
       <button
@@ -161,7 +160,7 @@ const DocumentInputNodeComponent = ({
         <span className="font-semibold text-blue-900 truncate">{data.documentName}</span>
       </div>
       <div className="text-xs text-gray-700 mt-2">
-        {data.isDragOver ? "Drop document here" : `Document: ${data.documentName}`}
+        {data.isDragOver ? "Drop document here" : `Click to preview • ${data.documentName}`}
       </div>
       <Handle type="source" position={Position.Right} className="w-2 h-4 bg-black/80" />
     </div>
@@ -181,6 +180,7 @@ interface AIWorkbenchProps {
 }
 import React, { forwardRef, useImperativeHandle } from "react";
 import { BookOpen } from "lucide-react";
+import DocumentPreview from "./DocumentPreview";
 
 const AIWorkbench = forwardRef(function AIWorkbench(
   { onModuleEdit, editingPromptNodeId, uploadedFiles }: AIWorkbenchProps,
@@ -189,6 +189,10 @@ const AIWorkbench = forwardRef(function AIWorkbench(
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<AllNodes>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  
+  // Add document preview state
+  const [previewDocument, setPreviewDocument] = useState<any>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // Handle node deletion
   useEffect(() => {
@@ -362,12 +366,25 @@ const AIWorkbench = forwardRef(function AIWorkbench(
     }
   }, [clearDragOverStates]);
 
-  // Handle node selection for editing prompts
+  // Handle node selection for editing prompts AND document preview
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
-      // Only handle helper nodes for editing
       if (node.type === "helper" && (node as HelperNode).data && (node as HelperNode).data.moduleType) {
+        // Handle helper nodes for editing
         onModuleEdit(node.id, node as HelperNode);
+      } else if (node.type === "document-input") {
+        // Handle document nodes for preview
+        const docNode = node as DocumentInputNode;
+        if (docNode.data && docNode.data.file) {
+          setPreviewDocument({
+            name: docNode.data.documentName,
+            type: docNode.data.file.type,
+            size: docNode.data.file.size,
+            preview: docNode.data.file.preview,
+            file: docNode.data.file
+          });
+          setIsPreviewOpen(true);
+        }
       }
     },
     [onModuleEdit]
@@ -421,37 +438,49 @@ const AIWorkbench = forwardRef(function AIWorkbench(
     editingPromptNodeId ?? nodes.find((n) => n.selected)?.id;
 
   return (
-    <div ref={reactFlowWrapper} className="w-full grow h-[650px] relative rounded-xl border bg-gradient-to-br from-slate-50 to-blue-50">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onDrop={onDrop}
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onNodeClick={onNodeClick}
-        nodeTypes={nodeTypes}
-        fitView
-        panOnScroll
-        proOptions={{ hideAttribution: true }}
-        defaultEdgeOptions={{ type: "smoothstep", animated: true, style: { stroke: "#333" } }}
-      >
-        <MiniMap 
-          nodeColor={(n) => {
-            const nodeData = n.data as HelperNodeData | DocumentInputNodeData;
-            if (nodeData.moduleType === "document-input") {
-              return "#e2e8f0"; // slate-200 for document nodes
-            }
-            return getModuleDef(nodeData.moduleType as ModuleKind).color.replace("bg-", "");
-          }}
-          pannable zoomable
-        />
-        <Controls />
-        <Background gap={20} size={2} color="#cad2e3" />
-      </ReactFlow>
-    </div>
+    <>
+      <div ref={reactFlowWrapper} className="w-full grow h-[650px] relative rounded-xl border bg-gradient-to-br from-slate-50 to-blue-50">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onDrop={onDrop}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onNodeClick={onNodeClick}
+          nodeTypes={nodeTypes}
+          fitView
+          panOnScroll
+          proOptions={{ hideAttribution: true }}
+          defaultEdgeOptions={{ type: "smoothstep", animated: true, style: { stroke: "#333" } }}
+        >
+          <MiniMap 
+            nodeColor={(n) => {
+              const nodeData = n.data as HelperNodeData | DocumentInputNodeData;
+              if (nodeData.moduleType === "document-input") {
+                return "#e2e8f0"; // slate-200 for document nodes
+              }
+              return getModuleDef(nodeData.moduleType as ModuleKind).color.replace("bg-", "");
+            }}
+            pannable zoomable
+          />
+          <Controls />
+          <Background gap={20} size={2} color="#cad2e3" />
+        </ReactFlow>
+      </div>
+
+      {/* Document Preview Modal */}
+      <DocumentPreview
+        isOpen={isPreviewOpen}
+        onClose={() => {
+          setIsPreviewOpen(false);
+          setPreviewDocument(null);
+        }}
+        document={previewDocument}
+      />
+    </>
   );
 });
 
