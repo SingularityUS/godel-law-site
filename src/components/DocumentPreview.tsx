@@ -75,7 +75,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
   const handleDownload = () => {
     if (document?.preview) {
-      const link = document.createElement("a");
+      const link = window.document.createElement("a");
       link.href = document.preview;
       link.download = document.name;
       link.click();
