@@ -1,7 +1,7 @@
-
-import React, { forwardRef, useCallback } from "react";
+import React, { forwardRef, useCallback, useMemo } from "react";
 import { ReactFlow } from "@xyflow/react";
 import { useWorkbenchEvents } from "@/hooks/useWorkbenchEvents";
+import { useDataFlow } from "@/hooks/workbench/useDataFlow";
 import { getNodeAtScreenPosition } from "@/utils/nodeUtils";
 import WorkbenchControls from "./WorkbenchControls";
 import { useFlowEventHandlers } from "./flow/FlowEventHandlers";
@@ -10,12 +10,14 @@ import {
   initialNodes,
   initialEdges,
   nodeTypes,
+  edgeTypes,
   defaultEdgeOptions,
   flowOptions,
   AllNodes
 } from "./flow/FlowConfiguration";
 
 import "@xyflow/react/dist/style.css";
+import "./dataPreview.css";
 
 /**
  * WorkbenchFlow Component
@@ -75,6 +77,9 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
     getNodeAtPosition
   });
 
+  // Initialize data flow management
+  const { getEdgeData, simulateProcessing } = useDataFlow(nodes, edges);
+
   // Initialize event handlers
   const { onNodeClick } = useFlowEventHandlers({
     nodes,
@@ -85,6 +90,20 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
 
   // Initialize node management
   const { getNodeColor } = useFlowNodeManager();
+
+  /**
+   * Enhance edges with data preview functionality
+   */
+  const enhancedEdges = useMemo(() => {
+    return edges.map(edge => ({
+      ...edge,
+      data: {
+        ...edge.data,
+        edgeData: getEdgeData(edge.id),
+        onSimulateProcessing: () => simulateProcessing(edge.id)
+      }
+    }));
+  }, [edges, getEdgeData, simulateProcessing]);
 
   /**
    * Wraps the drop handler to include container reference
@@ -105,7 +124,7 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
   return (
     <ReactFlow
       nodes={nodes}
-      edges={edges}
+      edges={enhancedEdges}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
@@ -114,6 +133,7 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
       onDragLeave={onDragLeave}
       onNodeClick={onNodeClick}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       defaultEdgeOptions={defaultEdgeOptions}
       {...flowOptions}
     >

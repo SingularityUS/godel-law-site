@@ -49,7 +49,7 @@ export const useWorkbenchState = ({
    * Connection Handler: Creates Edges Between Nodes
    * 
    * Called when users connect two nodes by dragging from one handle to another
-   * Creates animated edges with metadata for visual appeal and data flow indication
+   * Creates animated edges with data preview functionality and metadata for visual appeal
    * 
    * @param connection - Connection object with source and target node IDs
    */
@@ -60,7 +60,7 @@ export const useWorkbenchState = ({
           { 
             ...connection, 
             animated: true, 
-            type: "smoothstep", 
+            type: "dataPreview", 
             data: { label: "JSON" } // Indicates data format being passed
           },
           eds

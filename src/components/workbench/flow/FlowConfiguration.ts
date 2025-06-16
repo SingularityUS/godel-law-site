@@ -30,6 +30,7 @@ import { HelperNode } from "../HelperNode";
 import { DocumentInputNode } from "../DocumentInputNode";
 import HelperNodeComponent from "../HelperNode";
 import DocumentInputNodeComponent from "../DocumentInputNode";
+import DataPreviewEdge from "../DataPreviewEdge";
 
 // Union type for all supported node types
 export type AllNodes = HelperNode | DocumentInputNode;
@@ -57,8 +58,22 @@ export const initialNodes: HelperNode[] = [
 ];
 
 export const initialEdges: Edge[] = [
-  { id: "e1-2", source: "1", target: "2", animated: true, type: "smoothstep", data: { label: "JSON" } },
-  { id: "e2-3", source: "2", target: "3", animated: true, type: "smoothstep", data: { label: "JSON" } },
+  { 
+    id: "e1-2", 
+    source: "1", 
+    target: "2", 
+    animated: true, 
+    type: "dataPreview",
+    data: { label: "JSON" } 
+  },
+  { 
+    id: "e2-3", 
+    source: "2", 
+    target: "3", 
+    animated: true, 
+    type: "dataPreview",
+    data: { label: "JSON" } 
+  },
 ];
 
 // Register custom node types with React Flow
@@ -67,9 +82,14 @@ export const nodeTypes = {
   "document-input": DocumentInputNodeComponent,
 };
 
+// Register custom edge types with React Flow
+export const edgeTypes = {
+  dataPreview: DataPreviewEdge,
+};
+
 // Default edge configuration
 export const defaultEdgeOptions = { 
-  type: "smoothstep", 
+  type: "dataPreview", 
   animated: true, 
   style: { stroke: "#333" } 
 };

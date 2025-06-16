@@ -1,0 +1,37 @@
+
+/* Data Preview Edge Styles */
+.data-preview-edge-label {
+  pointer-events: all;
+  user-select: none;
+}
+
+.data-preview-box {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(4px);
+}
+
+.data-preview-box:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Animation for processing state */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Edge processing animation */
+.react-flow__edge path[style*="pulse"] {
+  stroke-dasharray: 5,5;
+  animation: dash 1s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
