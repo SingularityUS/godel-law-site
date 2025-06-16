@@ -1,7 +1,9 @@
+
 import React, { forwardRef, useCallback, useMemo } from "react";
 import { ReactFlow } from "@xyflow/react";
 import { useWorkbenchEvents } from "@/hooks/useWorkbenchEvents";
 import { useDataFlow } from "@/hooks/workbench/useDataFlow";
+import { useDataPreviewSelection } from "@/hooks/workbench/useDataPreviewSelection";
 import { getNodeAtScreenPosition } from "@/utils/nodeUtils";
 import WorkbenchControls from "./WorkbenchControls";
 import { useFlowEventHandlers } from "./flow/FlowEventHandlers";
@@ -80,6 +82,9 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
   // Initialize data flow management
   const { getEdgeData, simulateProcessing } = useDataFlow(nodes, edges);
 
+  // Initialize data preview selection
+  const { toggleEdgePreview, hideAllPreviews, isEdgeSelected } = useDataPreviewSelection();
+
   // Initialize event handlers
   const { onNodeClick } = useFlowEventHandlers({
     nodes,
@@ -92,7 +97,25 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
   const { getNodeColor } = useFlowNodeManager();
 
   /**
-   * Enhance edges with data preview functionality
+   * Enhanced node click handler that also hides data previews
+   */
+  const handleNodeClick = useCallback(
+    (event: React.MouseEvent, node: any) => {
+      hideAllPreviews();
+      onNodeClick(event, node);
+    },
+    [onNodeClick, hideAllPreviews]
+  );
+
+  /**
+   * Handle clicks on empty workspace to hide previews
+   */
+  const handlePaneClick = useCallback(() => {
+    hideAllPreviews();
+  }, [hideAllPreviews]);
+
+  /**
+   * Enhance edges with data preview functionality and selection state
    */
   const enhancedEdges = useMemo(() => {
     return edges.map(edge => ({
@@ -100,10 +123,12 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
       data: {
         ...edge.data,
         edgeData: getEdgeData(edge.id),
-        onSimulateProcessing: () => simulateProcessing(edge.id)
+        onSimulateProcessing: () => simulateProcessing(edge.id),
+        isSelected: isEdgeSelected(edge.id),
+        onEdgeClick: toggleEdgePreview
       }
     }));
-  }, [edges, getEdgeData, simulateProcessing]);
+  }, [edges, getEdgeData, simulateProcessing, isEdgeSelected, toggleEdgePreview]);
 
   /**
    * Wraps the drop handler to include container reference
@@ -131,7 +156,8 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
       onDrop={onDrop}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
-      onNodeClick={onNodeClick}
+      onNodeClick={handleNodeClick}
+      onPaneClick={handlePaneClick}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       defaultEdgeOptions={defaultEdgeOptions}

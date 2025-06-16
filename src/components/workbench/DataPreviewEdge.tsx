@@ -2,9 +2,9 @@
 /**
  * DataPreviewEdge Component
  * 
- * Purpose: Custom React Flow edge that displays data preview boxes
- * This component creates edges with data inspection capabilities,
- * showing input/output data at the connection midpoint.
+ * Purpose: Custom React Flow edge that displays data preview boxes when selected
+ * This component creates edges with optional data inspection capabilities,
+ * showing input/output data only when the edge is clicked to reduce clutter.
  */
 
 import React from "react";
@@ -12,7 +12,6 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   getBezierPath,
-  Edge,
   EdgeProps
 } from "@xyflow/react";
 import DataPreviewBox from "./DataPreviewBox";
@@ -27,6 +26,8 @@ interface DataPreviewEdgeProps extends EdgeProps {
     };
     onSimulateProcessing?: () => void;
     label?: string;
+    isSelected?: boolean;
+    onEdgeClick?: (edgeId: string) => void;
   };
 }
 
@@ -51,39 +52,79 @@ const DataPreviewEdge: React.FC<DataPreviewEdgeProps> = ({
     targetPosition,
   });
 
+  const hasData = Boolean(data?.edgeData);
+  const isSelected = Boolean(data?.isSelected);
+  const isProcessing = Boolean(data?.edgeData?.isProcessing);
+
+  const handleEdgeClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (hasData && data?.onEdgeClick) {
+      data.onEdgeClick(id);
+    }
+  };
+
+  // Style the edge based on its state
+  const edgeStyle = {
+    ...style,
+    stroke: isSelected 
+      ? '#3b82f6' 
+      : isProcessing 
+        ? '#3b82f6' 
+        : hasData 
+          ? '#6b7280' 
+          : '#333',
+    strokeWidth: isSelected ? 3 : isProcessing ? 3 : hasData ? 2.5 : 2,
+    cursor: hasData ? 'pointer' : 'default',
+    animation: isProcessing ? 'pulse 1s infinite' : 'none'
+  };
+
   return (
     <>
-      {/* Base edge path */}
+      {/* Base edge path with click handling */}
       <BaseEdge 
         path={edgePath} 
         markerEnd={markerEnd} 
-        style={{
-          ...style,
-          stroke: data?.edgeData?.isProcessing ? '#3b82f6' : '#333',
-          strokeWidth: data?.edgeData?.isProcessing ? 3 : 2,
-          animation: data?.edgeData?.isProcessing ? 'pulse 1s infinite' : 'none'
-        }} 
+        style={edgeStyle}
+        onClick={handleEdgeClick}
       />
       
-      {/* Data preview box at edge midpoint */}
-      <EdgeLabelRenderer>
-        <div
-          className="data-preview-edge-label nodrag nopan"
-          style={{
-            position: 'absolute',
-            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-            pointerEvents: 'all',
-            zIndex: 1000,
-          }}
-        >
-          {data?.edgeData && (
+      {/* Small data indicator dot when data is available but not selected */}
+      {hasData && !isSelected && (
+        <EdgeLabelRenderer>
+          <div
+            className="data-indicator-dot nodrag nopan"
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+              pointerEvents: 'all',
+              zIndex: 999,
+            }}
+            onClick={handleEdgeClick}
+          >
+            <div className="w-3 h-3 bg-blue-500 rounded-full opacity-70 hover:opacity-100 cursor-pointer border-2 border-white shadow-md" />
+          </div>
+        </EdgeLabelRenderer>
+      )}
+      
+      {/* Data preview box when selected */}
+      {hasData && isSelected && data?.edgeData && (
+        <EdgeLabelRenderer>
+          <div
+            className="data-preview-edge-label nodrag nopan"
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+              pointerEvents: 'all',
+              zIndex: 1000,
+            }}
+          >
             <DataPreviewBox
               edgeData={data.edgeData}
               onSimulateProcessing={data.onSimulateProcessing}
             />
-          )}
-        </div>
-      </EdgeLabelRenderer>
+          </div>
+        </EdgeLabelRenderer>
+      )}
     </>
   );
 };

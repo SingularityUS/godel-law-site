@@ -14,6 +14,12 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
+/* Data indicator dot styles */
+.data-indicator-dot {
+  pointer-events: all;
+  user-select: none;
+}
+
 /* Animation for processing state */
 @keyframes pulse {
   0%, 100% {
@@ -35,3 +41,10 @@
     stroke-dashoffset: -10;
   }
 }
+
+/* Edge hover states */
+.react-flow__edge:hover path {
+  stroke-width: 3;
+}
+
+/* Selected edge styles are now handled inline in the component */
