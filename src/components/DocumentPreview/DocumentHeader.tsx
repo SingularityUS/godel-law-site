@@ -2,7 +2,7 @@
 import React from "react";
 import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { X, FileText, Download } from "lucide-react";
+import { FileText, Download } from "lucide-react";
 import { formatFileSize, handleDocumentDownload } from "./documentUtils";
 
 interface DocumentHeaderProps {
@@ -48,14 +48,6 @@ const DocumentHeader: React.FC<DocumentHeaderProps> = ({ document, onClose }) =>
               Download
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            className="h-8 w-8 p-0"
-          >
-            <X className="h-4 w-4" />
-          </Button>
         </div>
       </div>
     </DialogHeader>
