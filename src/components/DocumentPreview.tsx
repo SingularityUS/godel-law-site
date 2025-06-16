@@ -178,7 +178,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
           </div>
         </DialogHeader>
 
-        {/* Document Content Area with ScrollArea for proper scrolling */}
+        {/* Document Content Area with explicit height for ScrollArea */}
         <div className="flex-1 min-h-0">
           {isLoading ? (
             // Loading state with spinner
@@ -198,11 +198,11 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
               </div>
             </div>
           ) : (
-            // Document content with ScrollArea for smooth scrolling
-            <ScrollArea className="h-full">
+            // Document content with ScrollArea having explicit height
+            <ScrollArea className="h-[calc(90vh-120px)]">
               <div className="bg-gray-100 min-h-full">
                 <div className="max-w-4xl mx-auto py-8 px-4">
-                  <div className="bg-white shadow-lg p-16 relative">
+                  <div className="bg-white shadow-lg p-16 relative min-h-[800px]">
                     <div 
                       className="prose prose-sm max-w-none"
                       style={{
