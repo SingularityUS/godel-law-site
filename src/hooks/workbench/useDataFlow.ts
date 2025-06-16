@@ -57,15 +57,25 @@ export const useDataFlow = (nodes: Node[], edges: Edge[]) => {
           ? { paragraphs: ['Text with errors...'] }
           : { corrections: [{ text: 'Corrected text...', suggestions: 2 }] };
       
-      case 'summarizer':
+      case 'citation-finder':
         return isInput
-          ? { text: 'Long content to summarize...' }
-          : { summary: 'Brief summary...', originalLength: 500, summaryLength: 50 };
+          ? { paragraphs: ['Text with citations...'] }
+          : { citations: [{ text: 'Found citation...', source: 'Academic paper' }] };
       
-      case 'translator':
+      case 'citation-verifier':
         return isInput
-          ? { text: 'Text to translate...', language: 'en' }
-          : { translatedText: 'Translated content...', targetLanguage: 'es' };
+          ? { citations: ['Citation to verify...'] }
+          : { verified: [{ citation: 'Verified citation...', isValid: true }] };
+      
+      case 'style-guide-enforcer':
+        return isInput
+          ? { text: 'Text to check style...' }
+          : { styleChecked: 'Style-corrected text...', violations: 1 };
+      
+      case 'custom':
+        return isInput
+          ? { input: 'Custom input data...' }
+          : { output: 'Custom processed data...', customField: 'value' };
       
       default:
         return { data: 'Processed data...', timestamp: new Date().toISOString() };
