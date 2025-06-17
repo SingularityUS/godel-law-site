@@ -37,11 +37,11 @@ export const useChatGPTApi = () => {
         }
       }
       
-      // Upgrade to more capable model for very large inputs
+      // Upgrade to more capable model for very large inputs (same logic as connection test)
       let selectedModel = model;
       if (estimatedInputTokens > 15000 && model === 'gpt-4o-mini') {
         selectedModel = 'gpt-4o';
-        console.log(`Upgrading to ${selectedModel} for large document processing`);
+        console.log(`Upgrading to ${selectedModel} for large document processing (${estimatedInputTokens} tokens)`);
       }
       
       console.log(`ChatGPT API call: ${estimatedInputTokens} input tokens, ${responseTokens} max response tokens, model: ${selectedModel}`);
@@ -57,8 +57,9 @@ export const useChatGPTApi = () => {
 
       if (error) throw error;
       
-      // Track token usage
+      // Track token usage using centralized hook
       if (data.usage && data.usage.total_tokens) {
+        console.log(`ChatGPT API used ${data.usage.total_tokens} tokens`);
         addTokens(data.usage.total_tokens);
       }
       

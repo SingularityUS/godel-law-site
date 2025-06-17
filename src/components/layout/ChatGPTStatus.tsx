@@ -11,31 +11,17 @@ import { Zap, AlertCircle, Clock, Wifi, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useChatGPTTokens } from "@/hooks/useChatGPTTokens";
 
 type ConnectionStatus = 'untested' | 'testing' | 'connected' | 'error';
 
-interface TokenUsage {
-  totalTokens: number;
-  lastUpdated: string;
-}
-
 const ChatGPTStatus: React.FC = () => {
   const { user } = useAuth();
+  const { tokenUsage, addTokens, getFormattedTokenCount } = useChatGPTTokens();
   const [status, setStatus] = useState<ConnectionStatus>('untested');
   const [currentModel, setCurrentModel] = useState<string>('');
-  const [tokenUsage, setTokenUsage] = useState<TokenUsage>({ totalTokens: 0, lastUpdated: '' });
   const [lastTestTime, setLastTestTime] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
-
-  // Load token usage from localStorage on component mount
-  useEffect(() => {
-    if (user) {
-      const savedUsage = localStorage.getItem(`chatgpt_tokens_${user.id}`);
-      if (savedUsage) {
-        setTokenUsage(JSON.parse(savedUsage));
-      }
-    }
-  }, [user]);
 
   // Test connection on component mount
   useEffect(() => {
@@ -49,15 +35,21 @@ const ChatGPTStatus: React.FC = () => {
     setErrorMessage('');
     
     try {
-      // Use the same parameters as the main processing pipeline
+      // Use the same dynamic model selection logic as the main pipeline
       const testPrompt = 'Test connection. Please respond with "Connection successful."';
-      const estimatedTokens = Math.ceil(testPrompt.length / 4);
+      const estimatedInputTokens = Math.ceil(testPrompt.length / 4);
       
-      // Use appropriate token limits based on the new logic
-      let maxTokens = 100; // Small test response
+      console.log(`ChatGPT connection test - estimated tokens: ${estimatedInputTokens}`);
+      
+      // Use dynamic model selection (same logic as nodeProcessor and useChatGPTApi)
       let selectedModel = 'gpt-4o-mini';
+      let maxTokens = 100;
       
-      console.log(`Testing ChatGPT connection with model: ${selectedModel}, tokens: ${estimatedTokens}`);
+      // Auto-upgrade model for large inputs (matching the production logic)
+      if (estimatedInputTokens > 15000) {
+        selectedModel = 'gpt-4o';
+        console.log(`Connection test: Auto-upgrading to ${selectedModel} for large input simulation`);
+      }
 
       const { data, error } = await supabase.functions.invoke('chat-gpt', {
         body: {
@@ -81,9 +73,10 @@ const ChatGPTStatus: React.FC = () => {
         setLastTestTime(new Date().toLocaleTimeString());
         setErrorMessage('');
         
-        // Update token usage
+        // Update token usage using the centralized hook
         if (data.usage && data.usage.total_tokens) {
-          updateTokenUsage(data.usage.total_tokens);
+          console.log(`Connection test used ${data.usage.total_tokens} tokens`);
+          addTokens(data.usage.total_tokens);
         }
         
         console.log(`ChatGPT connection test successful: ${data.response}`);
@@ -96,18 +89,6 @@ const ChatGPTStatus: React.FC = () => {
       setStatus('error');
       setErrorMessage(error.message || 'Connection test failed');
     }
-  };
-
-  const updateTokenUsage = (newTokens: number) => {
-    if (!user) return;
-    
-    const updatedUsage = {
-      totalTokens: tokenUsage.totalTokens + newTokens,
-      lastUpdated: new Date().toISOString()
-    };
-    
-    setTokenUsage(updatedUsage);
-    localStorage.setItem(`chatgpt_tokens_${user.id}`, JSON.stringify(updatedUsage));
   };
 
   const getStatusColor = () => {
@@ -137,12 +118,6 @@ const ChatGPTStatus: React.FC = () => {
     }
   };
 
-  const formatTokenCount = (tokens: number) => {
-    if (tokens >= 1000000) return `${(tokens / 1000000).toFixed(1)}M`;
-    if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}K`;
-    return tokens.toString();
-  };
-
   if (!user) return null;
 
   return (
@@ -160,7 +135,7 @@ const ChatGPTStatus: React.FC = () => {
       {/* Token Usage */}
       <div className="flex items-center gap-1 text-sm text-gray-600">
         <Zap size={14} />
-        <span>{formatTokenCount(tokenUsage.totalTokens)} tokens</span>
+        <span>{getFormattedTokenCount()} tokens</span>
       </div>
 
       {/* Refresh Button */}

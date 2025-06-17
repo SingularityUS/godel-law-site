@@ -24,29 +24,57 @@ export const useChatGPTTokens = () => {
   // Load saved token usage on mount
   useEffect(() => {
     if (user) {
-      const savedUsage = localStorage.getItem(`chatgpt_tokens_${user.id}`);
+      const storageKey = `chatgpt_tokens_${user.id}`;
+      const savedUsage = localStorage.getItem(storageKey);
+      
+      console.log(`Loading token usage for user ${user.id}:`, savedUsage);
+      
       if (savedUsage) {
         try {
-          setTokenUsage(JSON.parse(savedUsage));
+          const parsedUsage = JSON.parse(savedUsage);
+          console.log(`Restored token usage:`, parsedUsage);
+          setTokenUsage(parsedUsage);
         } catch (error) {
           console.error('Failed to parse saved token usage:', error);
+          // Reset to default if corrupted
+          const defaultUsage = { totalTokens: 0, lastUpdated: new Date().toISOString() };
+          setTokenUsage(defaultUsage);
+          localStorage.setItem(storageKey, JSON.stringify(defaultUsage));
         }
+      } else {
+        console.log('No previous token usage found, starting fresh');
       }
     }
   }, [user]);
 
   // Add tokens to the usage count
   const addTokens = useCallback((newTokens: number) => {
-    if (!user || newTokens <= 0) return;
+    if (!user || newTokens <= 0) {
+      console.warn('Cannot add tokens: user not authenticated or invalid token count', { user: !!user, newTokens });
+      return;
+    }
     
-    const updatedUsage = {
-      totalTokens: tokenUsage.totalTokens + newTokens,
-      lastUpdated: new Date().toISOString()
-    };
+    const storageKey = `chatgpt_tokens_${user.id}`;
     
-    setTokenUsage(updatedUsage);
-    localStorage.setItem(`chatgpt_tokens_${user.id}`, JSON.stringify(updatedUsage));
-  }, [user, tokenUsage.totalTokens]);
+    setTokenUsage(prevUsage => {
+      const updatedUsage = {
+        totalTokens: prevUsage.totalTokens + newTokens,
+        lastUpdated: new Date().toISOString()
+      };
+      
+      console.log(`Adding ${newTokens} tokens. Previous: ${prevUsage.totalTokens}, New total: ${updatedUsage.totalTokens}`);
+      
+      // Save to localStorage
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(updatedUsage));
+        console.log(`Token usage saved to localStorage:`, updatedUsage);
+      } catch (error) {
+        console.error('Failed to save token usage to localStorage:', error);
+      }
+      
+      return updatedUsage;
+    });
+  }, [user]);
 
   // Get formatted token count
   const getFormattedTokenCount = useCallback(() => {
@@ -56,9 +84,20 @@ export const useChatGPTTokens = () => {
     return tokens.toString();
   }, [tokenUsage.totalTokens]);
 
+  // Debug function to check current state
+  const debugTokenState = useCallback(() => {
+    console.log('Current token state:', {
+      user: user?.id,
+      tokenUsage,
+      storageKey: user ? `chatgpt_tokens_${user.id}` : 'no user',
+      localStorage: user ? localStorage.getItem(`chatgpt_tokens_${user.id}`) : 'no user'
+    });
+  }, [user, tokenUsage]);
+
   return {
     tokenUsage,
     addTokens,
-    getFormattedTokenCount
+    getFormattedTokenCount,
+    debugTokenState
   };
 };
