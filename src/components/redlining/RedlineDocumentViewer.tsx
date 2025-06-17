@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RedlineDocument, RedlineState, RedlineSuggestion } from "@/types/redlining";
 import RedlineToolbar from "./RedlineToolbar";
-import RedlineSuggestion from "./RedlineSuggestion";
+import RedlineSuggestionComponent from "./RedlineSuggestion";
 import { useRedlineDocument } from "@/hooks/redlining/useRedlineDocument";
 
 interface RedlineDocumentViewerProps {
@@ -63,7 +63,7 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
               <div key={index} className="mb-4 relative">
                 <p className="mb-2">{paragraph}</p>
                 {paragraphSuggestions.map(suggestion => (
-                  <RedlineSuggestion
+                  <RedlineSuggestionComponent
                     key={suggestion.id}
                     suggestion={suggestion}
                     onAccept={() => handleSuggestionAction(suggestion.id, 'accepted')}
