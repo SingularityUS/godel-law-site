@@ -1,4 +1,5 @@
-import React, { forwardRef, useState } from "react";
+
+import React, { forwardRef, useState, useEffect } from "react";
 import WorkbenchFlow from "./WorkbenchFlow";
 import DocumentPreviewManager from "./DocumentPreviewManager";
 import ExecutionButton from "./ExecutionButton";
@@ -10,9 +11,8 @@ import { useWorkspaceState } from "@/hooks/workbench/useWorkspaceState";
 /**
  * WorkbenchContainer Component
  * 
- * Purpose: Main container wrapper for the AI Workbench with persistent state
- * Now integrates with Supabase for workspace persistence to prevent state loss
- * during split-screen operations and component re-renders.
+ * Purpose: Main container wrapper for the AI Workbench with save-on-run persistence
+ * Now saves workspace only when user clicks Run or navigates away
  */
 
 interface WorkbenchContainerProps {
@@ -27,24 +27,39 @@ const WorkbenchContainer = forwardRef<any, WorkbenchContainerProps>(function Wor
 ) {
   const [showResults, setShowResults] = useState(false);
 
-  // Use persistent workspace state from Supabase with drag optimization
+  // Use workspace state without auto-save
   const {
     workspace,
     saveStatus,
     isLoading,
     updateNodes,
     updateEdges,
-    startDragging,
-    isDragging
+    saveWorkspace
   } = useWorkspaceState();
 
-  // Initialize workflow execution with persistent nodes and edges
+  // Initialize workflow execution with save functionality
   const {
     executionState,
     executeWorkflow,
     resetExecution,
     isWorkflowValid
-  } = useWorkflowExecution(workspace.nodes, workspace.edges);
+  } = useWorkflowExecution(workspace.nodes, workspace.edges, saveWorkspace, workspace);
+
+  // Save workspace when user navigates away
+  useEffect(() => {
+    const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
+      if (workspace.id) {
+        try {
+          await saveWorkspace(workspace);
+        } catch (error) {
+          console.error('Failed to save workspace on unload:', error);
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [workspace, saveWorkspace]);
 
   const handleExecute = async () => {
     try {
@@ -85,7 +100,6 @@ const WorkbenchContainer = forwardRef<any, WorkbenchContainerProps>(function Wor
         edges={workspace.edges}
         updateNodes={updateNodes}
         updateEdges={updateEdges}
-        startDragging={startDragging}
       />
       
       <ExecutionButton
@@ -98,18 +112,13 @@ const WorkbenchContainer = forwardRef<any, WorkbenchContainerProps>(function Wor
         onStop={handleStopExecution}
       />
 
-      {/* Save status indicator with drag state awareness */}
+      {/* Save status indicator */}
       {saveStatus.isSaving && (
         <div className="absolute top-4 right-4 bg-blue-100 text-blue-800 px-3 py-1 rounded-md text-sm">
           Saving...
         </div>
       )}
-      {isDragging && (
-        <div className="absolute top-4 right-4 bg-yellow-100 text-yellow-800 px-3 py-1 rounded-md text-sm">
-          Dragging...
-        </div>
-      )}
-      {saveStatus.lastSaved && !saveStatus.isSaving && !isDragging && (
+      {saveStatus.lastSaved && !saveStatus.isSaving && (
         <div className="absolute top-4 right-4 bg-green-100 text-green-800 px-3 py-1 rounded-md text-sm">
           Saved
         </div>

@@ -3,7 +3,7 @@
  * useWorkflowExecution Hook
  * 
  * Purpose: Orchestrates sequential execution of workbench modules
- * Coordinates between execution state, topological sorting, and module execution
+ * Now includes workspace saving before execution
  */
 
 import { useCallback } from "react";
@@ -12,7 +12,20 @@ import { useExecutionState } from "./useExecutionState";
 import { useTopologicalSort } from "./useTopologicalSort";
 import { useModuleExecution } from "./useModuleExecution";
 
-export const useWorkflowExecution = (nodes: Node[], edges: Edge[]) => {
+interface WorkspaceData {
+  id: string;
+  name: string;
+  nodes: Node[];
+  edges: Edge[];
+  isDefault: boolean;
+}
+
+export const useWorkflowExecution = (
+  nodes: Node[], 
+  edges: Edge[], 
+  saveWorkspace?: (workspaceData: WorkspaceData) => Promise<void>,
+  workspace?: WorkspaceData
+) => {
   const {
     executionState,
     startExecution,
@@ -30,6 +43,12 @@ export const useWorkflowExecution = (nodes: Node[], edges: Edge[]) => {
    */
   const executeWorkflow = useCallback(async () => {
     try {
+      // Save workspace before execution
+      if (saveWorkspace && workspace) {
+        console.log('Saving workspace before execution...');
+        await saveWorkspace(workspace);
+      }
+
       const executionOrder = calculateExecutionOrder(nodes, edges);
       startExecution(executionOrder);
 
@@ -63,7 +82,7 @@ export const useWorkflowExecution = (nodes: Node[], edges: Edge[]) => {
       setExecutionError(error.message || 'Execution failed');
       throw error;
     }
-  }, [nodes, edges, calculateExecutionOrder, startExecution, updateCurrentStep, completeExecution, setExecutionError, executeModule]);
+  }, [nodes, edges, calculateExecutionOrder, startExecution, updateCurrentStep, completeExecution, setExecutionError, executeModule, saveWorkspace, workspace]);
 
   /**
    * Check if workflow is valid for execution
