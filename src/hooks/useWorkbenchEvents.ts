@@ -38,13 +38,13 @@ type AllNodes = Node<any>;
 interface UseWorkbenchEventsProps {
   initialNodes: AllNodes[];
   initialEdges: Edge[];
-  getNodeAtPosition: (x: number, y: number) => Node | null;
+  reactFlowWrapper: React.RefObject<HTMLDivElement>;
 }
 
 export const useWorkbenchEvents = ({
   initialNodes,
   initialEdges,
-  getNodeAtPosition
+  reactFlowWrapper
 }: UseWorkbenchEventsProps) => {
 
   // Initialize core state management
@@ -61,14 +61,15 @@ export const useWorkbenchEvents = ({
     initialEdges
   });
 
-  // Initialize drag-drop handling
+  // Initialize drag-drop handling with current nodes state
   const {
     onDrop,
     onDragOver,
     onDragLeave
   } = useWorkbenchDragDrop({
     setNodes,
-    getNodeAtPosition
+    nodes,
+    reactFlowWrapper
   });
 
   // Initialize node event handling

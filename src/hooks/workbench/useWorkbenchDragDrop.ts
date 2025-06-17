@@ -27,19 +27,30 @@
 
 import { useCallback } from "react";
 import { Node } from "@xyflow/react";
+import { getNodeAtScreenPosition } from "@/utils/nodeUtils";
 
 // Type definition for all supported node types in the workbench
 type AllNodes = Node<any>;
 
 interface UseWorkbenchDragDropProps {
   setNodes: React.Dispatch<React.SetStateAction<AllNodes[]>>;
-  getNodeAtPosition: (x: number, y: number) => Node | null;
+  nodes: AllNodes[];
+  reactFlowWrapper: React.RefObject<HTMLDivElement>;
 }
 
 export const useWorkbenchDragDrop = ({
   setNodes,
-  getNodeAtPosition
+  nodes,
+  reactFlowWrapper
 }: UseWorkbenchDragDropProps) => {
+
+  /**
+   * Helper function to get node at position using current nodes
+   */
+  const getNodeAtPosition = useCallback((x: number, y: number) => {
+    const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
+    return getNodeAtScreenPosition(nodes, x, y, reactFlowBounds);
+  }, [nodes, reactFlowWrapper]);
 
   /**
    * Visual Feedback Helper: Clear Drag-Over States
@@ -84,10 +95,9 @@ export const useWorkbenchDragDrop = ({
    * 3. Create new helper node with module configuration
    * 
    * @param event - Drag event containing transfer data
-   * @param reactFlowWrapper - Ref to container for position calculations
    */
   const onDrop = useCallback(
-    (event: React.DragEvent, reactFlowWrapper: React.RefObject<HTMLDivElement>) => {
+    (event: React.DragEvent) => {
       event.preventDefault();
       console.log('Drop event received in workbench');
       clearDragOverStates();
@@ -180,7 +190,7 @@ export const useWorkbenchDragDrop = ({
       };
       setNodes((nds) => [...nds, newNode]);
     },
-    [setNodes, getNodeAtPosition, clearDragOverStates]
+    [setNodes, getNodeAtPosition, clearDragOverStates, reactFlowWrapper]
   );
 
   /**
@@ -229,14 +239,13 @@ export const useWorkbenchDragDrop = ({
    * Uses relatedTarget to ensure we only clear when truly leaving the container
    * 
    * @param event - Drag leave event
-   * @param reactFlowWrapper - Container ref for boundary checking
    */
-  const onDragLeave = useCallback((event: React.DragEvent, reactFlowWrapper: React.RefObject<HTMLDivElement>) => {
+  const onDragLeave = useCallback((event: React.DragEvent) => {
     // Only clear states if actually leaving the container
     if (!reactFlowWrapper.current?.contains(event.relatedTarget as HTMLElement)) {
       clearDragOverStates();
     }
-  }, [clearDragOverStates]);
+  }, [clearDragOverStates, reactFlowWrapper]);
 
   return {
     onDrop,

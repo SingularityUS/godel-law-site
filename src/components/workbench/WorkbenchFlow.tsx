@@ -6,7 +6,6 @@ import { useDataFlow } from "@/hooks/workbench/useDataFlow";
 import { useDataPreviewSelection } from "@/hooks/workbench/useDataPreviewSelection";
 import { useWorkflowExecution } from "@/hooks/workbench/useWorkflowExecution";
 import { useWorkspaceManager } from "@/hooks/workbench/useWorkspaceManager";
-import { getNodeAtScreenPosition } from "@/utils/nodeUtils";
 import WorkbenchControls from "./WorkbenchControls";
 import RunWorkflowButton from "./RunWorkflowButton";
 import WorkflowOutput from "./WorkflowOutput";
@@ -37,24 +36,21 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
   { onModuleEdit, editingPromptNodeId, uploadedFiles, reactFlowWrapper },
   ref
 ) {
-  // Initialize workbench event handling FIRST
+  // Initialize workbench event handling with direct reactFlowWrapper reference
   const {
     nodes,
     edges,
     setNodes,
     onNodesChange,
     onEdgesChange,
-    onDrop: handleDrop,
+    onDrop,
     onDragOver,
-    onDragLeave: handleDragLeave,
+    onDragLeave,
     onConnect
   } = useWorkbenchEvents({
     initialNodes,
     initialEdges,
-    getNodeAtPosition: (x: number, y: number) => {
-      const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
-      return getNodeAtScreenPosition(nodes, x, y, reactFlowBounds);
-    }
+    reactFlowWrapper
   });
 
   // Add new state for output display
@@ -172,22 +168,6 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
       }
     }));
   }, [nodes, executionState]);
-
-  /**
-   * Wraps the drop handler to include container reference
-   */
-  const onDrop = useCallback(
-    (event: React.DragEvent) => handleDrop(event, reactFlowWrapper),
-    [handleDrop, reactFlowWrapper]
-  );
-
-  /**
-   * Wraps the drag leave handler to include container reference
-   */
-  const onDragLeave = useCallback(
-    (event: React.DragEvent) => handleDragLeave(event, reactFlowWrapper),
-    [handleDragLeave, reactFlowWrapper]
-  );
 
   return (
     <>
