@@ -32,8 +32,8 @@ const WorkbenchControls: React.FC<WorkbenchControlsProps> = ({
 }) => {
   return (
     <>
-      {/* Pipeline execution controls - positioned at top */}
-      <div className="absolute top-4 left-4 z-10">
+      {/* Pipeline execution controls - positioned at top right */}
+      <div className="absolute top-4 right-4 z-10">
         <PipelineExecutionButton
           nodes={nodes}
           edges={edges}
