@@ -174,6 +174,7 @@ function parseModuleResponse(response: any, moduleType: ModuleKind): any {
       return parseGrammarResponse(response);
       
     default:
-      return parseJsonResponse(response);
+      // Pass moduleType as second argument to parseJsonResponse
+      return parseJsonResponse(response, moduleType);
   }
 }
