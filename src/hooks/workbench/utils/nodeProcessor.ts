@@ -8,7 +8,7 @@
 import { AllNodes, HelperNode } from "@/types/workbench";
 import { ModuleKind, MODULE_DEFINITIONS } from "@/data/modules";
 import { useChatGPTApi } from "../useChatGPTApi";
-import { processWithBatching, shouldUseBatchProcessing } from "./batchProcessor";
+import { processWithBatching, shouldUseBatchProcessing, shouldProcessParagraphsIndividually } from "./batchProcessor";
 import { DocumentChunk } from "./documentChunker";
 import { parseJsonResponse, parseGrammarResponse } from "./parsing";
 
@@ -62,8 +62,8 @@ export const createNodeProcessor = (nodes: AllNodes[], callChatGPT: ReturnType<t
     
     console.log(`Processing legal module ${nodeId} (${moduleType}) with ChatGPT`);
     
-    // Check if we need batch processing
-    if (shouldUseBatchProcessing(inputData)) {
+    // Check if we need batch processing or individual paragraph processing
+    if (shouldUseBatchProcessing(inputData) || shouldProcessParagraphsIndividually(inputData, moduleType)) {
       console.log(`Using batch processing for module ${moduleType}`);
       
       // Define processing function for individual chunks with module-specific progress
@@ -114,7 +114,8 @@ export const createNodeProcessor = (nodes: AllNodes[], callChatGPT: ReturnType<t
       // Enhanced progress callback with module-specific information
       const moduleProgressCallback = (completed: number, total: number, outputCount?: number) => {
         if (onProgress) {
-          const inputType = moduleType === 'paragraph-splitter' ? 'chunks' : 'paragraphs';
+          const inputType = shouldProcessParagraphsIndividually(inputData, moduleType) ? 'paragraphs' : 
+                           moduleType === 'paragraph-splitter' ? 'chunks' : 'paragraphs';
           const progress: ModuleProgress = {
             completed,
             total,
@@ -134,8 +135,8 @@ export const createNodeProcessor = (nodes: AllNodes[], callChatGPT: ReturnType<t
         }
       };
       
-      // Process with batching
-      const result = await processWithBatching(inputData, processChunk, moduleProgressCallback);
+      // Process with batching (includes individual paragraph processing for grammar checker)
+      const result = await processWithBatching(inputData, processChunk, moduleProgressCallback, moduleType);
       
       const processingTime = Date.now() - startTime;
       
