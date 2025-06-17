@@ -83,6 +83,11 @@ serve(async (req) => {
 
     const data = await response.json();
     
+    // Validate response structure
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      throw new Error('Invalid response structure from OpenAI API');
+    }
+    
     const result = {
       response: data.choices[0].message.content,
       model: data.model,

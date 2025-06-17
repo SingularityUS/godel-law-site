@@ -25,6 +25,7 @@ const ChatGPTStatus: React.FC = () => {
   const [currentModel, setCurrentModel] = useState<string>('');
   const [tokenUsage, setTokenUsage] = useState<TokenUsage>({ totalTokens: 0, lastUpdated: '' });
   const [lastTestTime, setLastTestTime] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   // Load token usage from localStorage on component mount
   useEffect(() => {
@@ -45,33 +46,55 @@ const ChatGPTStatus: React.FC = () => {
 
   const testConnection = async () => {
     setStatus('testing');
+    setErrorMessage('');
     
     try {
+      // Use the same parameters as the main processing pipeline
+      const testPrompt = 'Test connection. Please respond with "Connection successful."';
+      const estimatedTokens = Math.ceil(testPrompt.length / 4);
+      
+      // Use appropriate token limits based on the new logic
+      let maxTokens = 100; // Small test response
+      let selectedModel = 'gpt-4o-mini';
+      
+      console.log(`Testing ChatGPT connection with model: ${selectedModel}, tokens: ${estimatedTokens}`);
+
       const { data, error } = await supabase.functions.invoke('chat-gpt', {
         body: {
-          prompt: 'Hi',
-          model: 'gpt-4o-mini',
-          maxTokens: 10
+          prompt: testPrompt,
+          model: selectedModel,
+          maxTokens: maxTokens,
+          systemPrompt: 'You are a test assistant. Respond concisely to confirm the connection is working.'
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('ChatGPT connection test error:', error);
+        setStatus('error');
+        setErrorMessage(error.message || 'Connection failed');
+        return;
+      }
 
-      if (data.response) {
+      if (data && data.response) {
         setStatus('connected');
-        setCurrentModel(data.model || 'gpt-4o-mini');
+        setCurrentModel(data.model || selectedModel);
         setLastTestTime(new Date().toLocaleTimeString());
+        setErrorMessage('');
         
         // Update token usage
         if (data.usage && data.usage.total_tokens) {
           updateTokenUsage(data.usage.total_tokens);
         }
+        
+        console.log(`ChatGPT connection test successful: ${data.response}`);
       } else {
         setStatus('error');
+        setErrorMessage('No response received');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('ChatGPT connection test failed:', error);
       setStatus('error');
+      setErrorMessage(error.message || 'Connection test failed');
     }
   };
 
@@ -109,7 +132,7 @@ const ChatGPTStatus: React.FC = () => {
     switch (status) {
       case 'connected': return `Connected (${currentModel})`;
       case 'testing': return 'Testing...';
-      case 'error': return 'Connection Failed';
+      case 'error': return errorMessage ? `Error: ${errorMessage}` : 'Connection Failed';
       default: return 'Not Tested';
     }
   };
@@ -129,7 +152,7 @@ const ChatGPTStatus: React.FC = () => {
         <div className={`w-3 h-3 rounded-full flex items-center justify-center ${getStatusColor()}`}>
           {getStatusIcon()}
         </div>
-        <span className="text-sm font-medium text-gray-700">
+        <span className="text-sm font-medium text-gray-700" title={errorMessage}>
           {getStatusText()}
         </span>
       </div>
