@@ -107,35 +107,68 @@ export const analyzeParagraph = async (
     console.log(`Sending to ChatGPT for analysis:`);
     console.log('- Content length:', cleanContent.length);
     console.log('- Using system prompt length:', GRAMMAR_ANALYSIS_PROMPT.length);
+    console.log('- Content being sent:', cleanContent.substring(0, 200) + '...');
     
-    // FIXED: Correct parameter order - prompt first, then system prompt
+    // Call ChatGPT with correct parameter order: prompt, systemPrompt, model, maxTokens
     const response = await callGPT(cleanContent, GRAMMAR_ANALYSIS_PROMPT, 'gpt-4o-mini', 1000);
     
     console.log('ChatGPT raw response type:', typeof response);
-    console.log('ChatGPT raw response:', JSON.stringify(response).substring(0, 300));
+    console.log('ChatGPT raw response structure:', Object.keys(response || {}));
+    console.log('ChatGPT raw response:', JSON.stringify(response, null, 2).substring(0, 500));
     
-    // Enhanced response parsing
-    let parsed;
-    if (typeof response === 'string') {
-      console.log('Response is string, attempting JSON extraction...');
-      // Try to extract JSON from response
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        console.log('Found JSON in response:', jsonMatch[0].substring(0, 200));
-        parsed = JSON.parse(jsonMatch[0]);
-      } else {
-        console.error('No JSON found in string response');
-        throw new Error('No JSON found in response');
-      }
-    } else if (typeof response === 'object' && response !== null) {
-      console.log('Response is object, using directly');
-      parsed = response;
-    } else {
-      console.error('Unexpected response type:', typeof response);
-      throw new Error('Unexpected response format');
+    // Check for API error first
+    if (response && response.error) {
+      console.error('ChatGPT API returned error:', response.error);
+      throw new Error(`API Error: ${response.error}`);
     }
     
-    console.log('Parsed response:', JSON.stringify(parsed));
+    // Extract the actual content from the nested response structure
+    let actualContent;
+    if (response && response.response) {
+      // The actual content is nested in response.response
+      actualContent = response.response;
+      console.log('Extracted nested response content:', typeof actualContent);
+      console.log('Actual content preview:', actualContent.substring(0, 200));
+    } else if (typeof response === 'string') {
+      // Direct string response
+      actualContent = response;
+      console.log('Using direct string response');
+    } else {
+      console.error('Unexpected response structure - no nested response found');
+      console.log('Available response keys:', Object.keys(response || {}));
+      throw new Error('Invalid response structure from ChatGPT API');
+    }
+    
+    // Enhanced JSON parsing with better error handling
+    let parsed;
+    if (typeof actualContent === 'string') {
+      console.log('Parsing string content as JSON...');
+      // Try to extract JSON from response
+      const jsonMatch = actualContent.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        console.log('Found JSON in response:', jsonMatch[0].substring(0, 200));
+        try {
+          parsed = JSON.parse(jsonMatch[0]);
+          console.log('Successfully parsed JSON:', Object.keys(parsed));
+        } catch (parseError) {
+          console.error('JSON parse error:', parseError);
+          console.log('Failed to parse content:', jsonMatch[0]);
+          throw new Error('Failed to parse ChatGPT response as JSON');
+        }
+      } else {
+        console.error('No JSON found in string response');
+        console.log('String content:', actualContent);
+        throw new Error('No JSON found in ChatGPT response');
+      }
+    } else if (typeof actualContent === 'object' && actualContent !== null) {
+      console.log('Using object response directly');
+      parsed = actualContent;
+    } else {
+      console.error('Unexpected content type:', typeof actualContent);
+      throw new Error('Unexpected content format from ChatGPT');
+    }
+    
+    console.log('Final parsed response:', JSON.stringify(parsed, null, 2));
     
     // Validate parsed response structure
     if (!parsed || typeof parsed !== 'object') {
@@ -167,6 +200,13 @@ export const analyzeParagraph = async (
     console.log(`- ${suggestions.length} suggestions found`);
     console.log(`- Overall score: ${overallScore}`);
     console.log(`- Processing time: ${processingTime}ms`);
+    
+    if (suggestions.length > 0) {
+      console.log('Suggestions details:');
+      suggestions.forEach((sug, idx) => {
+        console.log(`  ${idx + 1}. ${sug.type} (${sug.severity}): "${sug.originalText}" -> "${sug.suggestedText}"`);
+      });
+    }
     
     return {
       paragraphId: paragraph.id,
