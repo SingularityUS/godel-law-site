@@ -5,15 +5,22 @@
  * Purpose: Displays grammar analysis results with detailed paragraph breakdown
  */
 
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Scale, Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Scale, Info, Edit } from "lucide-react";
+import RedlineDocumentViewer from "@/components/redlining/RedlineDocumentViewer";
+import { convertGrammarAnalysisToRedline } from "@/utils/redlining/grammarToRedline";
+import { RedlineDocument } from "@/types/redlining";
 
 interface GrammarAnalysisTabProps {
   output: any;
 }
 
 const GrammarAnalysisTab: React.FC<GrammarAnalysisTabProps> = ({ output }) => {
+  const [showRedlining, setShowRedlining] = useState(false);
+  const [redlineDocument, setRedlineDocument] = useState<RedlineDocument | null>(null);
+
   const grammarResult = output.results?.find((r: any) => r.moduleType === 'grammar-checker');
   
   if (!grammarResult) {
@@ -25,13 +32,59 @@ const GrammarAnalysisTab: React.FC<GrammarAnalysisTabProps> = ({ output }) => {
     return <div>Grammar analysis format not recognized</div>;
   }
 
+  const handleOpenRedlining = () => {
+    // Get the original document from the pipeline
+    const docResult = output.results?.find((r: any) => r.moduleType === 'document-input');
+    const originalDocument = {
+      name: docResult?.result?.metadata?.fileName || 'Document',
+      type: docResult?.result?.metadata?.fileType || 'text/plain',
+      content: docResult?.result?.content || ''
+    };
+
+    const redlineDoc = convertGrammarAnalysisToRedline(grammarResult.result, originalDocument);
+    setRedlineDocument(redlineDoc);
+    setShowRedlining(true);
+  };
+
+  const handleSaveDocument = (document: RedlineDocument) => {
+    console.log('Saving redlined document:', document);
+    // TODO: Implement document saving logic
+  };
+
+  const handleExportDocument = (document: RedlineDocument, format: string) => {
+    console.log('Exporting redlined document:', document, format);
+    // TODO: Implement document export logic
+  };
+
+  if (showRedlining && redlineDocument) {
+    return (
+      <RedlineDocumentViewer
+        document={redlineDocument}
+        onClose={() => setShowRedlining(false)}
+        onSave={handleSaveDocument}
+        onExport={handleExportDocument}
+      />
+    );
+  }
+
+  const isRedliningReady = grammarResult.result?.metadata?.redliningReady;
+
   return (
     <div className="space-y-4 h-full overflow-auto">
       <div className="p-4 border rounded bg-blue-50">
-        <h3 className="font-bold mb-2 flex items-center gap-2">
-          <Scale size={18} />
-          Grammar Analysis Summary
-        </h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-bold flex items-center gap-2">
+            <Scale size={18} />
+            Grammar Analysis Summary
+          </h3>
+          {isRedliningReady && (
+            <Button onClick={handleOpenRedlining} className="bg-blue-600 hover:bg-blue-700">
+              <Edit size={16} className="mr-1" />
+              Open Redlining Mode
+            </Button>
+          )}
+        </div>
+        
         <div className="grid grid-cols-3 gap-4 text-sm">
           <div>
             <strong>Total Errors:</strong> {grammarData.overallAssessment?.totalErrors || 0}
