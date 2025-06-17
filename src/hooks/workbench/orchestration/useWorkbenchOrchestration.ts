@@ -10,7 +10,7 @@ import { AllNodes, DocumentInputNode } from "@/types/workbench";
 import { useDataFlow } from "../useDataFlow";
 import { useDataPreviewSelection } from "../useDataPreviewSelection";
 import { usePipelineExecution } from "../usePipelineExecution";
-import { useFlowNodeManager } from "../../components/workbench/flow/FlowNodeManager";
+import { useFlowNodeManager } from "@/components/workbench/flow/FlowNodeManager";
 
 interface UseWorkbenchOrchestrationProps {
   nodes: AllNodes[];
