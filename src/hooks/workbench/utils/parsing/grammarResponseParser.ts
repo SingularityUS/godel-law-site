@@ -5,12 +5,34 @@
  * Purpose: Specialized parsing for grammar checker responses
  */
 
-export const parseGrammarResponse = (response: string): any => {
-  console.log('Parsing grammar response, length:', response.length);
+export const parseGrammarResponse = (response: any): any => {
+  console.log('Parsing grammar response, type:', typeof response);
+  
+  // Handle response object from ChatGPT API
+  let responseText: string;
+  if (typeof response === 'object' && response !== null) {
+    if (response.response && typeof response.response === 'string') {
+      responseText = response.response;
+      console.log('Extracted response text from API object, length:', responseText.length);
+    } else if (typeof response === 'string') {
+      responseText = response;
+    } else {
+      // If it's an object but structured differently, try to stringify and parse
+      responseText = JSON.stringify(response);
+      console.log('Converted object to string for parsing');
+    }
+  } else if (typeof response === 'string') {
+    responseText = response;
+  } else {
+    console.error('Unexpected response type:', typeof response);
+    responseText = String(response);
+  }
+  
+  console.log('Processing response text, length:', responseText.length);
   
   // Try direct JSON parsing first for structured responses
   try {
-    const parsed = JSON.parse(response);
+    const parsed = JSON.parse(responseText);
     if (parsed.analysis) {
       // Handle both single analysis and array of analysis
       const analysis = Array.isArray(parsed.analysis) ? parsed.analysis : [parsed.analysis];
@@ -44,7 +66,7 @@ export const parseGrammarResponse = (response: string): any => {
     ];
     
     for (const pattern of jsonPatterns) {
-      const match = response.match(pattern);
+      const match = responseText.match(pattern);
       if (match) {
         const jsonString = match[1] || match[0];
         try {
@@ -73,7 +95,7 @@ export const parseGrammarResponse = (response: string): any => {
   }
   
   // Enhanced fallback parsing for better data extraction
-  const sections = response.split(/\n\s*\n/);
+  const sections = responseText.split(/\n\s*\n/);
   const analysis: any[] = [];
   let totalErrorsFound = 0;
   
@@ -166,7 +188,7 @@ export const parseGrammarResponse = (response: string): any => {
     console.log('No structured content found, creating analysis from full response');
     
     // Split the response into reasonable paragraph-sized chunks
-    const chunks = response.split(/\n\s*\n/);
+    const chunks = responseText.split(/\n\s*\n/);
     chunks.forEach((chunk, index) => {
       if (chunk.trim().length > 100) { // Only process substantial chunks
         analysis.push({
