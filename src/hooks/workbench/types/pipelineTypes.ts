@@ -10,6 +10,7 @@ export interface ExecutionState {
     status: 'idle' | 'queued' | 'processing' | 'completed' | 'error';
     data?: any;
     error?: string;
+    progress?: string;
     processingTime?: number;
   };
 }
