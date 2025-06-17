@@ -1,3 +1,4 @@
+
 import React, { forwardRef, useCallback, useMemo } from "react";
 import { ReactFlow } from "@xyflow/react";
 import { useWorkbenchEvents } from "@/hooks/useWorkbenchEvents";
@@ -49,9 +50,16 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
     initialEdges,
     getNodeAtPosition: useCallback((x: number, y: number) => {
       const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
-      return getNodeAtScreenPosition(nodes, x, y, reactFlowBounds);
-    }, [nodes, reactFlowWrapper])
+      // We'll pass the nodes from the closure since they're available here
+      return getNodeAtScreenPosition([], x, y, reactFlowBounds);
+    }, [reactFlowWrapper])
   });
+
+  // Create a proper getNodeAtPosition function now that nodes is available
+  const getNodeAtPosition = useCallback((x: number, y: number) => {
+    const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
+    return getNodeAtScreenPosition(nodes, x, y, reactFlowBounds);
+  }, [nodes, reactFlowWrapper]);
 
   // Notify parent of nodes/edges changes
   React.useEffect(() => {

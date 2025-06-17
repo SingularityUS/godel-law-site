@@ -87,6 +87,24 @@ export const useWorkflowExecution = (nodes: Node[], edges: Edge[]) => {
   }, [nodes, edges]);
 
   /**
+   * Type guard to check if a string is a valid ModuleKind
+   */
+  const isValidModuleKind = useCallback((type: string): type is ModuleKind => {
+    const validTypes: ModuleKind[] = [
+      'document-input',
+      'text-extractor',
+      'paragraph-splitter',
+      'grammar-checker',
+      'citation-finder',
+      'citation-verifier',
+      'style-guide-enforcer',
+      'chatgpt-assistant',
+      'custom'
+    ];
+    return validTypes.includes(type as ModuleKind);
+  }, []);
+
+  /**
    * Execute a single module
    */
   const executeModule = useCallback(async (nodeId: string, inputData: any) => {
@@ -119,18 +137,7 @@ export const useWorkflowExecution = (nodes: Node[], edges: Edge[]) => {
     // For other modules, use enhanced mock data generation
     const validModuleType = isValidModuleKind(moduleType) ? moduleType : 'text-extractor';
     return await generateMockData(validModuleType, false, true, customPrompt);
-  }, [nodes, callChatGPT, generateMockData]);
-
-  /**
-   * Type guard to check if a string is a valid ModuleKind
-   */
-  const isValidModuleKind = (type: string): type is ModuleKind => {
-    const validTypes: ModuleKind[] = [
-      'text-extractor', 'data-processor', 'chatgpt-assistant', 
-      'sentiment-analyzer', 'summarizer', 'translator'
-    ];
-    return validTypes.includes(type as ModuleKind);
-  };
+  }, [nodes, callChatGPT, generateMockData, isValidModuleKind]);
 
   /**
    * Execute the entire workflow
