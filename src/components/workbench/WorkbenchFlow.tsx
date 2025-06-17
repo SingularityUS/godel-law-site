@@ -40,12 +40,13 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
     return getNodeAtScreenPosition(nodes, x, y, reactFlowBounds);
   }, [nodes]);
 
-  // Initialize drag-drop handling with direct workspace state updates
+  // Initialize drag-drop handling with current nodes and direct state setters
   const {
     onDrop: handleDrop,
     onDragOver,
     onDragLeave: handleDragLeave
   } = useWorkbenchDragDrop({
+    nodes,
     setNodes: updateNodes,
     getNodeAtPosition
   });
