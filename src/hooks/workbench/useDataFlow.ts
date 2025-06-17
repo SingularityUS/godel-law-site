@@ -65,7 +65,7 @@ export const useDataFlow = (nodes: Node[], edges: Edge[]) => {
     // For ChatGPT Assistant module, always use real API if available
     if (moduleType === 'chatgpt-assistant' && !isInput && useRealChatGPT) {
       const inputText = "Sample input data for ChatGPT processing...";
-      const systemPrompt = customPrompt || "You are a helpful AI assistant that processes and analyzes content.";
+      const systemPrompt = typeof customPrompt === 'string' ? customPrompt : "You are a helpful AI assistant that processes and analyzes content.";
       
       const chatGPTResponse = await callChatGPT(inputText, systemPrompt);
       
@@ -457,7 +457,9 @@ export const useDataFlow = (nodes: Node[], edges: Edge[]) => {
       // Use real ChatGPT for supported modules
       if (moduleType === 'chatgpt-assistant' || (targetNode?.data?.supportsChatGPT && Math.random() > 0.5)) {
         try {
-          enhancedOutput = await generateMockData(moduleType, false, true, customPrompt);
+          // Ensure customPrompt is properly typed as string or undefined
+          const promptOverride = typeof customPrompt === 'string' ? customPrompt : undefined;
+          enhancedOutput = await generateMockData(moduleType, false, true, promptOverride);
         } catch (error) {
           console.error('ChatGPT processing failed:', error);
         }
