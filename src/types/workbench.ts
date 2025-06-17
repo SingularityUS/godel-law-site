@@ -22,12 +22,12 @@
 import { Node, Edge } from "@xyflow/react";
 import { ModuleKind } from "@/data/modules";
 
-// Base node data interface
-export interface BaseNodeData {
+// Base node data interface with index signature for React Flow compatibility
+export interface BaseNodeData extends Record<string, unknown> {
   moduleType: ModuleKind | "document-input";
 }
 
-// Document input node data
+// Document input node data with index signature
 export interface DocumentInputNodeData extends BaseNodeData {
   moduleType: "document-input";
   documentName: string;
@@ -35,7 +35,7 @@ export interface DocumentInputNodeData extends BaseNodeData {
   isDragOver?: boolean;
 }
 
-// Helper node data
+// Helper node data with index signature
 export interface HelperNodeData extends BaseNodeData {
   moduleType: ModuleKind;
   promptOverride?: string;
