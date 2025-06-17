@@ -1,6 +1,6 @@
 
 /**
- * Pipeline Execution Types
+ * Pipeline Types
  * 
  * Purpose: Type definitions for pipeline execution system
  */
@@ -11,6 +11,19 @@ export interface ExecutionState {
     data?: any;
     error?: string;
     processingTime?: number;
+    debugInfo?: {
+      totalItems?: number;
+      processedItems?: number;
+      itemType?: string;
+      isPassThrough?: boolean;
+      isDeprecated?: boolean;
+      progress?: string;
+      contentLength?: number;
+      hasChunks?: boolean;
+      chunkCount?: number;
+      batchesProcessed?: number;
+      model?: string;
+    };
   };
 }
 
@@ -20,13 +33,9 @@ export interface PipelineResult {
   result: any;
 }
 
-export interface FinalLegalOutput {
-  summary: {
-    documentsProcessed: number;
-    modulesExecuted: number;
-    processingCompleted: string;
-    pipelineType: string;
+export interface ProgressInfo {
+  [nodeId: string]: {
+    completed: number;
+    total: number;
   };
-  results: PipelineResult[];
-  finalOutput: any;
 }
