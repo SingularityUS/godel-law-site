@@ -1,3 +1,4 @@
+
 /**
  * Core Node Processor
  * 
@@ -99,7 +100,7 @@ function prepareInputForModule(inputData: string, moduleType: ModuleKind): strin
     const parsed = JSON.parse(inputData);
     
     // For traditional modules, use existing logic
-    if (moduleType === 'legal-analyzer' || moduleType === 'text-extractor') {
+    if (moduleType === 'text-extractor' || moduleType === 'citation-finder') {
       if (parsed.processableContent && typeof parsed.processableContent === 'string') {
         return parsed.processableContent.trim();
       }
@@ -124,18 +125,17 @@ function prepareInputForModule(inputData: string, moduleType: ModuleKind): strin
  */
 function enhancePromptForModule(basePrompt: string, moduleType: ModuleKind): string {
   const moduleSpecificInstructions = {
-    'legal-analyzer': `
-CRITICAL INSTRUCTIONS FOR LEGAL ANALYSIS:
-- Analyze the legal content thoroughly
-- Identify key legal concepts and issues
-- Provide structured analysis with citations
-- Return valid JSON format`,
-    
     'text-extractor': `
 CRITICAL INSTRUCTIONS FOR TEXT EXTRACTION:
 - Extract and clean the text content
 - Preserve important formatting
-- Remove artifacts and noise`
+- Remove artifacts and noise`,
+    
+    'citation-finder': `
+CRITICAL INSTRUCTIONS FOR CITATION FINDING:
+- Identify all legal citations and references
+- Extract case names, statutes, and authorities
+- Provide structured citation data`
   };
   
   const enhancement = moduleSpecificInstructions[moduleType] || '';
@@ -149,8 +149,12 @@ function parseModuleResponse(response: any, moduleType: ModuleKind): any {
   console.log(`Parsing response for module: ${moduleType}`);
   
   switch (moduleType) {
-    case 'legal-analyzer':
     case 'text-extractor':
+    case 'citation-finder':
+    case 'citation-verifier':
+    case 'style-guide-enforcer':
+    case 'chatgpt-assistant':
+    case 'custom':
       return parseJsonResponse(response, moduleType);
       
     default:
