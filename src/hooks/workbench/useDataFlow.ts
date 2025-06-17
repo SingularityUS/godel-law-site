@@ -11,6 +11,7 @@ import { useState, useCallback, useEffect } from "react";
 import { Node, Edge } from "@xyflow/react";
 import { ModuleKind } from "@/data/modules";
 import { supabase } from "@/integrations/supabase/client";
+import { useChatGPTTokens } from "@/hooks/useChatGPTTokens";
 
 interface DataFlowState {
   [edgeId: string]: {
@@ -23,6 +24,7 @@ interface DataFlowState {
 
 export const useDataFlow = (nodes: Node[], edges: Edge[]) => {
   const [dataFlowState, setDataFlowState] = useState<DataFlowState>({});
+  const { addTokens } = useChatGPTTokens();
 
   /**
    * Call ChatGPT API through Supabase Edge Function
@@ -39,16 +41,23 @@ export const useDataFlow = (nodes: Node[], edges: Edge[]) => {
       });
 
       if (error) throw error;
+      
+      // Track token usage
+      if (data.usage && data.usage.total_tokens) {
+        addTokens(data.usage.total_tokens);
+      }
+      
       return data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('ChatGPT API call failed:', error);
       return {
         error: error.message || 'ChatGPT processing failed',
         timestamp: new Date().toISOString()
       };
     }
-  }, []);
+  }, [addTokens]);
 
+  
   /**
    * Generate enhanced mock data with potential ChatGPT integration
    */

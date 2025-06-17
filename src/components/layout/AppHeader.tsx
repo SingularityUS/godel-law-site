@@ -2,19 +2,21 @@
 /**
  * AppHeader Component
  * 
- * Purpose: Application header with branding, document controls, and user section
+ * Purpose: Application header with branding, document controls, ChatGPT status, and user section
  * This component provides the top-level navigation and controls for the AI Workbench
- * application, including document management and user authentication.
+ * application, including document management, ChatGPT connection monitoring, and user authentication.
  * 
  * Key Responsibilities:
  * - Displays application branding and title
  * - Houses document upload and library controls
+ * - Shows ChatGPT API connection status and token usage
  * - Shows user authentication information and logout
  * - Maintains consistent header styling and layout
  * 
  * Integration Points:
  * - Receives document management callbacks from parent
  * - Integrates with DocumentUpload and DocumentControls components
+ * - Displays real-time ChatGPT API status via ChatGPTStatus component
  * - Coordinates with UserSection for authentication display
  * - Maintains responsive design for different screen sizes
  * 
@@ -29,6 +31,7 @@ import React from "react";
 import { BookOpen } from "lucide-react";
 import DocumentControls from "./DocumentControls";
 import UserSection from "./UserSection";
+import ChatGPTStatus from "./ChatGPTStatus";
 
 export type UploadedFile = File & { preview?: string; extractedText?: string };
 
@@ -51,12 +54,16 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         <h1 className="text-2xl font-bold tracking-tight text-black">AI PRODUCTION LINE BUILDER</h1>
       </div>
       
-      {/* Document Management Controls */}
-      <DocumentControls 
-        onFilesAccepted={onFilesAccepted}
-        onUploadComplete={onUploadComplete}
-        onLibraryOpen={onLibraryOpen}
-      />
+      {/* Center Section - Document Controls and ChatGPT Status */}
+      <div className="flex items-center gap-6">
+        <DocumentControls 
+          onFilesAccepted={onFilesAccepted}
+          onUploadComplete={onUploadComplete}
+          onLibraryOpen={onLibraryOpen}
+        />
+        
+        <ChatGPTStatus />
+      </div>
 
       {/* User Authentication Section */}
       <UserSection />
