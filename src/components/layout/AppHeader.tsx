@@ -1,32 +1,4 @@
 
-/**
- * AppHeader Component
- * 
- * Purpose: Application header with branding, document controls, ChatGPT status, and user section
- * This component provides the top-level navigation and controls for the AI Workbench
- * application, including document management, ChatGPT connection monitoring, and user authentication.
- * 
- * Key Responsibilities:
- * - Displays application branding and title
- * - Houses document upload and library controls
- * - Shows ChatGPT API connection status and token usage
- * - Shows user authentication information and logout
- * - Maintains consistent header styling and layout
- * 
- * Integration Points:
- * - Receives document management callbacks from parent
- * - Integrates with DocumentUpload and DocumentControls components
- * - Displays real-time ChatGPT API status via ChatGPTStatus component
- * - Coordinates with UserSection for authentication display
- * - Maintains responsive design for different screen sizes
- * 
- * Architecture Benefits:
- * - Separates header concerns from main page logic
- * - Provides reusable header component for future pages
- * - Improves maintainability through focused responsibility
- * - Enables independent testing of header functionality
- */
-
 import React from "react";
 import { BookOpen } from "lucide-react";
 import DocumentControls from "./DocumentControls";
@@ -68,8 +40,8 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         </div>
       </div>
 
-      {/* ChatGPT Status Row */}
-      <div className="flex justify-center items-center py-2 px-8 border-t border-gray-200 bg-gray-50">
+      {/* ChatGPT Status Row - Narrow, right-aligned, white background */}
+      <div className="flex justify-end items-center py-1 px-8 bg-white">
         <ChatGPTStatus />
       </div>
     </header>
