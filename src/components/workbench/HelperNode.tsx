@@ -1,6 +1,7 @@
+
 import React, { useCallback } from "react";
 import { Handle, Position } from "@xyflow/react";
-import { ModuleKind } from "@/data/modules";
+import { ModuleKind, MODULE_DEFINITIONS } from "@/data/modules";
 import { FileText, FileSearch, SplitSquareHorizontal, CheckCircle, Clock, AlertCircle, Play } from "lucide-react";
 import ExecutionStatusIndicator from "./ExecutionStatusIndicator";
 
@@ -9,8 +10,8 @@ const nodeStyles =
 
 export interface HelperNodeData {
   moduleType: ModuleKind;
-  moduleLabel: string;
-  icon: React.FC;
+  moduleLabel?: string;
+  icon?: React.FC;
   promptOverride?: string;
   executionStatus?: {
     status: 'idle' | 'queued' | 'processing' | 'completed' | 'error';
@@ -47,6 +48,11 @@ const HelperNode: React.FC<HelperNodeProps> = ({ data, id }) => {
 
   const executionStatus = data.executionStatus || { status: 'idle' };
 
+  // Get module definition to access icon and label
+  const moduleDef = MODULE_DEFINITIONS.find(m => m.type === data.moduleType);
+  const IconComponent = data.icon || moduleDef?.icon;
+  const moduleLabel = data.moduleLabel || moduleDef?.label || data.moduleType;
+
   return (
     <div className={`relative ${nodeStyles}`} onClick={handleClick}>
       <Handle type="target" position={Position.Left} />
@@ -58,8 +64,8 @@ const HelperNode: React.FC<HelperNodeProps> = ({ data, id }) => {
         debugInfo={executionStatus.debugInfo}
       />
       
-      <data.icon size={32} className="text-gray-700" />
-      <div className="text-sm font-medium text-gray-800 mt-2">{data.moduleLabel}</div>
+      {IconComponent && <IconComponent size={32} className="text-gray-700" />}
+      <div className="text-sm font-medium text-gray-800 mt-2">{moduleLabel}</div>
       <Handle type="source" position={Position.Right} />
     </div>
   );

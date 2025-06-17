@@ -89,8 +89,8 @@ export const useDataFlowState = (nodes: Node[], edges: Edge[]) => {
     setTimeout(async () => {
       let enhancedOutput = edgeData.outputData;
 
-      // Use real ChatGPT for supported modules
-      if (moduleType === 'chatgpt-assistant' || (targetNode?.data?.supportsChatGPT && Math.random() > 0.5)) {
+      // Use real ChatGPT for supported modules (removed chatgpt-assistant reference)
+      if (targetNode?.data?.supportsChatGPT && Math.random() > 0.5) {
         try {
           // Ensure customPrompt is properly typed as string or undefined
           const promptOverride = typeof customPrompt === 'string' ? customPrompt : undefined;
