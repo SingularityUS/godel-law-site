@@ -2,8 +2,8 @@
 /**
  * useWorkspaceUpdaters Hook
  * 
- * Purpose: Provides update functions for nodes and edges
- * Handles workspace state updates in a controlled manner
+ * Purpose: Provides optimized update functions for nodes and edges
+ * Handles workspace state updates efficiently to prevent performance issues
  */
 
 import { useCallback } from "react";
@@ -29,25 +29,25 @@ export const useWorkspaceUpdaters = ({
 
   /**
    * Update nodes in the workspace
+   * Optimized to avoid excessive re-renders during drag operations
    */
   const updateNodes = useCallback((nodes: Node[]) => {
-    console.log('Updating workspace nodes:', nodes.length);
     setWorkspace({
       ...workspace,
       nodes
     });
-  }, [workspace, setWorkspace]);
+  }, [workspace.id, workspace.name, workspace.edges, workspace.isDefault, setWorkspace]);
 
   /**
    * Update edges in the workspace
+   * Optimized to avoid excessive re-renders
    */
   const updateEdges = useCallback((edges: Edge[]) => {
-    console.log('Updating workspace edges:', edges.length);
     setWorkspace({
       ...workspace,
       edges
     });
-  }, [workspace, setWorkspace]);
+  }, [workspace.id, workspace.name, workspace.nodes, workspace.isDefault, setWorkspace]);
 
   return {
     updateNodes,

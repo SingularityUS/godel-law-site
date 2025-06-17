@@ -4,6 +4,7 @@ import { ReactFlow, Node, Edge } from "@xyflow/react";
 import { useWorkbenchDragDrop } from "@/hooks/workbench/useWorkbenchDragDrop";
 import { useDataFlow } from "@/hooks/workbench/useDataFlow";
 import { useDataPreviewSelection } from "@/hooks/workbench/useDataPreviewSelection";
+import { useDragOptimization } from "@/hooks/workbench/useDragOptimization";
 import { getNodeAtScreenPosition } from "@/utils/nodeUtils";
 import WorkbenchControls from "./WorkbenchControls";
 import { useFlowEventHandlers } from "./flow/FlowEventHandlers";
@@ -40,6 +41,9 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
     return getNodeAtScreenPosition(nodes, x, y, reactFlowBounds);
   }, [nodes]);
 
+  // Initialize drag optimization
+  const { handleOptimizedNodesChange } = useDragOptimization({ updateNodes });
+
   // Initialize drag-drop handling with current nodes and direct state setters
   const {
     onDrop: handleDrop,
@@ -51,10 +55,10 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
     getNodeAtPosition
   });
 
-  // Initialize data flow management
+  // Initialize data flow management with memoized values
   const { getEdgeData, simulateProcessing } = useDataFlow(nodes, edges);
 
-  // Initialize data preview selection
+  // Initialize data preview selection with memoized callbacks
   const { toggleEdgePreview, hideAllPreviews, isEdgeSelected } = useDataPreviewSelection();
 
   // Initialize event handlers
@@ -69,29 +73,11 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
   const { getNodeColor } = useFlowNodeManager();
 
   /**
-   * Handle React Flow node changes and update workspace
+   * Optimized nodes change handler that prevents choppy dragging
    */
   const handleNodesChange = useCallback((changes: any[]) => {
-    const updatedNodes = nodes.map(node => {
-      const change = changes.find(c => c.id === node.id);
-      if (!change) return node;
-      
-      switch (change.type) {
-        case 'position':
-          return { ...node, position: change.position };
-        case 'dimensions':
-          return { ...node, width: change.dimensions?.width, height: change.dimensions?.height };
-        case 'remove':
-          return null;
-        case 'select':
-          return { ...node, selected: change.selected };
-        default:
-          return node;
-      }
-    }).filter(Boolean) as Node[];
-    
-    updateNodes(updatedNodes);
-  }, [nodes, updateNodes]);
+    handleOptimizedNodesChange(changes, nodes);
+  }, [handleOptimizedNodesChange, nodes]);
 
   /**
    * Handle React Flow edge changes and update workspace
@@ -158,7 +144,7 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
   }, [hideAllPreviews]);
 
   /**
-   * Enhance edges with data preview functionality and selection state
+   * Memoized enhanced edges to prevent flickering
    */
   const enhancedEdges = useMemo(() => {
     return edges.map(edge => ({
