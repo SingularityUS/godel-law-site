@@ -2,13 +2,13 @@
 /**
  * Paragraph Batch Processor
  * 
- * Purpose: Handles processing of paragraphs in batches for individual analysis
+ * Purpose: Handles processing of paragraphs in batches for individual analysis - FIXED progress tracking
  */
 
 import { BatchProcessingOptions, PARAGRAPH_BATCH_OPTIONS } from "./batchConfig";
 
 /**
- * Process paragraphs in batches for individual analysis
+ * Process paragraphs in batches for individual analysis - FIXED to show correct progress
  */
 export const processParagraphBatches = async (
   paragraphs: any[],
@@ -22,6 +22,11 @@ export const processParagraphBatches = async (
   let totalOutputGenerated = 0;
   
   console.log(`Starting paragraph batch processing of ${paragraphs.length} paragraphs`);
+  
+  // FIXED: Report initial progress correctly
+  if (onProgress) {
+    onProgress(0, paragraphs.length, 0);
+  }
   
   // Process paragraphs in batches
   for (let i = 0; i < paragraphs.length; i += config.maxConcurrent) {
@@ -77,7 +82,8 @@ export const processParagraphBatches = async (
     results.push(...batchResults);
     completedCount += batch.length;
     
-    // Update progress
+    // FIXED: Update progress with correct counts
+    console.log(`Progress update: ${completedCount}/${paragraphs.length} paragraphs completed`);
     if (onProgress) {
       onProgress(completedCount, paragraphs.length, totalOutputGenerated);
     }

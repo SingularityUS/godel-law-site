@@ -2,7 +2,7 @@
 /**
  * Batch Processor Utility
  * 
- * Purpose: Main orchestrator for batch processing of documents and paragraphs
+ * Purpose: Main orchestrator for batch processing of documents and paragraphs - FIXED data flow
  */
 
 import { DocumentChunk, reassembleChunks } from "./documentChunker";
@@ -27,7 +27,7 @@ export { processBatches } from "./chunkBatchProcessor";
 export { processParagraphBatches } from "./paragraphBatchProcessor";
 
 /**
- * Process data either as single chunk or in batches - enhanced for paragraph processing
+ * Process data either as single chunk or in batches - FIXED for proper paragraph processing
  */
 export const processWithBatching = async (
   data: any,
@@ -37,29 +37,35 @@ export const processWithBatching = async (
 ): Promise<any> => {
   // Check if we should process paragraphs individually (for grammar checker)
   if (shouldProcessParagraphsIndividually(data, moduleType || '')) {
-    console.log(`Processing ${data.output.paragraphs.length} paragraphs individually for ${moduleType}`);
+    const paragraphs = data.output?.paragraphs || data.paragraphs || [];
+    console.log(`Processing ${paragraphs.length} paragraphs individually for ${moduleType}`);
+    
+    // FIXED: Report initial progress correctly
+    if (onProgress) {
+      onProgress(0, paragraphs.length, 0);
+    }
     
     // Create a processing function for individual paragraphs
     const processIndividualParagraphWrapper = async (paragraph: any, index: number) => {
       return await processIndividualParagraph(
         paragraph, 
         index, 
-        data.output.paragraphs.length, 
-        data.output.documentType || 'legal',
+        paragraphs.length, 
+        data.output?.documentType || data.documentType || 'legal',
         processingFunction
       );
     };
     
-    // Process paragraphs in batches
+    // Process paragraphs in batches with correct progress tracking
     const results = await processParagraphBatches(
-      data.output.paragraphs,
+      paragraphs,
       processIndividualParagraphWrapper,
       {},
       onProgress
     );
     
     // Combine all analysis results
-    return combineAnalysisResults(results, data.output.paragraphs.length, moduleType);
+    return combineAnalysisResults(results, paragraphs.length, moduleType);
   }
   
   if (data.chunks && Array.isArray(data.chunks) && data.chunks.length > 1) {

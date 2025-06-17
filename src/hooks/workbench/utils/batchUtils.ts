@@ -52,7 +52,7 @@ export const shouldProcessParagraphsIndividually = (data: any, moduleType: strin
 };
 
 /**
- * Process individual paragraph for grammar checking with enhanced context preservation
+ * Process individual paragraph for grammar checking - FIXED to send only text content
  */
 export const processIndividualParagraph = async (
   paragraph: any, 
@@ -73,31 +73,15 @@ export const processIndividualParagraph = async (
     };
   }
   
-  // Create a focused data structure for individual paragraph with enhanced context
-  const paragraphData = {
-    paragraph: {
-      id: paragraph.id || `para-${index + 1}`,
-      content: paragraph.content,
-      wordCount: paragraph.wordCount || (paragraph.content ? paragraph.content.split(/\s+/).length : 0),
-      originalIndex: index
-    },
-    context: {
-      totalParagraphs: totalParagraphs,
-      currentIndex: index,
-      documentType: documentType || 'legal',
-      isIndividualProcessing: true,
-      processingMode: 'individual'
-    },
-    metadata: {
-      processingMode: 'individual',
-      paragraphId: paragraph.id || `para-${index + 1}`,
-      timestamp: new Date().toISOString(),
-      originalParagraph: paragraph
-    }
-  };
+  // FIXED: Send only the paragraph text content, not complex JSON
+  // The grammar checker needs plain text, not structured data
+  const paragraphText = paragraph.content;
+  
+  console.log(`Sending paragraph text (${paragraphText.length} chars) to grammar checker for analysis`);
   
   try {
-    const result = await processingFunction(JSON.stringify(paragraphData, null, 2));
+    // Send only the text content to the processing function
+    const result = await processingFunction(paragraphText);
     
     // Enhance result with paragraph context and validation
     if (result && result.output) {
@@ -107,7 +91,8 @@ export const processIndividualParagraph = async (
         paragraphId: paragraph.id || `para-${index + 1}`,
         processedIndividually: true,
         originalWordCount: paragraph.wordCount,
-        processingSuccess: true
+        processingSuccess: true,
+        originalParagraphContent: paragraph.content // Preserve original content
       };
       
       console.log(`✅ Paragraph ${index + 1} processed successfully`);
@@ -175,7 +160,8 @@ export const combineAnalysisResults = (results: any[], totalParagraphs: number, 
           originalIndex: result.metadata?.originalParagraphIndex ?? index,
           paragraphId: result.metadata?.paragraphId || item.paragraphId || `para-${index + 1}`,
           processedIndividually: true,
-          processingSuccess: result.metadata?.processingSuccess ?? true
+          processingSuccess: result.metadata?.processingSuccess ?? true,
+          originalContent: result.metadata?.originalParagraphContent // Add original content reference
         }));
         allAnalysis.push(...enhancedAnalysis);
         
@@ -192,7 +178,8 @@ export const combineAnalysisResults = (results: any[], totalParagraphs: number, 
           originalIndex: result.metadata?.originalParagraphIndex ?? index,
           paragraphId: result.metadata?.paragraphId || result.output.analysis.paragraphId || `para-${index + 1}`,
           processedIndividually: true,
-          processingSuccess: result.metadata?.processingSuccess ?? true
+          processingSuccess: result.metadata?.processingSuccess ?? true,
+          originalContent: result.metadata?.originalParagraphContent
         };
         allAnalysis.push(enhancedItem);
         
