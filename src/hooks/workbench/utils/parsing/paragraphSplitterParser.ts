@@ -6,7 +6,9 @@
  */
 
 export const parseParagraphSplitterResponse = (response: any): any => {
-  console.log('Parsing paragraph splitter response, type:', typeof response, 'length:', typeof response === 'string' ? response.length : 'N/A');
+  console.log('=== PARAGRAPH SPLITTER PARSER DEBUG ===');
+  console.log('Raw response type:', typeof response);
+  console.log('Raw response preview:', typeof response === 'string' ? response.substring(0, 200) + '...' : JSON.stringify(response).substring(0, 200) + '...');
   
   // Handle non-string responses
   let responseString: string;
@@ -40,26 +42,64 @@ export const parseParagraphSplitterResponse = (response: any): any => {
     console.warn('Converting non-string response to string for paragraph splitter');
   }
   
+  console.log('Processing response string length:', responseString.length);
+  
   // Try direct JSON parsing first
   try {
     const parsed = JSON.parse(responseString);
+    console.log('Direct JSON parsing successful, checking structure...');
+    
     if (parsed.paragraphs && Array.isArray(parsed.paragraphs)) {
-      console.log(`Direct JSON parsing successful: ${parsed.paragraphs.length} paragraphs found`);
+      console.log(`Found ${parsed.paragraphs.length} paragraphs in direct parse`);
+      
+      // Validate and clean paragraph content
+      const cleanedParagraphs = parsed.paragraphs.map((para: any, index: number) => {
+        const cleanContent = cleanParagraphContent(para.content || para.text || '');
+        console.log(`Paragraph ${index + 1} original length: ${(para.content || para.text || '').length}, cleaned length: ${cleanContent.length}`);
+        
+        return {
+          id: para.id || `para-${index + 1}`,
+          content: cleanContent,
+          wordCount: cleanContent.split(/\s+/).filter(word => word.length > 0).length,
+          type: para.type || 'body',
+          sectionNumber: para.sectionNumber || ''
+        };
+      }).filter(para => para.content.length > 10); // Filter out empty or very short paragraphs
+      
       return {
         output: {
-          paragraphs: parsed.paragraphs,
-          totalParagraphs: parsed.paragraphs.length,
+          paragraphs: cleanedParagraphs,
+          totalParagraphs: cleanedParagraphs.length,
           documentType: parsed.documentType || 'legal'
         }
       };
     }
+    
     // Check if the parsed object has an output property with paragraphs
     if (parsed.output && parsed.output.paragraphs && Array.isArray(parsed.output.paragraphs)) {
-      console.log(`JSON parsing successful with output wrapper: ${parsed.output.paragraphs.length} paragraphs found`);
-      return parsed;
+      console.log(`Found ${parsed.output.paragraphs.length} paragraphs in output wrapper`);
+      
+      const cleanedParagraphs = parsed.output.paragraphs.map((para: any, index: number) => {
+        const cleanContent = cleanParagraphContent(para.content || para.text || '');
+        return {
+          id: para.id || `para-${index + 1}`,
+          content: cleanContent,
+          wordCount: cleanContent.split(/\s+/).filter(word => word.length > 0).length,
+          type: para.type || 'body',
+          sectionNumber: para.sectionNumber || ''
+        };
+      }).filter(para => para.content.length > 10);
+      
+      return {
+        output: {
+          paragraphs: cleanedParagraphs,
+          totalParagraphs: cleanedParagraphs.length,
+          documentType: parsed.output.documentType || 'legal'
+        }
+      };
     }
   } catch (error) {
-    console.warn('Direct JSON parsing failed for paragraph splitter, attempting extraction');
+    console.warn('Direct JSON parsing failed for paragraph splitter, attempting extraction:', error);
   }
 
   // Try to extract JSON from markdown code blocks with enhanced patterns
@@ -79,17 +119,48 @@ export const parseParagraphSplitterResponse = (response: any): any => {
           const parsed = JSON.parse(jsonString.trim());
           if (parsed.paragraphs && Array.isArray(parsed.paragraphs)) {
             console.log(`JSON extraction successful: ${parsed.paragraphs.length} paragraphs found`);
+            
+            const cleanedParagraphs = parsed.paragraphs.map((para: any, index: number) => {
+              const cleanContent = cleanParagraphContent(para.content || para.text || '');
+              return {
+                id: para.id || `para-${index + 1}`,
+                content: cleanContent,
+                wordCount: cleanContent.split(/\s+/).filter(word => word.length > 0).length,
+                type: para.type || 'body',
+                sectionNumber: para.sectionNumber || ''
+              };
+            }).filter(para => para.content.length > 10);
+            
             return {
               output: {
-                paragraphs: parsed.paragraphs,
-                totalParagraphs: parsed.paragraphs.length,
+                paragraphs: cleanedParagraphs,
+                totalParagraphs: cleanedParagraphs.length,
                 documentType: parsed.documentType || 'legal'
               }
             };
           }
+          
           if (parsed.output && parsed.output.paragraphs && Array.isArray(parsed.output.paragraphs)) {
             console.log(`JSON extraction successful with wrapper: ${parsed.output.paragraphs.length} paragraphs found`);
-            return parsed;
+            
+            const cleanedParagraphs = parsed.output.paragraphs.map((para: any, index: number) => {
+              const cleanContent = cleanParagraphContent(para.content || para.text || '');
+              return {
+                id: para.id || `para-${index + 1}`,
+                content: cleanContent,
+                wordCount: cleanContent.split(/\s+/).filter(word => word.length > 0).length,
+                type: para.type || 'body',
+                sectionNumber: para.sectionNumber || ''
+              };
+            }).filter(para => para.content.length > 10);
+            
+            return {
+              output: {
+                paragraphs: cleanedParagraphs,
+                totalParagraphs: cleanedParagraphs.length,
+                documentType: parsed.output.documentType || 'legal'
+              }
+            };
           }
         } catch (parseError) {
           console.warn(`Failed to parse JSON from pattern ${pattern}:`, parseError);
@@ -121,12 +192,17 @@ export const parseParagraphSplitterResponse = (response: any): any => {
     const matches = responseString.matchAll(pattern);
     for (const match of matches) {
       const content = match[1]?.trim() || match[0]?.trim();
-      if (content && content.length > 100) { // Only include substantial content
-        paragraphs.push({
-          id: `para-${paragraphs.length + 1}`,
-          content: content,
-          wordCount: content.split(/\s+/).length
-        });
+      if (content && content.length > 100) {
+        const cleanContent = cleanParagraphContent(content);
+        if (cleanContent.length > 50) {
+          paragraphs.push({
+            id: `para-${paragraphs.length + 1}`,
+            content: cleanContent,
+            wordCount: cleanContent.split(/\s+/).filter(word => word.length > 0).length,
+            type: 'body',
+            sectionNumber: ''
+          });
+        }
       }
     }
     
@@ -140,13 +216,14 @@ export const parseParagraphSplitterResponse = (response: any): any => {
   if (paragraphs.length === 0) {
     const sections = responseString.split(/\n\s*\n/);
     sections.forEach((section, index) => {
-      const content = section.trim();
-      // More lenient content filter for final fallback
-      if (content.length > 50 && !content.match(/^(error|failed|unable)/i)) {
+      const cleanContent = cleanParagraphContent(section.trim());
+      if (cleanContent.length > 50 && !cleanContent.match(/^(error|failed|unable)/i)) {
         paragraphs.push({
           id: `para-${index + 1}`,
-          content: content,
-          wordCount: content.split(/\s+/).length
+          content: cleanContent,
+          wordCount: cleanContent.split(/\s+/).filter(word => word.length > 0).length,
+          type: 'body',
+          sectionNumber: ''
         });
       }
     });
@@ -156,12 +233,22 @@ export const parseParagraphSplitterResponse = (response: any): any => {
   // If still no paragraphs, create a single paragraph from the entire response
   if (paragraphs.length === 0 && responseString.trim().length > 0) {
     console.warn('No paragraphs extracted, creating single paragraph from entire response');
-    paragraphs.push({
-      id: 'para-1',
-      content: responseString.trim(),
-      wordCount: responseString.trim().split(/\s+/).length
-    });
+    const cleanContent = cleanParagraphContent(responseString.trim());
+    if (cleanContent.length > 0) {
+      paragraphs.push({
+        id: 'para-1',
+        content: cleanContent,
+        wordCount: cleanContent.split(/\s+/).filter(word => word.length > 0).length,
+        type: 'body',
+        sectionNumber: ''
+      });
+    }
   }
+
+  console.log(`=== FINAL RESULT: ${paragraphs.length} paragraphs ===`);
+  paragraphs.forEach((para, index) => {
+    console.log(`Paragraph ${index + 1}: "${para.content.substring(0, 100)}..." (${para.wordCount} words)`);
+  });
 
   return {
     output: {
@@ -173,3 +260,32 @@ export const parseParagraphSplitterResponse = (response: any): any => {
     }
   };
 };
+
+/**
+ * Clean paragraph content by removing JSON artifacts and escaped characters
+ */
+function cleanParagraphContent(content: string): string {
+  if (!content || typeof content !== 'string') {
+    return '';
+  }
+  
+  // Remove escaped quotes and slashes
+  let cleaned = content.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+  
+  // Remove JSON-like artifacts
+  cleaned = cleaned.replace(/\{\s*"[^"]*":\s*[^,}]+[,}]/g, '');
+  cleaned = cleaned.replace(/^\s*[,}\]]+/, ''); // Remove leading JSON artifacts
+  cleaned = cleaned.replace(/[,{\[]+\s*$/, ''); // Remove trailing JSON artifacts
+  
+  // Remove escaped newlines and normalize whitespace
+  cleaned = cleaned.replace(/\\n/g, ' ').replace(/\s+/g, ' ');
+  
+  // Remove any remaining JSON property patterns
+  cleaned = cleaned.replace(/"[^"]*":\s*[^,}]+/g, '');
+  cleaned = cleaned.replace(/[{}[\]]/g, '');
+  
+  // Clean up extra whitespace and punctuation
+  cleaned = cleaned.trim().replace(/^[,\s]+|[,\s]+$/g, '');
+  
+  return cleaned;
+}

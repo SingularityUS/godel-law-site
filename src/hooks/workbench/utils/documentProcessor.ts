@@ -2,7 +2,7 @@
 /**
  * Document Processor Utility
  * 
- * Purpose: Handles extraction of text content from legal documents with chunking support
+ * Purpose: Handles extraction of text content from legal documents with enhanced debugging
  */
 
 import { DocumentInputNode } from "@/types/workbench";
@@ -11,6 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { chunkDocument, DocumentChunk } from "./documentChunker";
 
 export const extractDocumentText = async (docNode: DocumentInputNode): Promise<any> => {
+  console.log('=== DOCUMENT PROCESSOR DEBUG ===');
+  
   if (!docNode.data?.file) {
     throw new Error('No file attached to document node');
   }
@@ -29,11 +31,9 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<a
     
     // Check if this is a proper File object or a Supabase storage reference
     if (typeof file.arrayBuffer === 'function') {
-      // This is a proper File object
       console.log('Using File object arrayBuffer method');
       arrayBuffer = await file.arrayBuffer();
     } else if (file.preview) {
-      // This is from Supabase storage, fetch the file content
       console.log('Fetching file from Supabase storage:', file.preview);
       const response = await fetch(file.preview);
       if (!response.ok) {
@@ -46,19 +46,15 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<a
     
     // Handle different file types
     if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || fileName.endsWith('.docx')) {
-      // Extract text from DOCX files using mammoth
       const result = await mammoth.extractRawText({ arrayBuffer });
       extractedText = result.value;
       documentType = "docx";
       console.log(`Extracted ${extractedText.length} characters from DOCX file`);
       
     } else if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
-      // For PDF files, we'll need to handle them differently
-      // For now, provide guidance that PDF extraction needs additional setup
       throw new Error('PDF text extraction requires additional setup. Please convert to DOCX or plain text format.');
       
     } else if (fileType?.startsWith('text/') || fileName.endsWith('.txt')) {
-      // Handle plain text files - convert ArrayBuffer to text
       const textDecoder = new TextDecoder('utf-8');
       extractedText = textDecoder.decode(arrayBuffer);
       documentType = "text";
@@ -73,32 +69,37 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<a
       throw new Error('No text content could be extracted from the document');
     }
     
-    console.log('Successfully extracted text:', extractedText.substring(0, 200) + '...');
+    // Clean the extracted text
+    const cleanedText = cleanExtractedText(extractedText);
+    console.log('Text cleaning stats:');
+    console.log(`- Original length: ${extractedText.length}`);
+    console.log(`- Cleaned length: ${cleanedText.length}`);
+    console.log(`- First 200 chars: "${cleanedText.substring(0, 200)}..."`);
     
     // Check if document needs chunking
-    const estimatedTokens = Math.ceil(extractedText.length / 4);
+    const estimatedTokens = Math.ceil(cleanedText.length / 4);
     const needsChunking = estimatedTokens > 3000;
     
     let chunks: DocumentChunk[] = [];
     if (needsChunking) {
       console.log(`Document is large (${estimatedTokens} estimated tokens), creating chunks...`);
-      chunks = chunkDocument(extractedText, fileName, {
+      chunks = chunkDocument(cleanedText, fileName, {
         maxTokens: 3000,
         overlapSize: 200,
         preserveParagraphs: true
       });
     }
     
-    return {
+    const result = {
       documentType,
       title: fileName,
-      content: extractedText.trim(),
+      content: cleanedText,
       chunks: chunks.length > 0 ? chunks : undefined,
       metadata: {
         fileName,
         fileType,
         fileSize: file.size,
-        contentLength: extractedText.length,
+        contentLength: cleanedText.length,
         extractedSuccessfully: true,
         estimatedTokens,
         needsChunking,
@@ -106,10 +107,17 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<a
       }
     };
     
+    console.log('Document extraction result:', {
+      contentLength: result.content.length,
+      chunkCount: result.chunks?.length || 0,
+      estimatedTokens: result.metadata.estimatedTokens
+    });
+    
+    return result;
+    
   } catch (error) {
     console.error('Error extracting document text:', error);
     
-    // Return error information instead of placeholder content
     return {
       documentType: "error",
       title: fileName,
@@ -124,3 +132,28 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<a
     };
   }
 };
+
+/**
+ * Clean extracted text to ensure it's properly formatted
+ */
+function cleanExtractedText(text: string): string {
+  if (!text || typeof text !== 'string') {
+    return '';
+  }
+  
+  // Normalize line endings
+  let cleaned = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  
+  // Remove excessive whitespace but preserve paragraph structure
+  cleaned = cleaned.replace(/[ \t]+/g, ' '); // Replace multiple spaces/tabs with single space
+  cleaned = cleaned.replace(/\n\s+/g, '\n'); // Remove leading spaces on new lines
+  cleaned = cleaned.replace(/\s+\n/g, '\n'); // Remove trailing spaces before new lines
+  
+  // Normalize paragraph breaks (convert multiple newlines to double newlines)
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+  
+  // Remove leading/trailing whitespace
+  cleaned = cleaned.trim();
+  
+  return cleaned;
+}

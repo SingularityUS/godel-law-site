@@ -2,133 +2,178 @@
 /**
  * Core Node Processor
  * 
- * Purpose: Handles the actual ChatGPT API calls and response processing with enhanced validation
+ * Purpose: Core processing logic for individual nodes with enhanced data cleaning
  */
 
-import { HelperNode } from "@/types/workbench";
+import { AllNodes, HelperNode } from "@/types/workbench";
 import { ModuleKind } from "@/data/modules";
 import { useChatGPTApi } from "../useChatGPTApi";
-import { parseJsonResponse } from "./parsing/responseParser";
-import { parseGrammarResponse } from "./parsing/grammarResponseParser";
-import { parseParagraphSplitterResponse } from "./parsing/paragraphSplitterParser";
+import { parseJsonResponse, parseGrammarResponse, parseParagraphSplitterResponse } from "./parsing";
 
 export const createCoreProcessor = (callChatGPT: ReturnType<typeof useChatGPTApi>['callChatGPT']) => {
-  return async (
-    node: HelperNode,
-    promptData: string,
-    systemPrompt: string,
-    moduleType: ModuleKind
-  ) => {
-    console.log(`Processing ${moduleType} with ${promptData.length} characters of data`);
+  return async (node: HelperNode, inputData: string, systemPrompt: string, moduleType: ModuleKind): Promise<any> => {
+    console.log(`=== CORE PROCESSOR: ${moduleType} ===`);
+    console.log('Input data type:', typeof inputData);
+    console.log('Input data preview:', inputData.substring(0, 200) + '...');
     
-    // Call ChatGPT API with proper error handling
-    let response: any;
+    // Clean and prepare input data based on module type
+    const cleanedInput = prepareInputForModule(inputData, moduleType);
+    console.log('Cleaned input preview:', cleanedInput.substring(0, 200) + '...');
+    
+    // Enhanced system prompt based on module type
+    const enhancedPrompt = enhancePromptForModule(systemPrompt, moduleType);
+    
     try {
-      response = await callChatGPT(systemPrompt, promptData);
-      console.log(`ChatGPT API response received for ${moduleType}, type: ${typeof response}, length: ${typeof response === 'string' ? response.length : 'N/A'}`);
+      const result = await callChatGPT(enhancedPrompt, cleanedInput);
+      console.log('ChatGPT response type:', typeof result);
+      console.log('ChatGPT response preview:', typeof result === 'string' ? result.substring(0, 200) + '...' : JSON.stringify(result).substring(0, 200) + '...');
+      
+      // Parse response based on module type
+      const parsed = parseModuleResponse(result, moduleType);
+      console.log(`Parsed result: ${parsed.output?.paragraphs?.length || parsed.output?.analysis?.length || 'unknown'} items`);
+      
+      return {
+        output: parsed.output,
+        metadata: {
+          moduleType,
+          processingTime: Date.now(),
+          timestamp: new Date().toISOString(),
+          inputLength: cleanedInput.length,
+          outputItems: parsed.output?.paragraphs?.length || parsed.output?.analysis?.length || 0
+        }
+      };
     } catch (error) {
-      console.error(`ChatGPT API call failed for ${moduleType}:`, error);
-      return {
-        output: {
-          error: `API call failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          moduleType: moduleType
-        },
-        metadata: {
-          moduleType: moduleType,
-          nodeId: node.id,
-          processingTime: Date.now(),
-          error: true
-        }
-      };
+      console.error(`Error in core processor for ${moduleType}:`, error);
+      throw error;
     }
-    
-    // Validate response
-    if (response === null || response === undefined) {
-      console.error(`No response received from ChatGPT for ${moduleType}`);
-      return {
-        output: {
-          error: 'No response received from ChatGPT',
-          moduleType: moduleType
-        },
-        metadata: {
-          moduleType: moduleType,
-          nodeId: node.id,
-          processingTime: Date.now(),
-          error: true
-        }
-      };
-    }
-    
-    // Parse response based on module type with enhanced error handling
-    let parsedOutput: any;
-    
-    try {
-      if (moduleType === 'paragraph-splitter') {
-        parsedOutput = parseParagraphSplitterResponse(response);
-        console.log(`Paragraph splitter parsing complete:`, {
-          hasParagraphs: !!parsedOutput.output?.paragraphs,
-          paragraphCount: parsedOutput.output?.paragraphs?.length || 0,
-          hasError: !!parsedOutput.output?.error
-        });
-      } else if (moduleType === 'grammar-checker') {
-        parsedOutput = parseGrammarResponse(response);
-        console.log(`Grammar checker parsing complete:`, {
-          hasAnalysis: !!parsedOutput.output?.analysis,
-          analysisCount: Array.isArray(parsedOutput.output?.analysis) ? parsedOutput.output.analysis.length : 0,
-          hasError: !!parsedOutput.output?.error
-        });
-      } else {
-        parsedOutput = parseJsonResponse(response, moduleType);
-        console.log(`Generic JSON parsing complete for ${moduleType}`);
-      }
-    } catch (parseError) {
-      console.error(`Parsing failed for ${moduleType}:`, parseError);
-      parsedOutput = {
-        output: {
-          error: `Parsing failed: ${parseError instanceof Error ? parseError.message : 'Unknown parsing error'}`,
-          rawResponse: response,
-          moduleType: moduleType
-        }
-      };
-    }
-    
-    // Ensure we have a consistent output structure
-    if (typeof parsedOutput === 'string' || !parsedOutput.output) {
-      parsedOutput = {
-        output: parsedOutput,
-        rawResponse: response
-      };
-    }
-    
-    // Add comprehensive metadata
-    const result = {
-      ...parsedOutput,
-      metadata: {
-        ...parsedOutput.metadata,
-        moduleType: moduleType,
-        nodeId: node.id,
-        processingTime: Date.now(),
-        responseLength: typeof response === 'string' ? response.length : JSON.stringify(response).length,
-        responseType: typeof response,
-        timestamp: new Date().toISOString()
-      }
-    };
-    
-    // Log processing results with detailed statistics
-    if (result.output && !result.output.error) {
-      if (Array.isArray(result.output.paragraphs)) {
-        console.log(`✅ ${moduleType} processed successfully: ${result.output.paragraphs.length} paragraphs generated`);
-      } else if (Array.isArray(result.output.analysis)) {
-        console.log(`✅ ${moduleType} processed successfully: ${result.output.analysis.length} analysis items generated`);
-      } else if (result.output.totalParagraphs) {
-        console.log(`✅ ${moduleType} processed successfully: ${result.output.totalParagraphs} total paragraphs`);
-      } else {
-        console.log(`✅ ${moduleType} processed successfully`);
-      }
-    } else {
-      console.warn(`⚠️ ${moduleType} completed with errors:`, result.output?.error);
-    }
-    
-    return result;
   };
 };
+
+/**
+ * Prepare input data for specific module types
+ */
+function prepareInputForModule(inputData: string, moduleType: ModuleKind): string {
+  console.log(`Preparing input for module: ${moduleType}`);
+  
+  try {
+    // Try to parse as JSON to extract actual content
+    const parsed = JSON.parse(inputData);
+    
+    if (moduleType === 'paragraph-splitter') {
+      // For paragraph splitter, extract only the clean text content
+      if (parsed.content && typeof parsed.content === 'string') {
+        console.log('Extracted clean content for paragraph splitter');
+        return parsed.content.trim();
+      }
+      
+      // If it's already processed paragraphs, extract text from them
+      if (parsed.paragraphs && Array.isArray(parsed.paragraphs)) {
+        const combinedText = parsed.paragraphs
+          .map((p: any) => p.content || p.text || '')
+          .filter((text: string) => text.length > 0)
+          .join('\n\n');
+        console.log('Combined text from existing paragraphs for re-processing');
+        return combinedText;
+      }
+      
+      // If it has output.content, use that
+      if (parsed.output && parsed.output.content) {
+        console.log('Extracted content from output wrapper');
+        return parsed.output.content.trim();
+      }
+    }
+    
+    if (moduleType === 'grammar-checker') {
+      // For grammar checker, we need paragraph content
+      if (parsed.output && parsed.output.paragraphs && Array.isArray(parsed.output.paragraphs)) {
+        console.log('Prepared paragraph data for grammar checker');
+        return JSON.stringify({
+          paragraphs: parsed.output.paragraphs.map((p: any) => ({
+            id: p.id,
+            content: p.content || p.text || '',
+            wordCount: p.wordCount || 0
+          }))
+        }, null, 2);
+      }
+    }
+    
+    // For other modules, try to extract meaningful content
+    if (parsed.content) {
+      return parsed.content;
+    }
+    if (parsed.output && parsed.output.content) {
+      return parsed.output.content;
+    }
+    
+    // If we can't extract specific content, return the original parsed data as JSON
+    return JSON.stringify(parsed, null, 2);
+    
+  } catch (error) {
+    console.log('Input is not JSON, using as-is');
+    // If not JSON, return as-is but clean it up
+    return inputData.trim();
+  }
+}
+
+/**
+ * Enhance system prompt based on module type
+ */
+function enhancePromptForModule(basePrompt: string, moduleType: ModuleKind): string {
+  const moduleSpecificInstructions = {
+    'paragraph-splitter': `
+CRITICAL INSTRUCTIONS FOR PARAGRAPH SPLITTING:
+- You are receiving CLEAN TEXT CONTENT only
+- Do NOT include any JSON metadata in paragraph content
+- Extract and return ONLY the actual paragraph text
+- Each paragraph should contain complete, readable sentences
+- Preserve all original text content without truncation
+- Return valid JSON with this exact structure:
+{
+  "paragraphs": [
+    {
+      "id": "para-1",
+      "content": "Full paragraph text here...",
+      "type": "body",
+      "sectionNumber": "",
+      "wordCount": 50
+    }
+  ],
+  "totalParagraphs": 6,
+  "documentType": "legal"
+}`,
+    
+    'grammar-checker': `
+CRITICAL INSTRUCTIONS FOR GRAMMAR CHECKING:
+- Process each paragraph individually
+- Preserve the original paragraph structure
+- Return corrections and suggestions for each paragraph
+- Maintain the original text length and meaning`,
+    
+    'legal-analyzer': `
+CRITICAL INSTRUCTIONS FOR LEGAL ANALYSIS:
+- Analyze the legal content thoroughly
+- Identify key legal concepts and issues
+- Provide structured analysis with citations`
+  };
+  
+  const enhancement = moduleSpecificInstructions[moduleType] || '';
+  return `${basePrompt}\n\n${enhancement}`;
+}
+
+/**
+ * Parse response based on module type
+ */
+function parseModuleResponse(response: any, moduleType: ModuleKind): any {
+  console.log(`Parsing response for module: ${moduleType}`);
+  
+  switch (moduleType) {
+    case 'paragraph-splitter':
+      return parseParagraphSplitterResponse(response);
+      
+    case 'grammar-checker':
+      return parseGrammarResponse(response);
+      
+    default:
+      return parseJsonResponse(response);
+  }
+}
