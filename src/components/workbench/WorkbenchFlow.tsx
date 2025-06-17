@@ -1,16 +1,19 @@
 
-import React, { forwardRef, useCallback, useMemo, useEffect, useImperativeHandle } from "react";
+/**
+ * WorkbenchFlow Component
+ * 
+ * Purpose: Core React Flow implementation for the AI Workbench
+ * Refactored to use orchestration hooks for better organization
+ */
+
+import React, { forwardRef, useCallback } from "react";
 import { ReactFlow } from "@xyflow/react";
 import { useWorkbenchEvents } from "@/hooks/useWorkbenchEvents";
-import { useDataFlow } from "@/hooks/workbench/useDataFlow";
-import { useDataPreviewSelection } from "@/hooks/workbench/useDataPreviewSelection";
-import { usePipelineExecution } from "@/hooks/workbench/usePipelineExecution";
+import { useWorkbenchOrchestration } from "@/hooks/workbench/orchestration/useWorkbenchOrchestration";
+import { useNodeEnhancement } from "@/hooks/workbench/orchestration/useNodeEnhancement";
+import { useEdgeEnhancement } from "@/hooks/workbench/orchestration/useEdgeEnhancement";
 import WorkbenchControls from "./WorkbenchControls";
-import ExecutionStatusIndicator from "./ExecutionStatusIndicator";
 import FinalOutputPanel from "./FinalOutputPanel";
-import { useFlowNodeManager } from "./flow/FlowNodeManager";
-import { DocumentInputNode } from "./DocumentInputNode";
-import { HelperNode } from "./HelperNode";
 import {
   initialNodes,
   initialEdges,
@@ -23,14 +26,6 @@ import {
 
 import "@xyflow/react/dist/style.css";
 import "./dataPreview.css";
-
-/**
- * WorkbenchFlow Component
- * 
- * Purpose: Core React Flow implementation for the AI Workbench
- * This component handles the main flow diagram functionality including
- * node management, event handling, user interactions, and pipeline execution.
- */
 
 interface WorkbenchFlowProps {
   onModuleEdit: (nodeId: string, node: any) => void;
@@ -60,57 +55,44 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
     reactFlowWrapper
   });
 
-  // Initialize data flow management
-  const { getEdgeData, simulateProcessing } = useDataFlow(nodes, edges);
-
-  // Initialize data preview selection
-  const { toggleEdgePreview, hideAllPreviews, isEdgeSelected } = useDataPreviewSelection();
-
-  // Initialize pipeline execution
+  // Initialize orchestration
   const {
+    getEdgeData,
+    simulateProcessing,
+    toggleEdgePreview,
+    hideAllPreviews,
+    isEdgeSelected,
+    handleClosePreview,
     isExecuting,
     finalOutput,
     executeAllPipelines,
     resetExecution,
+    getNodeExecutionStatus,
+    getNodeColor,
+    handlePaneClick
+  } = useWorkbenchOrchestration({
+    nodes,
+    edges,
+    setNodes,
+    onModuleEdit,
+    ref
+  });
+
+  // Enhance nodes with execution status
+  const { enhancedNodes } = useNodeEnhancement({
+    nodes,
     getNodeExecutionStatus
-  } = usePipelineExecution(nodes, edges);
+  });
 
-  // Initialize node management
-  const { getNodeColor } = useFlowNodeManager();
-
-  /**
-   * Listen for settings button clicks from HelperNode components
-   */
-  useEffect(() => {
-    const handleOpenNodeSettings = (event: any) => {
-      const { nodeId } = event.detail;
-      const node = nodes.find(n => n.id === nodeId) as HelperNode;
-      if (node) {
-        onModuleEdit(nodeId, node);
-      }
-    };
-
-    window.addEventListener('openNodeSettings', handleOpenNodeSettings);
-    return () => window.removeEventListener('openNodeSettings', handleOpenNodeSettings);
-  }, [nodes, onModuleEdit]);
-
-  /**
-   * Expose imperative API for adding document nodes from external sources
-   */
-  useImperativeHandle(ref, () => ({
-    addDocumentNode: (file: any) => {
-      const nodeId = `doc-${Date.now()}-${file.name}`;
-      const position = { x: 80, y: 420 + Math.random() * 100 };
-      const newNode: DocumentInputNode = {
-        id: nodeId,
-        type: "document-input",
-        position,
-        data: { moduleType: "document-input" as const, documentName: file.name, file },
-        draggable: true,
-      };
-      setNodes((nds) => [...nds, newNode]);
-    },
-  }));
+  // Enhance edges with data preview functionality
+  const { enhancedEdges } = useEdgeEnhancement({
+    edges,
+    getEdgeData,
+    simulateProcessing,
+    isEdgeSelected,
+    toggleEdgePreview,
+    handleClosePreview
+  });
 
   /**
    * Handles node clicks for both editing and preview functionality
@@ -119,7 +101,7 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
     (_: React.MouseEvent, node: AllNodes) => {
       if (node.type === "document-input") {
         // Handle document nodes for preview
-        const docNode = node as DocumentInputNode;
+        const docNode = node as any;
         if (docNode.data?.file) {
           const previewEvent = new CustomEvent('openDocumentPreview', {
             detail: {
@@ -147,50 +129,6 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
     },
     [onNodeClick, hideAllPreviews]
   );
-
-  /**
-   * Handle clicks on empty workspace to hide previews
-   */
-  const handlePaneClick = useCallback(() => {
-    hideAllPreviews();
-  }, [hideAllPreviews]);
-
-  /**
-   * Handle closing specific edge preview
-   */
-  const handleClosePreview = useCallback((edgeId: string) => {
-    hideAllPreviews();
-  }, [hideAllPreviews]);
-
-  /**
-   * Enhance edges with data preview functionality and selection state
-   */
-  const enhancedEdges = useMemo(() => {
-    return edges.map(edge => ({
-      ...edge,
-      data: {
-        ...edge.data,
-        edgeData: getEdgeData(edge.id),
-        onSimulateProcessing: () => simulateProcessing(edge.id),
-        isSelected: isEdgeSelected(edge.id),
-        onEdgeClick: toggleEdgePreview,
-        onClosePreview: handleClosePreview
-      }
-    }));
-  }, [edges, getEdgeData, simulateProcessing, isEdgeSelected, toggleEdgePreview, handleClosePreview]);
-
-  /**
-   * Enhance nodes with execution status indicators
-   */
-  const enhancedNodes = useMemo(() => {
-    return nodes.map(node => ({
-      ...node,
-      data: {
-        ...node.data,
-        executionStatus: getNodeExecutionStatus(node.id)
-      }
-    }));
-  }, [nodes, getNodeExecutionStatus]);
 
   return (
     <>
