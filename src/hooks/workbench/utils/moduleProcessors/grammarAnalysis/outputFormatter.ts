@@ -64,8 +64,7 @@ export function formatSingleParagraphOutput(
       redliningData: {
         ready: true,
         totalSuggestions: analysis.totalSuggestions,
-        timestamp: analysis.timestamp,
-        hasPositionData: true
+        timestamp: analysis.timestamp
       }
     },
     metadata: {
@@ -153,8 +152,7 @@ export function formatBatchOutput(
       redliningData: {
         ready: true,
         totalSuggestions: analysis.totalSuggestions,
-        timestamp: analysis.timestamp,
-        hasPositionData: true
+        timestamp: analysis.timestamp
       }
     },
     metadata: {
