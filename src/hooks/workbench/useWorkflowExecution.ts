@@ -118,7 +118,7 @@ export const useWorkflowExecution = () => {
       : JSON.stringify(inputData);
 
     try {
-      const result = await callChatGPT(userPrompt, systemPrompt);
+      const result = await callChatGPT(userPrompt, systemPrompt || "Process this input:");
       return result.response || result.error;
     } catch (error) {
       console.error(`Error processing module ${node.id}:`, error);

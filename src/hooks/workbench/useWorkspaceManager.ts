@@ -119,7 +119,7 @@ export const useWorkspaceManager = () => {
   /**
    * Get user's workspaces
    */
-  const getUserWorkspaces = useCallback(async () => {
+  const getUserWorkspaces = useCallback(async (): Promise<WorkspaceData[]> => {
     if (!user) return [];
 
     try {
