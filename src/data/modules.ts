@@ -7,7 +7,8 @@ import {
   Shield, 
   Palette, 
   Bot,
-  Settings
+  Settings,
+  LucideIcon
 } from "lucide-react";
 
 export type ModuleKind = 
@@ -25,7 +26,7 @@ export interface AIModuleDefinition {
   type: ModuleKind;
   label: string;
   description: string;
-  icon: React.ComponentType<{ size?: number }>;
+  icon: LucideIcon;
   color: string;
   supportsChatGPT: boolean;
   isPassThrough?: boolean;

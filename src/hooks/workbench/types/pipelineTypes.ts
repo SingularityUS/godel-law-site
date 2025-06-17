@@ -39,3 +39,14 @@ export interface ProgressInfo {
     total: number;
   };
 }
+
+export interface FinalLegalOutput {
+  summary: {
+    documentsProcessed: number;
+    modulesExecuted: number;
+    processingCompleted: string;
+    pipelineType: string;
+  };
+  results: PipelineResult[];
+  finalOutput: any;
+}
