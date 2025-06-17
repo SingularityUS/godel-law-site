@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Handle, Position, Node } from "@xyflow/react";
 import { X, Settings, Loader2, CheckCircle, AlertCircle } from "lucide-react";
@@ -5,28 +6,7 @@ import { MODULE_DEFINITIONS, ModuleKind } from "@/data/modules";
 import { useModuleColors } from "@/hooks/useModuleColors";
 import ChatGPTIndicator from "./ChatGPTIndicator";
 
-/**
- * HelperNode Component
- * 
- * Purpose: Renders AI processing module nodes in the workflow graph
- * These nodes represent different AI operations (text extraction, grammar checking, etc.)
- * that can be chained together to create complex document processing pipelines.
- * 
- * Features:
- * - Displays module icon, name, and prompt status
- * - Color-coded based on module type or custom user colors
- * - Handles selection states for prompt editing
- * - Includes delete functionality and settings access
- * 
- * Integration:
- * - Used by AIWorkbench as a custom node type
- * - Connects to other nodes via React Flow edges
- * - Triggers prompt editing when clicked
- * - References MODULE_DEFINITIONS for styling and metadata
- */
-
-// Add index signature for compatibility with React Flow
-interface HelperNodeData extends Record<string, unknown> {
+export interface HelperNodeData extends Record<string, unknown> {
   moduleType: ModuleKind;
   promptOverride?: string;
   isProcessing?: boolean;
@@ -34,7 +14,10 @@ interface HelperNodeData extends Record<string, unknown> {
   hasError?: boolean;
 }
 
-export type HelperNode = Node<HelperNodeData>;
+export interface HelperNode extends Node {
+  type: "helper";
+  data: HelperNodeData;
+}
 
 interface HelperNodeProps {
   data: HelperNodeData;
@@ -42,10 +25,8 @@ interface HelperNodeProps {
   id: string;
 }
 
-/**
- * Helper function to get module definition from the modules registry
- */
-const getModuleDef = (type: ModuleKind) => MODULE_DEFINITIONS.find((m) => m.type === type)!;
+const getModuleDef = (type: ModuleKind) =>
+  MODULE_DEFINITIONS.find((m) => m.type === type)!;
 
 const HelperNodeComponent: React.FC<HelperNodeProps> = ({ 
   data, 
@@ -56,7 +37,7 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
   const { getModuleColor } = useModuleColors();
   const [nodeColor, setNodeColor] = useState(getModuleColor(id));
 
-  // Listen for color change events and update local state
+  // Listen for color changes
   useEffect(() => {
     const handleColorChange = (event: CustomEvent) => {
       if (event.detail.nodeId === id) {
@@ -64,16 +45,9 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
       }
     };
 
-    window.addEventListener('moduleColorChanged', handleColorChange as EventListener);
-    return () => {
-      window.removeEventListener('moduleColorChanged', handleColorChange as EventListener);
-    };
+    window.addEventListener('nodeColorChanged', handleColorChange as EventListener);
+    return () => window.removeEventListener('nodeColorChanged', handleColorChange as EventListener);
   }, [id]);
-
-  // Update color when getModuleColor result changes
-  useEffect(() => {
-    setNodeColor(getModuleColor(id));
-  }, [id, getModuleColor]);
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
