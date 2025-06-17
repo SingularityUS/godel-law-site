@@ -3,158 +3,35 @@
  * useWorkflowExecution Hook
  * 
  * Purpose: Orchestrates sequential execution of workbench modules
- * Handles topological sorting, data flow, and execution state management
+ * Coordinates between execution state, topological sorting, and module execution
  */
 
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import { Node, Edge } from "@xyflow/react";
-import { useChatGPTApi } from "./useChatGPTApi";
-import { useMockDataGenerator } from "./useMockDataGenerator";
-import { ModuleKind } from "@/data/modules";
-
-interface ExecutionState {
-  isExecuting: boolean;
-  currentStep: number;
-  totalSteps: number;
-  executionOrder: string[];
-  results: Record<string, any>;
-  finalResult: any;
-  error: string | null;
-}
+import { useExecutionState } from "./useExecutionState";
+import { useTopologicalSort } from "./useTopologicalSort";
+import { useModuleExecution } from "./useModuleExecution";
 
 export const useWorkflowExecution = (nodes: Node[], edges: Edge[]) => {
-  const { callChatGPT } = useChatGPTApi();
-  const { generateMockData } = useMockDataGenerator();
+  const {
+    executionState,
+    startExecution,
+    updateCurrentStep,
+    completeExecution,
+    setExecutionError,
+    resetExecution
+  } = useExecutionState();
 
-  const [executionState, setExecutionState] = useState<ExecutionState>({
-    isExecuting: false,
-    currentStep: 0,
-    totalSteps: 0,
-    executionOrder: [],
-    results: {},
-    finalResult: null,
-    error: null
-  });
-
-  /**
-   * Calculate execution order using topological sort
-   */
-  const calculateExecutionOrder = useCallback(() => {
-    // Find document input nodes (starting points)
-    const documentNodes = nodes.filter(node => node.data?.moduleType === 'document-input');
-    if (documentNodes.length === 0) {
-      throw new Error('No document input nodes found. Please add a document to start the workflow.');
-    }
-
-    // Build adjacency list from edges
-    const adjacencyList: Record<string, string[]> = {};
-    const inDegree: Record<string, number> = {};
-    
-    // Initialize
-    nodes.forEach(node => {
-      adjacencyList[node.id] = [];
-      inDegree[node.id] = 0;
-    });
-
-    // Build graph
-    edges.forEach(edge => {
-      adjacencyList[edge.source].push(edge.target);
-      inDegree[edge.target]++;
-    });
-
-    // Topological sort using Kahn's algorithm
-    const queue = Object.keys(inDegree).filter(nodeId => inDegree[nodeId] === 0);
-    const executionOrder: string[] = [];
-
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      executionOrder.push(current);
-
-      adjacencyList[current].forEach(neighbor => {
-        inDegree[neighbor]--;
-        if (inDegree[neighbor] === 0) {
-          queue.push(neighbor);
-        }
-      });
-    }
-
-    // Check for cycles
-    if (executionOrder.length !== nodes.length) {
-      throw new Error('Workflow contains cycles. Please check your connections.');
-    }
-
-    return executionOrder;
-  }, [nodes, edges]);
-
-  /**
-   * Type guard to check if a string is a valid ModuleKind
-   */
-  const isValidModuleKind = useCallback((type: string): type is ModuleKind => {
-    const validTypes: ModuleKind[] = [
-      'document-input',
-      'text-extractor',
-      'paragraph-splitter',
-      'grammar-checker',
-      'citation-finder',
-      'citation-verifier',
-      'style-guide-enforcer',
-      'chatgpt-assistant',
-      'custom'
-    ];
-    return validTypes.includes(type as ModuleKind);
-  }, []);
-
-  /**
-   * Execute a single module
-   */
-  const executeModule = useCallback(async (nodeId: string, inputData: any) => {
-    const node = nodes.find(n => n.id === nodeId);
-    if (!node) throw new Error(`Node ${nodeId} not found`);
-
-    const moduleType = typeof node.data?.moduleType === 'string' ? node.data.moduleType : 'default';
-    const customPrompt = typeof node.data?.promptOverride === 'string' ? node.data.promptOverride : undefined;
-
-    // Handle document input nodes
-    if (moduleType === 'document-input') {
-      return node.data?.extractedText || node.data?.content || 'Sample document content';
-    }
-
-    // Handle ChatGPT-enabled modules
-    if (moduleType === 'chatgpt-assistant' || node.data?.supportsChatGPT) {
-      try {
-        const systemPrompt = customPrompt || `You are processing data through a ${moduleType} module. Process the input data accordingly.`;
-        const result = await callChatGPT(
-          `Process this data: ${JSON.stringify(inputData)}`,
-          systemPrompt
-        );
-        return result.response || result.error || 'Processing completed';
-      } catch (error) {
-        console.error(`ChatGPT processing failed for ${nodeId}:`, error);
-        return `Error processing with ChatGPT: ${error}`;
-      }
-    }
-
-    // For other modules, use enhanced mock data generation
-    const validModuleType = isValidModuleKind(moduleType) ? moduleType : 'text-extractor';
-    return await generateMockData(validModuleType, false, true, customPrompt);
-  }, [nodes, callChatGPT, generateMockData, isValidModuleKind]);
+  const { calculateExecutionOrder, isWorkflowValid } = useTopologicalSort();
+  const { executeModule } = useModuleExecution();
 
   /**
    * Execute the entire workflow
    */
   const executeWorkflow = useCallback(async () => {
     try {
-      const executionOrder = calculateExecutionOrder();
-      
-      setExecutionState({
-        isExecuting: true,
-        currentStep: 0,
-        totalSteps: executionOrder.length,
-        executionOrder,
-        results: {},
-        finalResult: null,
-        error: null
-      });
+      const executionOrder = calculateExecutionOrder(nodes, edges);
+      startExecution(executionOrder);
 
       const results: Record<string, any> = {};
       let currentData: any = null;
@@ -163,16 +40,13 @@ export const useWorkflowExecution = (nodes: Node[], edges: Edge[]) => {
       for (let i = 0; i < executionOrder.length; i++) {
         const nodeId = executionOrder[i];
         
-        setExecutionState(prev => ({
-          ...prev,
-          currentStep: i + 1
-        }));
+        updateCurrentStep(i + 1);
 
         // Get input data from previous step or use initial data
         const inputData = i === 0 ? null : currentData;
         
         // Execute the module
-        const result = await executeModule(nodeId, inputData);
+        const result = await executeModule(nodeId, nodes, inputData);
         results[nodeId] = result;
         currentData = result;
 
@@ -181,57 +55,27 @@ export const useWorkflowExecution = (nodes: Node[], edges: Edge[]) => {
       }
 
       // Execution completed successfully
-      setExecutionState(prev => ({
-        ...prev,
-        isExecuting: false,
-        results,
-        finalResult: currentData
-      }));
-
+      completeExecution(results, currentData);
       return currentData;
 
     } catch (error: any) {
       console.error('Workflow execution failed:', error);
-      setExecutionState(prev => ({
-        ...prev,
-        isExecuting: false,
-        error: error.message || 'Execution failed'
-      }));
+      setExecutionError(error.message || 'Execution failed');
       throw error;
     }
-  }, [calculateExecutionOrder, executeModule]);
-
-  /**
-   * Reset execution state
-   */
-  const resetExecution = useCallback(() => {
-    setExecutionState({
-      isExecuting: false,
-      currentStep: 0,
-      totalSteps: 0,
-      executionOrder: [],
-      results: {},
-      finalResult: null,
-      error: null
-    });
-  }, []);
+  }, [nodes, edges, calculateExecutionOrder, startExecution, updateCurrentStep, completeExecution, setExecutionError, executeModule]);
 
   /**
    * Check if workflow is valid for execution
    */
-  const isWorkflowValid = useCallback(() => {
-    try {
-      calculateExecutionOrder();
-      return true;
-    } catch {
-      return false;
-    }
-  }, [calculateExecutionOrder]);
+  const checkWorkflowValid = useCallback(() => {
+    return isWorkflowValid(nodes, edges);
+  }, [nodes, edges, isWorkflowValid]);
 
   return {
     executionState,
     executeWorkflow,
     resetExecution,
-    isWorkflowValid
+    isWorkflowValid: checkWorkflowValid
   };
 };
