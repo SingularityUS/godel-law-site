@@ -1,293 +1,138 @@
+import { FileText, FileSearch, SplitSquareHorizontal, BookOpenCheck, ListChecks, TextQuote, MessageSquare, LayoutDashboard, FileJson2, BrainCircuit, BadgeInfo, GraduationCap, Search, Sparkles, Lightbulb, ShieldCheck, PiggyBank, Gavel, Scale, Landmark, Briefcase, ClipboardList, FileSignature, MessageSquarePlus, FileType, CircleUserRound, Inbox, LucideIcon } from "lucide-react";
 
-import { ArrowDown, ArrowUp, Divide, BookOpen, MessageSquare } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+export interface ModuleDefinition {
+  type: ModuleKind;
+  label: string;
+  icon: LucideIcon;
+  category: ModuleCategory;
+  description: string;
+  supportsChatGPT: boolean;
+  defaultPrompt: string;
+}
 
 export type ModuleKind =
   | "document-input"
   | "text-extractor"
   | "paragraph-splitter"
   | "grammar-checker"
-  | "citation-finder"
-  | "citation-verifier"
-  | "style-guide-enforcer"
-  | "chatgpt-assistant"
-  | "custom";
+  | "legal-summary"
+  | "legal-qa"
+  | "contract-analyzer"
+  | "legal-translator"
+  | "legal-researcher"
+  | "clause-identifier"
+  | "risk-assessor"
+  | "compliance-checker";
 
-export interface AIModuleDefinition {
-  type: ModuleKind;
-  label: string;
-  color: string;
-  icon: LucideIcon;
-  defaultPrompt: string;
-  supportsChatGPT?: boolean;
-  outputFormat?: 'text' | 'json' | 'structured';
-}
+export type ModuleCategory = "input" | "processing" | "analysis" | "utility";
 
-// Enhanced with legal-specific prompts for law firm document processing
-export const MODULE_DEFINITIONS: AIModuleDefinition[] = [
+export const MODULE_DEFINITIONS: ModuleDefinition[] = [
   {
     type: "document-input",
     label: "Document Input",
-    color: "bg-slate-600",
-    icon: BookOpen,
-    defaultPrompt: "This node represents an uploaded legal document for processing in the pipeline.",
+    icon: FileText,
+    category: "input",
+    description: "Upload and input legal documents",
+    supportsChatGPT: false,
+    defaultPrompt: ""
   },
   {
     type: "text-extractor",
-    label: "Text Extractor",
-    color: "bg-slate-600",
-    icon: ArrowDown,
-    defaultPrompt: `You are a legal document text extraction specialist. Extract all text content from the provided legal document while preserving:
-- Document structure and hierarchy (headings, sections, subsections)
-- Legal formatting (numbered paragraphs, bullet points, indentation)
-- Citations and case references
-- Tables, schedules, and exhibits
-- Signature blocks and date stamps
-- Page numbers and footnotes
-
-Return the extracted text in a structured JSON format:
-{
-  "documentType": "contract|brief|pleading|memo|other",
-  "title": "document title",
-  "sections": [
-    {
-      "heading": "section heading",
-      "content": "section text content",
-      "subsections": []
-    }
-  ],
-  "citations": ["list of citations found"],
-  "metadata": {
-    "pageCount": number,
-    "hasSignatures": boolean,
-    "hasExhibits": boolean
-  }
-}`,
-    supportsChatGPT: true,
-    outputFormat: 'json'
+    label: "Text Extractor", 
+    icon: FileSearch,
+    category: "processing",
+    description: "Extract and format text content from documents",
+    supportsChatGPT: false, // Changed from true to false
+    defaultPrompt: "Extract and structure the text content from the provided document, preserving all important information and formatting."
   },
   {
     type: "paragraph-splitter",
     label: "Paragraph Splitter",
-    color: "bg-slate-600",
-    icon: Divide,
-    defaultPrompt: `You are a legal document paragraph analyzer. Split the provided legal text into logical paragraphs while maintaining legal document structure:
-
-- Preserve numbered sections (1., 2., 3., etc.)
-- Maintain subsection hierarchy (a., b., c., etc.)
-- Keep related clauses together
-- Separate whereas clauses, recitals, and operative provisions
-- Maintain citation integrity within paragraphs
-
-Return a structured JSON array:
-{
-  "paragraphs": [
-    {
-      "id": "p1",
-      "type": "recital|operative|signature|exhibit",
-      "sectionNumber": "1.1",
-      "content": "paragraph text",
-      "containsCitations": boolean,
-      "isNumbered": boolean
-    }
-  ],
-  "totalParagraphs": number,
-  "documentStructure": "simple|complex|multi-level"
-}`,
+    icon: SplitSquareHorizontal,
+    category: "processing", 
+    description: "Split document into individual paragraphs for analysis",
     supportsChatGPT: true,
-    outputFormat: 'json'
+    defaultPrompt: "Split the provided legal document text into individual paragraphs. For each paragraph, provide: 1) A unique paragraph ID, 2) The complete paragraph text, 3) A brief summary of the paragraph's legal significance. Maintain the original order and preserve all content. Format as JSON with 'paragraphs' array containing objects with 'id', 'text', and 'summary' fields."
   },
   {
     type: "grammar-checker",
     label: "Grammar Checker",
-    color: "bg-slate-600",
-    icon: ArrowUp,
-    defaultPrompt: `You are a legal writing specialist trained in proper legal grammar, style, and formatting. Analyze each paragraph for:
-
-LEGAL WRITING STANDARDS:
-- Proper legal terminology usage
-- Consistent verb tenses (past/present)
-- Active vs. passive voice appropriateness
-- Sentence structure clarity
-- Parallel construction in lists
-- Proper use of legal Latin phrases
-- Citation format consistency (Bluebook/local rules)
-
-For each paragraph, provide three-column analysis:
-{
-  "analysis": [
-    {
-      "paragraphId": "p1",
-      "original": "original paragraph text",
-      "suggestions": [
-        {
-          "issue": "grammar|style|clarity|legal_terminology",
-          "description": "explanation of the issue",
-          "suggestion": "specific improvement suggestion",
-          "severity": "minor|moderate|major"
-        }
-      ],
-      "corrected": "corrected paragraph text with all changes applied",
-      "legalWritingScore": number (1-10),
-      "improvementSummary": "brief summary of changes made"
-    }
-  ],
-  "overallAssessment": {
-    "totalErrors": number,
-    "writingQuality": "excellent|good|needs_improvement|poor",
-    "recommendations": ["list of general writing improvements"]
-  }
-}`,
+    icon: BookOpenCheck,
+    category: "analysis",
+    description: "Analyze and correct grammar and style in legal documents",
     supportsChatGPT: true,
-    outputFormat: 'json'
+    defaultPrompt: "Analyze the provided legal text for grammar, style, and clarity. Provide a detailed analysis of each paragraph, including suggestions for improvement and corrections. Focus on legal writing conventions and terminology. Return a JSON object with 'analysis' (array of paragraph analyses) and 'overallAssessment' (summary of writing quality)."
   },
   {
-    type: "citation-finder",
-    label: "Citation Finder",
-    color: "bg-slate-600",
-    icon: Divide,
-    defaultPrompt: `You are a legal citation specialist. Identify and extract all legal citations, references, and authorities from the text:
-
-FIND AND ANALYZE:
-- Case citations (with proper case name, court, year)
-- Statutory references (USC, state codes, regulations)
-- Secondary authorities (law reviews, treatises)
-- Internal cross-references
-- Incomplete or malformed citations
-
-Return structured citation data:
-{
-  "citations": [
-    {
-      "id": "cite1",
-      "type": "case|statute|regulation|secondary|internal",
-      "text": "original citation text",
-      "parsed": {
-        "caseName": "if applicable",
-        "court": "if applicable", 
-        "year": "if applicable",
-        "volume": "if applicable",
-        "reporter": "if applicable",
-        "page": "if applicable"
-      },
-      "location": "paragraph/section where found",
-      "isComplete": boolean,
-      "needsVerification": boolean,
-      "bluebookFormat": "proper Bluebook citation format"
-    }
-  ],
-  "summary": {
-    "totalCitations": number,
-    "caseCount": number,
-    "statuteCount": number,
-    "incompleteCount": number
-  }
-}`,
+    type: "legal-summary",
+    label: "Legal Summary",
+    icon: TextQuote,
+    category: "analysis",
+    description: "Generate concise summaries of legal documents",
     supportsChatGPT: true,
-    outputFormat: 'json'
+    defaultPrompt: "Create a concise and accurate summary of the provided legal document. Focus on key facts, legal issues, and conclusions. The summary should be no more than 200 words."
   },
   {
-    type: "citation-verifier",
-    label: "Citation Verifier",
-    color: "bg-slate-600",
-    icon: ArrowDown,
-    defaultPrompt: `You are a legal citation verification specialist. Verify the accuracy and format compliance of legal citations:
-
-VERIFICATION TASKS:
-- Check Bluebook format compliance
-- Verify case name accuracy
-- Confirm court and jurisdiction
-- Check year and reporter accuracy
-- Validate parallel citations
-- Flag potentially outdated authorities
-
-Return verification results:
-{
-  "verificationResults": [
-    {
-      "citationId": "cite1",
-      "originalCitation": "original text",
-      "status": "verified|needs_correction|cannot_verify|outdated",
-      "issues": [
-        {
-          "type": "format|accuracy|currency|completeness",
-          "description": "specific issue found",
-          "correction": "suggested correction"
-        }
-      ],
-      "correctedCitation": "properly formatted citation",
-      "confidence": number (1-10),
-      "lastVerified": "current date"
-    }
-  ],
-  "overallReport": {
-    "totalVerified": number,
-    "needsCorrection": number,
-    "cannotVerify": number,
-    "recommendManualReview": ["list of citations needing human review"]
-  }
-}`,
-    supportsChatGPT: true,
-    outputFormat: 'json'
-  },
-  {
-    type: "style-guide-enforcer",
-    label: "Style-Guide Enforcer",
-    color: "bg-slate-600",
-    icon: ArrowUp,
-    defaultPrompt: `You are a legal style guide enforcement specialist. Analyze text for adherence to legal writing style guides (Bluebook, local court rules, firm style):
-
-STYLE GUIDE CHECKS:
-- Citation format consistency (Bluebook Rule 1-21)
-- Capitalization rules for legal terms
-- Abbreviation standards
-- Quotation and punctuation rules
-- Font and formatting requirements
-- Court-specific local rules compliance
-
-Provide style conformance analysis:
-{
-  "styleAnalysis": [
-    {
-      "section": "section identifier",
-      "violations": [
-        {
-          "rule": "specific style rule violated",
-          "violation": "text that violates rule",
-          "correction": "corrected version",
-          "ruleReference": "Bluebook rule number or local rule cite"
-        }
-      ],
-      "complianceScore": number (1-10)
-    }
-  ],
-  "summary": {
-    "overallCompliance": number (1-10),
-    "totalViolations": number,
-    "majorIssues": number,
-    "recommendations": ["list of style improvements"],
-    "styleGuideUsed": "Bluebook 21st|Local Rules|Firm Style"
-  }
-}`,
-    supportsChatGPT: true,
-    outputFormat: 'json'
-  },
-  {
-    type: "chatgpt-assistant",
-    label: "ChatGPT Assistant",
-    color: "bg-emerald-600",
+    type: "legal-qa",
+    label: "Legal Q&A",
     icon: MessageSquare,
-    defaultPrompt: `You are a legal AI assistant specializing in document analysis for law firms. Process and analyze legal content based on the input data. Provide clear, structured responses following legal writing standards and maintaining confidentiality. Focus on supporting first-year associate tasks such as document review, citation checking, and legal writing improvement.`,
+    category: "analysis",
+    description: "Answer questions about legal documents",
     supportsChatGPT: true,
-    outputFormat: 'json'
+    defaultPrompt: "Answer the following question about the provided legal document: [QUESTION]. Provide a detailed and accurate answer based on the document's content. Cite specific sections or clauses to support your answer."
   },
   {
-    type: "custom",
-    label: "Custom Helper",
-    color: "bg-slate-600",
-    icon: Divide,
-    defaultPrompt: "You have a custom AI assistant role for legal document processing. Edit the prompt to define its function and enable ChatGPT processing if needed.",
+    type: "contract-analyzer",
+    label: "Contract Analyzer",
+    icon: FileJson2,
+    category: "analysis",
+    description: "Analyze contracts for key terms and potential issues",
     supportsChatGPT: true,
-    outputFormat: 'text'
+    defaultPrompt: "Analyze the provided contract and identify key terms, obligations, and potential risks. Provide a summary of the contract's main provisions and highlight any clauses that may be problematic or require further review."
   },
+  {
+    type: "legal-translator",
+    label: "Legal Translator",
+    icon: GraduationCap,
+    category: "utility",
+    description: "Translate legal documents between languages",
+    supportsChatGPT: true,
+    defaultPrompt: "Translate the provided legal document from [SOURCE_LANGUAGE] to [TARGET_LANGUAGE]. Ensure the translation is accurate and preserves the legal meaning and intent of the original document."
+  },
+  {
+    type: "legal-researcher",
+    label: "Legal Researcher",
+    icon: Search,
+    category: "utility",
+    description: "Research legal precedents and statutes",
+    supportsChatGPT: true,
+    defaultPrompt: "Research legal precedents and statutes related to the following topic: [TOPIC]. Provide a summary of relevant cases, statutes, and regulations, and explain how they apply to the topic."
+  },
+  {
+    type: "clause-identifier",
+    label: "Clause Identifier",
+    icon: ClipboardList,
+    category: "analysis",
+    description: "Identify and extract specific clauses from legal documents",
+    supportsChatGPT: true,
+    defaultPrompt: "Identify and extract all clauses related to [CLAUSE_TYPE] from the provided legal document. Provide the text of each clause and a brief explanation of its meaning and significance."
+  },
+  {
+    type: "risk-assessor",
+    label: "Risk Assessor",
+    icon: ShieldCheck,
+    category: "analysis",
+    description: "Assess legal risks associated with a document or situation",
+    supportsChatGPT: true,
+    defaultPrompt: "Assess the legal risks associated with the following document or situation: [DESCRIPTION]. Identify potential liabilities, compliance issues, and other legal concerns. Provide recommendations for mitigating these risks."
+  },
+  {
+    type: "compliance-checker",
+    label: "Compliance Checker",
+    icon: ListChecks,
+    category: "analysis",
+    description: "Check legal documents for compliance with regulations",
+    supportsChatGPT: true,
+    defaultPrompt: "Check the provided legal document for compliance with the following regulations: [REGULATIONS]. Identify any areas where the document may not comply and provide recommendations for ensuring compliance."
+  }
 ];

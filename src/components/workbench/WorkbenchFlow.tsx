@@ -1,4 +1,3 @@
-
 import React, { forwardRef, useCallback, useMemo, useEffect, useImperativeHandle } from "react";
 import { ReactFlow } from "@xyflow/react";
 import { useWorkbenchEvents } from "@/hooks/useWorkbenchEvents";
@@ -180,16 +179,22 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
   }, [edges, getEdgeData, simulateProcessing, isEdgeSelected, toggleEdgePreview, handleClosePreview]);
 
   /**
-   * Enhance nodes with execution status indicators
+   * Enhance nodes with execution status indicators and debug info
    */
   const enhancedNodes = useMemo(() => {
-    return nodes.map(node => ({
-      ...node,
-      data: {
-        ...node.data,
-        executionStatus: getNodeExecutionStatus(node.id)
-      }
-    }));
+    return nodes.map(node => {
+      const executionStatus = getNodeExecutionStatus(node.id);
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          executionStatus: {
+            ...executionStatus,
+            debugInfo: executionStatus.debugInfo
+          }
+        }
+      };
+    });
   }, [nodes, getNodeExecutionStatus]);
 
   return (

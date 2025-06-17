@@ -1,4 +1,3 @@
-
 /**
  * Node Processor Utility
  * 
@@ -181,6 +180,31 @@ export const createNodeProcessor = (nodes: AllNodes[], callChatGPT: ReturnType<t
 
     const moduleType = node.data.moduleType as ModuleKind;
     const moduleDef = MODULE_DEFINITIONS.find(m => m.type === moduleType);
+    
+    // Handle text-extractor as pass-through (no ChatGPT processing)
+    if (moduleType === 'text-extractor') {
+      console.log(`Text extractor pass-through for node ${nodeId}`);
+      
+      // Simply format and pass through the extracted text data
+      const result = {
+        moduleType,
+        output: {
+          ...inputData,
+          extractedText: inputData.content || inputData.extractedText,
+          formattedContent: inputData.content || inputData.extractedText
+        },
+        metadata: {
+          processingTime: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          passThrough: true,
+          preservedChunks: inputData.chunks?.length || 0,
+          totalCharacters: (inputData.content || '').length
+        }
+      };
+      
+      console.log(`Text extractor preserved ${result.metadata.preservedChunks} chunks, ${result.metadata.totalCharacters} characters`);
+      return result;
+    }
     
     if (!moduleDef?.supportsChatGPT) {
       console.warn(`Module ${moduleType} does not support ChatGPT processing`);
