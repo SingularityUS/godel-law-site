@@ -1,3 +1,4 @@
+
 /**
  * usePipelineExecution Hook
  * 
@@ -20,7 +21,6 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
   const [isExecuting, setIsExecuting] = useState(false);
   const [finalOutput, setFinalOutput] = useState<any>(null);
   const [progressInfo, setProgressInfo] = useState<{[nodeId: string]: {completed: number, total: number}}>({});
-  const [debugInfo, setDebugInfo] = useState<{[nodeId: string]: any}>({});
   const { callChatGPT } = useChatGPTApi();
 
   // Create utility functions
@@ -36,7 +36,6 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
     setIsExecuting(true);
     setFinalOutput(null);
     setProgressInfo({});
-    setDebugInfo({});
     
     try {
       const executionOrder = executionManager.getExecutionOrder(startNodeId);
@@ -64,16 +63,6 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
             // Extract text from legal document
             currentData = await extractDocumentText(node as DocumentInputNode);
             
-            // Set debug info for document input
-            setDebugInfo(prev => ({
-              ...prev,
-              [nodeId]: {
-                totalChunks: currentData.chunks?.length || 0,
-                totalCharacters: currentData.content?.length || 0,
-                fileSize: currentData.metadata?.fileSize || 0
-              }
-            }));
-            
             // Show chunking info if document was chunked
             if (currentData.chunks && currentData.chunks.length > 1) {
               console.log(`Document chunked into ${currentData.chunks.length} parts for processing`);
@@ -88,37 +77,6 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
             };
             
             currentData = await processNode(nodeId, currentData, onProgress);
-            
-            // Extract debug info from result metadata
-            const metadata = currentData.metadata || {};
-            const output = currentData.output || {};
-            
-            let nodeDebugInfo: any = {};
-            
-            // Add module-specific debug info
-            if (node?.data?.moduleType === 'text-extractor') {
-              nodeDebugInfo = {
-                totalChunks: metadata.preservedChunks || 0,
-                totalCharacters: metadata.totalCharacters || 0,
-                passThrough: metadata.passThrough || false
-              };
-            } else if (node?.data?.moduleType === 'paragraph-splitter') {
-              nodeDebugInfo = {
-                totalParagraphs: output.paragraphs?.length || 0,
-                totalChunks: metadata.totalChunks || 0
-              };
-            } else if (node?.data?.moduleType === 'grammar-checker') {
-              nodeDebugInfo = {
-                totalParagraphs: output.analysis?.length || 0,
-                totalErrors: output.overallAssessment?.totalErrors || 0,
-                totalChunks: metadata.totalChunks || 0
-              };
-            }
-            
-            setDebugInfo(prev => ({
-              ...prev,
-              [nodeId]: nodeDebugInfo
-            }));
           }
 
           pipelineResults.push({
@@ -185,19 +143,17 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
   }, [executePipeline, executionManager]);
 
   /**
-   * Get execution status for a specific node with debug info
+   * Get execution status for a specific node
    */
   const getNodeExecutionStatus = useCallback((nodeId: string) => {
     const baseStatus = executionState[nodeId] || { status: 'idle' };
     const progress = progressInfo[nodeId];
-    const debug = debugInfo[nodeId];
     
     return {
       ...baseStatus,
-      progress: progress ? `${progress.completed}/${progress.total}` : undefined,
-      debugInfo: debug
+      progress: progress ? `${progress.completed}/${progress.total}` : undefined
     };
-  }, [executionState, progressInfo, debugInfo]);
+  }, [executionState, progressInfo]);
 
   /**
    * Reset execution state
@@ -207,7 +163,6 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
     setFinalOutput(null);
     setIsExecuting(false);
     setProgressInfo({});
-    setDebugInfo({});
   }, []);
 
   return {
@@ -215,7 +170,6 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
     isExecuting,
     finalOutput,
     progressInfo,
-    debugInfo,
     executeAllPipelines,
     executePipeline,
     getNodeExecutionStatus,
