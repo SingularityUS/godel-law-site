@@ -19,9 +19,9 @@ export const usePipelineDocumentProcessor = () => {
       console.log(`Document chunked into ${currentData.chunks.length} parts for processing`);
     }
     
-    // Log document statistics
+    // Log document statistics - fix the property name
     const stats = currentData.metadata;
-    console.log(`Document stats: ${stats?.contentLength || 0} chars, ${stats?.estimatedTokens || 0} tokens, ${stats?.chunkCount || 1} chunks`);
+    console.log(`Document stats: ${stats?.processableLength || 0} chars, ${stats?.estimatedTokens || 0} tokens, ${stats?.chunkCount || 1} chunks`);
     
     return currentData;
   }, []);
