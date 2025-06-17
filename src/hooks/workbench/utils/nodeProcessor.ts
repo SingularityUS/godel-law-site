@@ -12,8 +12,18 @@ import { processWithBatching, shouldUseBatchProcessing } from "./batchProcessor"
 import { DocumentChunk } from "./documentChunker";
 import { parseJsonResponse, parseGrammarResponse } from "./parsing";
 
+// Enhanced progress interface for module-specific tracking
+export interface ModuleProgress {
+  completed: number;
+  total: number;
+  moduleType: ModuleKind;
+  inputType: 'chunks' | 'paragraphs' | 'documents';
+  outputGenerated?: number;
+  outputType?: string;
+}
+
 export const createNodeProcessor = (nodes: AllNodes[], callChatGPT: ReturnType<typeof useChatGPTApi>['callChatGPT']) => {
-  return async (nodeId: string, inputData: any, onProgress?: (completed: number, total: number) => void): Promise<any> => {
+  return async (nodeId: string, inputData: any, onProgress?: (progress: ModuleProgress) => void): Promise<any> => {
     const startTime = Date.now();
     const node = nodes.find(n => n.id === nodeId) as HelperNode;
     
@@ -56,7 +66,7 @@ export const createNodeProcessor = (nodes: AllNodes[], callChatGPT: ReturnType<t
     if (shouldUseBatchProcessing(inputData)) {
       console.log(`Using batch processing for module ${moduleType}`);
       
-      // Define processing function for individual chunks
+      // Define processing function for individual chunks with module-specific progress
       const processChunk = async (chunkContent: string, chunkInfo?: DocumentChunk) => {
         // Format chunk data for legal processing
         let promptData: string;
@@ -101,8 +111,31 @@ export const createNodeProcessor = (nodes: AllNodes[], callChatGPT: ReturnType<t
         };
       };
       
+      // Enhanced progress callback with module-specific information
+      const moduleProgressCallback = (completed: number, total: number, outputCount?: number) => {
+        if (onProgress) {
+          const inputType = moduleType === 'paragraph-splitter' ? 'chunks' : 'paragraphs';
+          const progress: ModuleProgress = {
+            completed,
+            total,
+            moduleType,
+            inputType,
+            outputGenerated: outputCount
+          };
+          
+          // Add output type information
+          if (moduleType === 'paragraph-splitter') {
+            progress.outputType = 'paragraphs';
+          } else if (moduleType === 'grammar-checker') {
+            progress.outputType = 'errors';
+          }
+          
+          onProgress(progress);
+        }
+      };
+      
       // Process with batching
-      const result = await processWithBatching(inputData, processChunk, onProgress);
+      const result = await processWithBatching(inputData, processChunk, moduleProgressCallback);
       
       const processingTime = Date.now() - startTime;
       
@@ -117,7 +150,7 @@ export const createNodeProcessor = (nodes: AllNodes[], callChatGPT: ReturnType<t
       };
       
     } else {
-      // Single document processing
+      // Single document processing with progress tracking
       let promptData: string;
       if (typeof inputData === 'object') {
         promptData = JSON.stringify(inputData, null, 2);
@@ -126,6 +159,17 @@ export const createNodeProcessor = (nodes: AllNodes[], callChatGPT: ReturnType<t
       }
       
       console.log(`Processing single document for ${moduleType}`);
+      
+      // Report progress for single document processing
+      if (onProgress) {
+        const progress: ModuleProgress = {
+          completed: 0,
+          total: 1,
+          moduleType,
+          inputType: 'documents'
+        };
+        onProgress(progress);
+      }
       
       const result = await callChatGPT(promptData, systemPrompt, 'gpt-4o-mini');
       
@@ -139,6 +183,19 @@ export const createNodeProcessor = (nodes: AllNodes[], callChatGPT: ReturnType<t
         processedOutput = parseGrammarResponse(result.response);
       } else {
         processedOutput = parseJsonResponse(result.response, moduleType);
+      }
+
+      // Report completion
+      if (onProgress) {
+        const progress: ModuleProgress = {
+          completed: 1,
+          total: 1,
+          moduleType,
+          inputType: 'documents',
+          outputGenerated: Array.isArray(processedOutput.paragraphs) ? processedOutput.paragraphs.length : 
+                          Array.isArray(processedOutput.analysis) ? processedOutput.analysis.length : 1
+        };
+        onProgress(progress);
       }
 
       const processingTime = Date.now() - startTime;

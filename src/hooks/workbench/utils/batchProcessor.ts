@@ -20,17 +20,18 @@ const DEFAULT_BATCH_OPTIONS: BatchProcessingOptions = {
 };
 
 /**
- * Process chunks in batches with progress tracking
+ * Process chunks in batches with enhanced progress tracking
  */
 export const processBatches = async (
   chunks: DocumentChunk[],
   processingFunction: (chunkContent: string, chunkInfo: DocumentChunk) => Promise<any>,
   options: Partial<BatchProcessingOptions> = {},
-  onProgress?: (completed: number, total: number) => void
+  onProgress?: (completed: number, total: number, outputGenerated?: number) => void
 ): Promise<any[]> => {
   const config = { ...DEFAULT_BATCH_OPTIONS, ...options };
   const results: any[] = [];
   let completedCount = 0;
+  let totalOutputGenerated = 0;
   
   console.log(`Starting batch processing of ${chunks.length} chunks`);
   
@@ -51,6 +52,20 @@ export const processBatches = async (
           console.log(`Processing chunk ${globalIndex + 1}/${chunks.length} (attempt ${attempt})`);
           const result = await processingFunction(chunk.content, chunk);
           
+          // Count output items generated (paragraphs, errors, etc.)
+          let outputCount = 0;
+          if (result.output) {
+            if (Array.isArray(result.output.paragraphs)) {
+              outputCount = result.output.paragraphs.length;
+            } else if (Array.isArray(result.output.analysis)) {
+              outputCount = result.output.analysis.length;
+            } else if (result.output.totalParagraphs) {
+              outputCount = result.output.totalParagraphs;
+            }
+          }
+          
+          totalOutputGenerated += outputCount;
+          
           // Add chunk metadata to result
           return {
             ...result,
@@ -58,7 +73,8 @@ export const processBatches = async (
               chunkIndex: chunk.chunkIndex,
               totalChunks: chunk.totalChunks,
               startPosition: chunk.startPosition,
-              endPosition: chunk.endPosition
+              endPosition: chunk.endPosition,
+              outputGenerated: outputCount
             }
           };
         } catch (error) {
@@ -72,7 +88,8 @@ export const processBatches = async (
                 chunkIndex: chunk.chunkIndex,
                 totalChunks: chunk.totalChunks,
                 startPosition: chunk.startPosition,
-                endPosition: chunk.endPosition
+                endPosition: chunk.endPosition,
+                outputGenerated: 0
               }
             };
           }
@@ -87,9 +104,9 @@ export const processBatches = async (
     results.push(...batchResults);
     completedCount += batch.length;
     
-    // Update progress
+    // Update progress with enhanced information
     if (onProgress) {
-      onProgress(completedCount, chunks.length);
+      onProgress(completedCount, chunks.length, totalOutputGenerated);
     }
     
     // Delay between batches (except for the last one)
@@ -99,7 +116,7 @@ export const processBatches = async (
     }
   }
   
-  console.log(`Batch processing completed: ${results.length} results`);
+  console.log(`Batch processing completed: ${results.length} results, ${totalOutputGenerated} items generated`);
   return results;
 };
 
@@ -118,7 +135,7 @@ export const shouldUseBatchProcessing = (data: any): boolean => {
 export const processWithBatching = async (
   data: any,
   processingFunction: (content: string, chunkInfo?: DocumentChunk) => Promise<any>,
-  onProgress?: (completed: number, total: number) => void
+  onProgress?: (completed: number, total: number, outputGenerated?: number) => void
 ): Promise<any> => {
   if (data.chunks && Array.isArray(data.chunks) && data.chunks.length > 1) {
     console.log('Using batch processing for chunked document');
@@ -130,30 +147,53 @@ export const processWithBatching = async (
     );
     return reassembleChunks(results);
   } else if (data.paragraphs && Array.isArray(data.paragraphs)) {
-    console.log(`Processing all ${data.paragraphs.length} paragraphs in batches for comprehensive analysis`);
+    console.log(`Processing all ${data.paragraphs.length} paragraphs for comprehensive analysis`);
     
-    // For paragraph processing, we need to send all paragraphs to ensure complete processing
-    const fullDataString = JSON.stringify(data, null, 2);
-    console.log(`Sending ${data.paragraphs.length} paragraphs for processing`);
+    // For paragraph processing, we track progress by paragraphs
+    const totalParagraphs = data.paragraphs.length;
     
     if (onProgress) {
-      onProgress(0, 1); // Start progress
+      onProgress(0, totalParagraphs, 0); // Start progress
     }
+    
+    const fullDataString = JSON.stringify(data, null, 2);
+    console.log(`Sending ${totalParagraphs} paragraphs for processing`);
     
     const result = await processingFunction(fullDataString);
     
+    // Count output generated
+    let outputGenerated = 0;
+    if (result.output) {
+      if (Array.isArray(result.output.analysis)) {
+        outputGenerated = result.output.analysis.length;
+      } else if (result.output.processingStats?.paragraphsAnalyzed) {
+        outputGenerated = result.output.processingStats.paragraphsAnalyzed;
+      }
+    }
+    
     if (onProgress) {
-      onProgress(1, 1); // Complete progress
+      onProgress(totalParagraphs, totalParagraphs, outputGenerated); // Complete progress
     }
     
     // Ensure we return the processing statistics
     if (result.output && result.output.processingStats) {
-      console.log(`Processed ${result.output.processingStats.paragraphsAnalyzed || data.paragraphs.length} paragraphs`);
+      console.log(`Processed ${result.output.processingStats.paragraphsAnalyzed || totalParagraphs} paragraphs`);
     }
     
     return result;
   } else {
     console.log('Processing as single document');
-    return await processingFunction(data.content || JSON.stringify(data));
+    
+    if (onProgress) {
+      onProgress(0, 1, 0);
+    }
+    
+    const result = await processingFunction(data.content || JSON.stringify(data));
+    
+    if (onProgress) {
+      onProgress(1, 1, 1);
+    }
+    
+    return result;
   }
 };

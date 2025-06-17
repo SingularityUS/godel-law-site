@@ -19,7 +19,7 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
   const [executionState, setExecutionState] = useState<ExecutionState>({});
   const [isExecuting, setIsExecuting] = useState(false);
   const [finalOutput, setFinalOutput] = useState<any>(null);
-  const [progressInfo, setProgressInfo] = useState<{[nodeId: string]: {completed: number, total: number}}>({});
+  const [progressInfo, setProgressInfo<{[nodeId: string]: {completed: number, total: number}}>({});
   const { callChatGPT } = useChatGPTApi();
 
   // Create utility functions
@@ -72,14 +72,32 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
             console.log(`Document stats: ${stats?.contentLength || 0} chars, ${stats?.estimatedTokens || 0} tokens, ${stats?.chunkCount || 1} chunks`);
             
           } else {
-            // Process with ChatGPT using legal prompts
-            const onProgress = (completed: number, total: number) => {
+            // Enhanced progress callback for module-specific tracking
+            const onProgress = (progress: any) => {
+              // Handle both old and new progress formats
+              let completed: number, total: number;
+              
+              if (typeof progress === 'object' && progress.completed !== undefined) {
+                // New ModuleProgress format
+                completed = progress.completed;
+                total = progress.total;
+                
+                // Log module-specific progress
+                const inputType = progress.inputType || 'items';
+                const outputInfo = progress.outputGenerated ? ` → ${progress.outputGenerated} ${progress.outputType || 'items'}` : '';
+                console.log(`${node?.data?.moduleType}: Processing ${inputType} ${completed}/${total}${outputInfo}`);
+              } else {
+                // Legacy format compatibility
+                completed = progress.completed || progress;
+                total = progress.total || 1;
+              }
+              
               setProgressInfo(prev => ({
                 ...prev,
                 [nodeId]: { completed, total }
               }));
               
-              // Update execution state with progress for debugging
+              // Update execution state with enhanced progress
               setExecutionState(prev => ({
                 ...prev,
                 [nodeId]: { 

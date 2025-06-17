@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Handle, Position, Node } from "@xyflow/react";
 import { X, Settings } from "lucide-react";
@@ -33,7 +32,31 @@ interface HelperNodeProps {
 const getModuleDef = (type: ModuleKind) => MODULE_DEFINITIONS.find((m) => m.type === type)!;
 
 /**
- * Extract processing statistics from execution data for debugging display
+ * Format module-specific progress display
+ */
+const formatModuleProgress = (progress: any, moduleType: ModuleKind): string | null => {
+  if (!progress || !progress.includes('/')) return null;
+  
+  const [completed, total] = progress.split('/').map(Number);
+  
+  switch (moduleType) {
+    case 'paragraph-splitter':
+      return `Chunk ${completed}/${total}`;
+    case 'grammar-checker':
+      return `Para ${completed}/${total}`;
+    case 'citation-finder':
+      return `Para ${completed}/${total}`;
+    case 'citation-verifier':
+      return `Cite ${completed}/${total}`;
+    case 'style-guide-enforcer':
+      return `Para ${completed}/${total}`;
+    default:
+      return `${completed}/${total}`;
+  }
+};
+
+/**
+ * Extract enhanced processing statistics from execution data
  */
 const getProcessingStats = (data: any, moduleType: ModuleKind): string | null => {
   if (!data) return null;
@@ -42,7 +65,7 @@ const getProcessingStats = (data: any, moduleType: ModuleKind): string | null =>
     // For text extractor (pass-through)
     if (moduleType === 'text-extractor') {
       if (data.metadata?.passedThrough) {
-        return `Pass-through (deprecated)`;
+        return `Pass-through`;
       }
       return null;
     }
@@ -51,9 +74,9 @@ const getProcessingStats = (data: any, moduleType: ModuleKind): string | null =>
     if (moduleType === 'paragraph-splitter' && data.output) {
       const paragraphs = data.output.paragraphs || data.output.totalParagraphs;
       if (Array.isArray(paragraphs)) {
-        return `${paragraphs.length} paragraphs`;
+        return `${paragraphs.length}p`;
       } else if (typeof paragraphs === 'number') {
-        return `${paragraphs} paragraphs`;
+        return `${paragraphs}p`;
       }
     }
     
@@ -68,7 +91,26 @@ const getProcessingStats = (data: any, moduleType: ModuleKind): string | null =>
         const totalErrors = overall?.totalErrors || 0;
         return `${processed}p, ${totalErrors}e`;
       } else if (stats?.paragraphsAnalyzed) {
-        return `${stats.paragraphsAnalyzed} analyzed`;
+        const totalErrors = overall?.totalErrors || 0;
+        return `${stats.paragraphsAnalyzed}p, ${totalErrors}e`;
+      }
+    }
+    
+    // For citation modules
+    if (moduleType === 'citation-finder' && data.output) {
+      const citations = data.output.citations || data.output.totalCitations;
+      if (Array.isArray(citations)) {
+        return `${citations.length}c`;
+      } else if (typeof citations === 'number') {
+        return `${citations}c`;
+      }
+    }
+    
+    if (moduleType === 'citation-verifier' && data.output) {
+      const verified = data.output.verifiedCitations?.length || data.output.totalVerified || 0;
+      const invalid = data.output.invalidCitations?.length || data.output.totalInvalid || 0;
+      if (verified || invalid) {
+        return `${verified}v, ${invalid}i`;
       }
     }
     
@@ -144,11 +186,14 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
   const supportsChatGPT = module.supportsChatGPT || data.moduleType === 'chatgpt-assistant';
   const isLegalModule = ['text-extractor', 'paragraph-splitter', 'grammar-checker', 'citation-finder', 'citation-verifier', 'style-guide-enforcer'].includes(data.moduleType);
 
-  // Get execution status and progress
+  // Get execution status and enhanced progress
   const executionStatus = data.executionStatus?.status || 'idle';
   const isProcessing = executionStatus === 'processing';
   const progress = data.executionStatus?.progress;
   const processingStats = getProcessingStats(data.executionStatus?.data, data.moduleType);
+  
+  // Format progress for display
+  const formattedProgress = formatModuleProgress(progress, data.moduleType);
 
   return (
     <div
@@ -198,16 +243,16 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
         </span>
         <span className={`text-xs font-bold ${textColor} text-center leading-tight`}>{module.label}</span>
         
-        {/* Progress indicator during processing */}
-        {progress && (
-          <div className={`text-xs ${textColor}/90 mt-1`}>
-            {progress}
+        {/* Enhanced progress indicator during processing */}
+        {formattedProgress && isProcessing && (
+          <div className={`text-xs ${textColor}/90 mt-1 font-mono`}>
+            {formattedProgress}
           </div>
         )}
         
         {/* Processing stats when completed */}
         {processingStats && executionStatus === 'completed' && (
-          <div className={`text-xs ${textColor}/80 mt-1`}>
+          <div className={`text-xs ${textColor}/80 mt-1 font-mono`}>
             {processingStats}
           </div>
         )}
