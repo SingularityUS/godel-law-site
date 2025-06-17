@@ -1,4 +1,3 @@
-
 import { ArrowDown, ArrowUp, Divide, BookOpen, MessageSquare } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -63,7 +62,7 @@ Return the extracted text in a structured JSON format:
     "hasExhibits": boolean
   }
 }`,
-    supportsChatGPT: true,
+    supportsChatGPT: false, // Now a pass-through module
     outputFormat: 'json'
   },
   {
@@ -71,29 +70,41 @@ Return the extracted text in a structured JSON format:
     label: "Paragraph Splitter",
     color: "bg-slate-600",
     icon: Divide,
-    defaultPrompt: `You are a legal document paragraph analyzer. Split the provided legal text into logical paragraphs while maintaining legal document structure:
+    defaultPrompt: `You are a legal document paragraph analyzer. Split ALL provided legal text into logical paragraphs while maintaining legal document structure. Process the ENTIRE document content, not just a sample.
+
+IMPORTANT: Process ALL content provided. Do not limit the number of paragraphs. A legal document may contain hundreds of paragraphs.
 
 - Preserve numbered sections (1., 2., 3., etc.)
 - Maintain subsection hierarchy (a., b., c., etc.)
 - Keep related clauses together
 - Separate whereas clauses, recitals, and operative provisions
 - Maintain citation integrity within paragraphs
+- Split on natural paragraph breaks (double line breaks, section breaks)
+- Include ALL content from the input document
 
-Return a structured JSON array:
+Return a structured JSON array with ALL paragraphs:
 {
   "paragraphs": [
     {
       "id": "p1",
-      "type": "recital|operative|signature|exhibit",
+      "type": "recital|operative|signature|exhibit|body|heading",
       "sectionNumber": "1.1",
       "content": "paragraph text",
       "containsCitations": boolean,
-      "isNumbered": boolean
+      "isNumbered": boolean,
+      "wordCount": number
     }
   ],
   "totalParagraphs": number,
-  "documentStructure": "simple|complex|multi-level"
-}`,
+  "documentStructure": "simple|complex|multi-level",
+  "processingStats": {
+    "inputWordCount": number,
+    "outputWordCount": number,
+    "averageParagraphLength": number
+  }
+}
+
+CRITICAL: Ensure you process ALL input content and return ALL paragraphs, not just the first few.`,
     supportsChatGPT: true,
     outputFormat: 'json'
   },
@@ -102,7 +113,9 @@ Return a structured JSON array:
     label: "Grammar Checker",
     color: "bg-slate-600",
     icon: ArrowUp,
-    defaultPrompt: `You are a legal writing specialist trained in proper legal grammar, style, and formatting. Analyze each paragraph for:
+    defaultPrompt: `You are a legal writing specialist trained in proper legal grammar, style, and formatting. Analyze ALL paragraphs provided for:
+
+IMPORTANT: Process ALL paragraphs from the input data. Do not skip any paragraphs.
 
 LEGAL WRITING STANDARDS:
 - Proper legal terminology usage
@@ -113,7 +126,7 @@ LEGAL WRITING STANDARDS:
 - Proper use of legal Latin phrases
 - Citation format consistency (Bluebook/local rules)
 
-For each paragraph, provide three-column analysis:
+For ALL paragraphs, provide comprehensive analysis:
 {
   "analysis": [
     {
@@ -135,9 +148,18 @@ For each paragraph, provide three-column analysis:
   "overallAssessment": {
     "totalErrors": number,
     "writingQuality": "excellent|good|needs_improvement|poor",
-    "recommendations": ["list of general writing improvements"]
+    "recommendations": ["list of general writing improvements"],
+    "totalParagraphsProcessed": number,
+    "averageScore": number
+  },
+  "processingStats": {
+    "paragraphsAnalyzed": number,
+    "totalSuggestions": number,
+    "averageImprovementsPerParagraph": number
   }
-}`,
+}
+
+CRITICAL: Process ALL paragraphs from the input. Ensure the analysis array contains entries for every single paragraph provided.`,
     supportsChatGPT: true,
     outputFormat: 'json'
   },

@@ -8,13 +8,43 @@
 export const parseGrammarResponse = (response: string): any => {
   console.log('Parsing grammar response, length:', response.length);
   
-  // Split response into sections and try to identify paragraphs
+  // Try direct JSON parsing first for structured responses
+  try {
+    const parsed = JSON.parse(response);
+    if (parsed.analysis && Array.isArray(parsed.analysis)) {
+      console.log(`Direct JSON parsing successful: ${parsed.analysis.length} paragraphs analyzed`);
+      return parsed;
+    }
+  } catch (error) {
+    console.warn('Direct JSON parsing failed, attempting extraction');
+  }
+
+  // Try to extract JSON from text response
+  try {
+    const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/) || 
+                     response.match(/\{[\s\S]*\}/);
+    
+    if (jsonMatch) {
+      const jsonString = jsonMatch[1] || jsonMatch[0];
+      const parsed = JSON.parse(jsonString.trim());
+      
+      if (parsed.analysis && Array.isArray(parsed.analysis)) {
+        console.log(`JSON extraction successful: ${parsed.analysis.length} paragraphs analyzed`);
+        return parsed;
+      }
+    }
+  } catch (error) {
+    console.warn('JSON extraction failed, falling back to text parsing');
+  }
+  
+  // Fallback: Split response into sections and try to identify paragraphs
   const sections = response.split(/\n\n+/);
   const analysis: any[] = [];
   let overallAssessment: any = {};
   
   // Look for structured content patterns
   let paragraphCounter = 1;
+  let totalErrorsFound = 0;
   
   sections.forEach((section, index) => {
     // Skip very short sections
@@ -49,14 +79,17 @@ export const parseGrammarResponse = (response: string): any => {
       if (suggestionsMatch) {
         suggestions.push({
           issue: "Grammar/Style",
-          severity: "Medium",
+          severity: "moderate",
           description: suggestionsMatch[1]?.trim(),
           suggestion: "See corrected version"
         });
+        totalErrorsFound += 1;
       }
       
       // Look for quality indicators in the text
       const hasErrors = originalText !== correctedText;
+      if (hasErrors) totalErrorsFound += 1;
+      
       const score = hasErrors ? Math.floor(Math.random() * 3) + 6 : Math.floor(Math.random() * 2) + 8; // 6-8 if errors, 8-9 if clean
       
       analysis.push({
@@ -92,23 +125,39 @@ export const parseGrammarResponse = (response: string): any => {
     });
   }
 
-  // Create overall assessment
-  const totalErrors = analysis.reduce((sum, para) => sum + (para.suggestions?.length || 0), 0);
+  // Create comprehensive overall assessment
   const avgScore = analysis.length > 0 
     ? Math.round(analysis.reduce((sum, para) => sum + para.legalWritingScore, 0) / analysis.length)
     : 8;
 
   overallAssessment = {
-    totalErrors,
+    totalErrors: totalErrorsFound,
     writingQuality: avgScore >= 8 ? "Good" : avgScore >= 6 ? "Fair" : "Needs Improvement",
     overallScore: avgScore,
-    totalParagraphs: analysis.length
+    totalParagraphs: analysis.length,
+    averageScore: avgScore,
+    totalParagraphsProcessed: analysis.length,
+    recommendations: [
+      "Review all suggestions for grammar and style improvements",
+      "Consider legal writing best practices for future documents",
+      "Verify all legal citations and terminology"
+    ]
   };
 
-  console.log(`Grammar parsing complete: ${analysis.length} paragraphs, ${totalErrors} total errors`);
+  // Add processing statistics
+  const processingStats = {
+    paragraphsAnalyzed: analysis.length,
+    totalSuggestions: analysis.reduce((sum, para) => sum + (para.suggestions?.length || 0), 0),
+    averageImprovementsPerParagraph: analysis.length > 0 
+      ? Math.round((analysis.reduce((sum, para) => sum + (para.suggestions?.length || 0), 0) / analysis.length) * 10) / 10
+      : 0
+  };
+
+  console.log(`Grammar parsing complete: ${analysis.length} paragraphs, ${totalErrorsFound} total errors`);
 
   return {
     analysis,
-    overallAssessment
+    overallAssessment,
+    processingStats
   };
 };

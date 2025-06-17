@@ -107,18 +107,20 @@ export const processBatches = async (
  * Determine if content should be processed in batches
  */
 export const shouldUseBatchProcessing = (data: any): boolean => {
-  return data.chunks && Array.isArray(data.chunks) && data.chunks.length > 1;
+  // Check for chunked documents OR large paragraph arrays
+  return (data.chunks && Array.isArray(data.chunks) && data.chunks.length > 1) ||
+         (data.paragraphs && Array.isArray(data.paragraphs) && data.paragraphs.length > 50);
 };
 
 /**
- * Process data either as single chunk or in batches
+ * Process data either as single chunk or in batches - enhanced for paragraph processing
  */
 export const processWithBatching = async (
   data: any,
   processingFunction: (content: string, chunkInfo?: DocumentChunk) => Promise<any>,
   onProgress?: (completed: number, total: number) => void
 ): Promise<any> => {
-  if (shouldUseBatchProcessing(data)) {
+  if (data.chunks && Array.isArray(data.chunks) && data.chunks.length > 1) {
     console.log('Using batch processing for chunked document');
     const results = await processBatches(
       data.chunks,
@@ -127,8 +129,31 @@ export const processWithBatching = async (
       onProgress
     );
     return reassembleChunks(results);
+  } else if (data.paragraphs && Array.isArray(data.paragraphs)) {
+    console.log(`Processing all ${data.paragraphs.length} paragraphs in batches for comprehensive analysis`);
+    
+    // For paragraph processing, we need to send all paragraphs to ensure complete processing
+    const fullDataString = JSON.stringify(data, null, 2);
+    console.log(`Sending ${data.paragraphs.length} paragraphs for processing`);
+    
+    if (onProgress) {
+      onProgress(0, 1); // Start progress
+    }
+    
+    const result = await processingFunction(fullDataString);
+    
+    if (onProgress) {
+      onProgress(1, 1); // Complete progress
+    }
+    
+    // Ensure we return the processing statistics
+    if (result.output && result.output.processingStats) {
+      console.log(`Processed ${result.output.processingStats.paragraphsAnalyzed || data.paragraphs.length} paragraphs`);
+    }
+    
+    return result;
   } else {
     console.log('Processing as single document');
-    return await processingFunction(data.content);
+    return await processingFunction(data.content || JSON.stringify(data));
   }
 };

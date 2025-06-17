@@ -1,4 +1,3 @@
-
 /**
  * usePipelineExecution Hook
  * 
@@ -67,6 +66,11 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
             if (currentData.chunks && currentData.chunks.length > 1) {
               console.log(`Document chunked into ${currentData.chunks.length} parts for processing`);
             }
+            
+            // Log document statistics
+            const stats = currentData.metadata;
+            console.log(`Document stats: ${stats?.contentLength || 0} chars, ${stats?.estimatedTokens || 0} tokens, ${stats?.chunkCount || 1} chunks`);
+            
           } else {
             // Process with ChatGPT using legal prompts
             const onProgress = (completed: number, total: number) => {
@@ -74,9 +78,42 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
                 ...prev,
                 [nodeId]: { completed, total }
               }));
+              
+              // Update execution state with progress for debugging
+              setExecutionState(prev => ({
+                ...prev,
+                [nodeId]: { 
+                  ...prev[nodeId], 
+                  status: 'processing',
+                  progress: `${completed}/${total}` 
+                }
+              }));
             };
             
+            // Log input data statistics before processing
+            if (currentData) {
+              if (currentData.paragraphs && Array.isArray(currentData.paragraphs)) {
+                console.log(`${node?.data?.moduleType}: Processing ${currentData.paragraphs.length} paragraphs`);
+              } else if (currentData.chunks && Array.isArray(currentData.chunks)) {
+                console.log(`${node?.data?.moduleType}: Processing ${currentData.chunks.length} chunks`);
+              } else if (currentData.content) {
+                console.log(`${node?.data?.moduleType}: Processing content (${currentData.content.length} chars)`);
+              }
+            }
+            
             currentData = await processNode(nodeId, currentData, onProgress);
+            
+            // Log output data statistics after processing
+            if (currentData && currentData.output) {
+              const output = currentData.output;
+              if (output.paragraphs && Array.isArray(output.paragraphs)) {
+                console.log(`${node?.data?.moduleType}: Generated ${output.paragraphs.length} paragraphs`);
+              } else if (output.analysis && Array.isArray(output.analysis)) {
+                console.log(`${node?.data?.moduleType}: Analyzed ${output.analysis.length} items`);
+              } else if (output.totalParagraphs) {
+                console.log(`${node?.data?.moduleType}: Processed ${output.totalParagraphs} paragraphs`);
+              }
+            }
           }
 
           pipelineResults.push({
@@ -85,12 +122,13 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
             result: currentData
           });
 
-          // Update status to completed with data
+          // Update status to completed with data and statistics
           setExecutionState(prev => ({
             ...prev,
             [nodeId]: { 
               status: 'completed', 
-              data: currentData 
+              data: currentData,
+              processingTime: currentData?.metadata?.processingTime
             }
           }));
 
@@ -102,6 +140,8 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
           });
 
         } catch (error: any) {
+          console.error(`Error processing node ${nodeId} (${node?.data?.moduleType}):`, error);
+          
           // Update status to error
           setExecutionState(prev => ({
             ...prev,
@@ -117,7 +157,15 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
       // Create comprehensive final output for legal review
       const finalLegalOutput = executionManager.createFinalOutput(pipelineResults, currentData);
       setFinalOutput(finalLegalOutput);
+      
+      // Log final pipeline statistics
       console.log('Legal document processing pipeline completed successfully');
+      console.log(`Final output contains:`, {
+        totalModules: pipelineResults.length,
+        finalDataType: typeof currentData,
+        hasAnalysis: currentData?.output?.analysis ? currentData.output.analysis.length : 0,
+        hasParagraphs: currentData?.output?.paragraphs ? currentData.output.paragraphs.length : 0
+      });
 
     } catch (error: any) {
       console.error('Legal document processing pipeline failed:', error);

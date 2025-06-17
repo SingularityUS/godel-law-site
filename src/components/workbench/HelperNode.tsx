@@ -15,6 +15,7 @@ interface HelperNodeData extends Record<string, unknown> {
     status: 'idle' | 'queued' | 'processing' | 'completed' | 'error';
     data?: any;
     error?: string;
+    progress?: string;
   };
 }
 
@@ -30,6 +31,69 @@ interface HelperNodeProps {
  * Helper function to get module definition from the modules registry
  */
 const getModuleDef = (type: ModuleKind) => MODULE_DEFINITIONS.find((m) => m.type === type)!;
+
+/**
+ * Extract processing statistics from execution data for debugging display
+ */
+const getProcessingStats = (data: any, moduleType: ModuleKind): string | null => {
+  if (!data) return null;
+  
+  try {
+    // For text extractor (pass-through)
+    if (moduleType === 'text-extractor') {
+      if (data.metadata?.passedThrough) {
+        return `Pass-through (deprecated)`;
+      }
+      return null;
+    }
+    
+    // For paragraph splitter
+    if (moduleType === 'paragraph-splitter' && data.output) {
+      const paragraphs = data.output.paragraphs || data.output.totalParagraphs;
+      if (Array.isArray(paragraphs)) {
+        return `${paragraphs.length} paragraphs`;
+      } else if (typeof paragraphs === 'number') {
+        return `${paragraphs} paragraphs`;
+      }
+    }
+    
+    // For grammar checker
+    if (moduleType === 'grammar-checker' && data.output) {
+      const analysis = data.output.analysis;
+      const stats = data.output.processingStats;
+      const overall = data.output.overallAssessment;
+      
+      if (analysis && Array.isArray(analysis)) {
+        const processed = analysis.length;
+        const totalErrors = overall?.totalErrors || 0;
+        return `${processed}p, ${totalErrors}e`;
+      } else if (stats?.paragraphsAnalyzed) {
+        return `${stats.paragraphsAnalyzed} analyzed`;
+      }
+    }
+    
+    // For other modules, try to extract relevant counts
+    if (data.output) {
+      // Look for common count properties
+      const counts = [];
+      if (data.output.totalCitations) counts.push(`${data.output.totalCitations}c`);
+      if (data.output.totalParagraphs) counts.push(`${data.output.totalParagraphs}p`);
+      if (data.output.totalSections) counts.push(`${data.output.totalSections}s`);
+      
+      if (counts.length > 0) return counts.join(', ');
+    }
+    
+    // Check for chunk processing
+    if (data.metadata?.chunkCount) {
+      return `${data.metadata.chunkCount} chunks`;
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Error extracting processing stats:', error);
+    return null;
+  }
+};
 
 const HelperNodeComponent: React.FC<HelperNodeProps> = ({ 
   data, 
@@ -80,9 +144,11 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
   const supportsChatGPT = module.supportsChatGPT || data.moduleType === 'chatgpt-assistant';
   const isLegalModule = ['text-extractor', 'paragraph-splitter', 'grammar-checker', 'citation-finder', 'citation-verifier', 'style-guide-enforcer'].includes(data.moduleType);
 
-  // Get execution status
+  // Get execution status and progress
   const executionStatus = data.executionStatus?.status || 'idle';
   const isProcessing = executionStatus === 'processing';
+  const progress = data.executionStatus?.progress;
+  const processingStats = getProcessingStats(data.executionStatus?.data, data.moduleType);
 
   return (
     <div
@@ -131,6 +197,20 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
           <module.icon size={20} />
         </span>
         <span className={`text-xs font-bold ${textColor} text-center leading-tight`}>{module.label}</span>
+        
+        {/* Progress indicator during processing */}
+        {progress && (
+          <div className={`text-xs ${textColor}/90 mt-1`}>
+            {progress}
+          </div>
+        )}
+        
+        {/* Processing stats when completed */}
+        {processingStats && executionStatus === 'completed' && (
+          <div className={`text-xs ${textColor}/80 mt-1`}>
+            {processingStats}
+          </div>
+        )}
       </div>
       
       {/* Prompt status indicator */}

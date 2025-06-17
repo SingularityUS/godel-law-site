@@ -24,6 +24,24 @@ export const createNodeProcessor = (nodes: AllNodes[], callChatGPT: ReturnType<t
     const moduleType = node.data.moduleType as ModuleKind;
     const moduleDef = MODULE_DEFINITIONS.find(m => m.type === moduleType);
     
+    // Text extractor is now a pass-through module (for future deprecation)
+    if (moduleType === 'text-extractor') {
+      console.log(`Text extractor ${nodeId} operating as pass-through (deprecated behavior)`);
+      const processingTime = Date.now() - startTime;
+      
+      return {
+        ...inputData,
+        metadata: {
+          ...inputData.metadata,
+          processingTime,
+          passedThrough: true,
+          moduleType: 'text-extractor',
+          timestamp: new Date().toISOString(),
+          note: 'Text extraction handled by document processor - this module is now pass-through'
+        }
+      };
+    }
+    
     if (!moduleDef?.supportsChatGPT) {
       console.warn(`Module ${moduleType} does not support ChatGPT processing`);
       return inputData; // Pass through unchanged
