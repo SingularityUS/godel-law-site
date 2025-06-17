@@ -7,7 +7,6 @@
  */
 
 import React from "react";
-import { MessageSquare, Zap } from "lucide-react";
 
 interface ChatGPTIndicatorProps {
   isActive?: boolean;
@@ -24,15 +23,7 @@ const ChatGPTIndicator: React.FC<ChatGPTIndicatorProps> = ({
 
   return (
     <div className={`absolute -top-1 -left-1 ${className}`}>
-      {isProcessing ? (
-        <div className="w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center animate-pulse">
-          <Zap size={8} className="text-white" />
-        </div>
-      ) : (
-        <div className="w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
-          <MessageSquare size={8} className="text-white" />
-        </div>
-      )}
+      <div className={`w-1.5 h-1.5 bg-green-500 rounded-full ${isProcessing ? 'animate-pulse' : ''}`} />
     </div>
   );
 };
