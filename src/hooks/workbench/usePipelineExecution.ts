@@ -1,3 +1,4 @@
+
 /**
  * usePipelineExecution Hook
  * 
@@ -19,7 +20,7 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
   const [executionState, setExecutionState] = useState<ExecutionState>({});
   const [isExecuting, setIsExecuting] = useState(false);
   const [finalOutput, setFinalOutput] = useState<any>(null);
-  const [progressInfo, setProgressInfo<{[nodeId: string]: {completed: number, total: number}}>({});
+  const [progressInfo, setProgressInfo] = useState<{[nodeId: string]: {completed: number, total: number}}>({});
   const { callChatGPT } = useChatGPTApi();
 
   // Create utility functions
