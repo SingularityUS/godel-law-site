@@ -148,7 +148,7 @@ export const reassembleChunks = (processedChunks: any[]): any => {
   // Combine results from multiple chunks
   const combinedResult = {
     moduleType: processedChunks[0].moduleType,
-    output: '',
+    output: null as any, // Use any type to handle different output types
     metadata: {
       totalChunks: processedChunks.length,
       combinedResults: true,
@@ -174,6 +174,11 @@ export const reassembleChunks = (processedChunks: any[]): any => {
     combinedResult.output = processedChunks.reduce((merged, chunk) => {
       return { ...merged, ...chunk.output };
     }, {});
+  } else {
+    // Fallback to string concatenation
+    combinedResult.output = processedChunks
+      .map(chunk => String(chunk.output || ''))
+      .join('\n\n---\n\n');
   }
   
   return combinedResult;
