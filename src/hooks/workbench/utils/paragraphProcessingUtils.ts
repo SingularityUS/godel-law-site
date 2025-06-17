@@ -6,14 +6,14 @@
  */
 
 /**
- * Process individual paragraph for grammar checking - FIXED to send only text content
+ * Process individual paragraph for grammar checking - FIXED to send full paragraph object
  */
 export const processIndividualParagraph = async (
   paragraph: any, 
   index: number, 
   totalParagraphs: number, 
   documentType: string,
-  processingFunction: (content: string) => Promise<any>
+  processingFunction: (paragraphData: any) => Promise<any>
 ) => {
   console.log(`Processing paragraph ${index + 1}/${totalParagraphs}: "${paragraph.content?.substring(0, 50)}..."`);
   
@@ -27,15 +27,24 @@ export const processIndividualParagraph = async (
     };
   }
   
-  // FIXED: Send only the paragraph text content, not complex JSON
-  // The grammar checker needs plain text, not structured data
-  const paragraphText = paragraph.content;
+  // FIXED: Send the full paragraph object, not just the text content
+  // Create a properly structured paragraph object for the grammar checker
+  const paragraphData = {
+    id: paragraph.id || `para-${index + 1}`,
+    content: paragraph.content,
+    wordCount: paragraph.wordCount || paragraph.content.split(/\s+/).length,
+    originalIndex: index
+  };
   
-  console.log(`Sending paragraph text (${paragraphText.length} chars) to grammar checker for analysis`);
+  console.log(`Sending full paragraph object for analysis:`, {
+    id: paragraphData.id,
+    contentLength: paragraphData.content.length,
+    wordCount: paragraphData.wordCount
+  });
   
   try {
-    // Send only the text content to the processing function
-    const result = await processingFunction(paragraphText);
+    // Send the full paragraph object to the processing function
+    const result = await processingFunction(paragraphData);
     
     // Enhance result with paragraph context and validation
     if (result && result.output) {

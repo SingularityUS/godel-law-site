@@ -20,8 +20,20 @@ export const processGrammarAnalysis = async (
   // Extract paragraphs from input with enhanced debugging
   let paragraphs: any[] = [];
   
-  if (inputData && typeof inputData === 'object') {
-    // Check various possible paragraph locations
+  // FIXED: Handle direct string input (individual paragraph content)
+  if (typeof inputData === 'string') {
+    console.log('Received string input - creating paragraph object from content');
+    console.log('String content length:', inputData.length);
+    console.log('String content preview:', inputData.substring(0, 100) + '...');
+    
+    // Create a paragraph object from the string content
+    paragraphs = [{
+      id: `para-${Date.now()}`,
+      content: inputData
+    }];
+    console.log(`Created single paragraph from string input: ${paragraphs.length} paragraph`);
+  } else if (inputData && typeof inputData === 'object') {
+    // Check various possible paragraph locations for object input
     if (inputData.output && inputData.output.paragraphs && Array.isArray(inputData.output.paragraphs)) {
       paragraphs = inputData.output.paragraphs;
       console.log(`Found ${paragraphs.length} paragraphs in output wrapper`);
@@ -37,7 +49,7 @@ export const processGrammarAnalysis = async (
       return createEmptyAnalysisResult('No paragraphs found in input data structure');
     }
   } else {
-    console.error('Input data is not an object or is null');
+    console.error('Input data is not a string or object, or is null');
     return createEmptyAnalysisResult('Invalid input data format');
   }
   
@@ -176,7 +188,8 @@ export const processGrammarAnalysis = async (
       processingTime: analysis.processingTime,
       method: 'streamlined-enhanced',
       redliningReady: true,
-      positionAware: true
+      positionAware: true,
+      handledStringInput: typeof inputData === 'string'
     }
   };
 };
