@@ -1,3 +1,4 @@
+
 /**
  * useDataFlowState Hook
  * 
@@ -65,9 +66,8 @@ export const useDataFlowState = (nodes: Node[], edges: Edge[]) => {
 
   /**
    * Simulate data processing with real ChatGPT integration
-   * Enhanced to support workflow execution mode
    */
-  const simulateProcessing = useCallback(async (edgeId: string, realData?: any) => {
+  const simulateProcessing = useCallback(async (edgeId: string) => {
     const edgeData = dataFlowState[edgeId];
     if (!edgeData) return;
 
@@ -87,7 +87,7 @@ export const useDataFlowState = (nodes: Node[], edges: Edge[]) => {
 
     // Simulate processing delay
     setTimeout(async () => {
-      let enhancedOutput = realData || edgeData.outputData;
+      let enhancedOutput = edgeData.outputData;
 
       // Use real ChatGPT for supported modules
       if (moduleType === 'chatgpt-assistant' || (targetNode?.data?.supportsChatGPT && Math.random() > 0.5)) {
