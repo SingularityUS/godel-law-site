@@ -1,4 +1,3 @@
-
 import React, { forwardRef, useState } from "react";
 import WorkbenchFlow from "./WorkbenchFlow";
 import DocumentPreviewManager from "./DocumentPreviewManager";
@@ -28,13 +27,15 @@ const WorkbenchContainer = forwardRef<any, WorkbenchContainerProps>(function Wor
 ) {
   const [showResults, setShowResults] = useState(false);
 
-  // Use persistent workspace state from Supabase
+  // Use persistent workspace state from Supabase with drag optimization
   const {
     workspace,
     saveStatus,
     isLoading,
     updateNodes,
-    updateEdges
+    updateEdges,
+    startDragging,
+    isDragging
   } = useWorkspaceState();
 
   // Initialize workflow execution with persistent nodes and edges
@@ -84,6 +85,7 @@ const WorkbenchContainer = forwardRef<any, WorkbenchContainerProps>(function Wor
         edges={workspace.edges}
         updateNodes={updateNodes}
         updateEdges={updateEdges}
+        startDragging={startDragging}
       />
       
       <ExecutionButton
@@ -96,13 +98,18 @@ const WorkbenchContainer = forwardRef<any, WorkbenchContainerProps>(function Wor
         onStop={handleStopExecution}
       />
 
-      {/* Save status indicator */}
+      {/* Save status indicator with drag state awareness */}
       {saveStatus.isSaving && (
         <div className="absolute top-4 right-4 bg-blue-100 text-blue-800 px-3 py-1 rounded-md text-sm">
           Saving...
         </div>
       )}
-      {saveStatus.lastSaved && !saveStatus.isSaving && (
+      {isDragging && (
+        <div className="absolute top-4 right-4 bg-yellow-100 text-yellow-800 px-3 py-1 rounded-md text-sm">
+          Dragging...
+        </div>
+      )}
+      {saveStatus.lastSaved && !saveStatus.isSaving && !isDragging && (
         <div className="absolute top-4 right-4 bg-green-100 text-green-800 px-3 py-1 rounded-md text-sm">
           Saved
         </div>

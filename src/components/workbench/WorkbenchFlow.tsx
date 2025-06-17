@@ -1,9 +1,9 @@
-
 import React, { forwardRef, useCallback, useMemo, useRef } from "react";
 import { ReactFlow, Node, Edge } from "@xyflow/react";
 import { useWorkbenchDragDrop } from "@/hooks/workbench/useWorkbenchDragDrop";
 import { useDataFlow } from "@/hooks/workbench/useDataFlow";
 import { useDataPreviewSelection } from "@/hooks/workbench/useDataPreviewSelection";
+import { useDragStateDetection } from "@/hooks/workbench/workspace/useDragStateDetection";
 import { getNodeAtScreenPosition } from "@/utils/nodeUtils";
 import WorkbenchControls from "./WorkbenchControls";
 import { useFlowEventHandlers } from "./flow/FlowEventHandlers";
@@ -26,13 +26,19 @@ interface WorkbenchFlowProps {
   edges: Edge[];
   updateNodes: (nodes: Node[]) => void;
   updateEdges: (edges: Edge[]) => void;
+  startDragging?: () => void;
 }
 
 const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow(
-  { onModuleEdit, editingPromptNodeId, uploadedFiles, nodes, edges, updateNodes, updateEdges },
+  { onModuleEdit, editingPromptNodeId, uploadedFiles, nodes, edges, updateNodes, updateEdges, startDragging },
   ref
 ) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+
+  // Initialize drag state detection
+  const { handleNodesChangeWithDragDetection } = useDragStateDetection({
+    onDragStart: startDragging || (() => {})
+  });
 
   // Create a proper getNodeAtPosition function
   const getNodeAtPosition = useCallback((x: number, y: number) => {
@@ -69,29 +75,32 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
   const { getNodeColor } = useFlowNodeManager();
 
   /**
-   * Handle React Flow node changes and update workspace
+   * Handle React Flow node changes with drag detection and update workspace
    */
   const handleNodesChange = useCallback((changes: any[]) => {
-    const updatedNodes = nodes.map(node => {
-      const change = changes.find(c => c.id === node.id);
-      if (!change) return node;
+    // Use drag-aware handler that detects when dragging starts
+    handleNodesChangeWithDragDetection(changes, (processedChanges) => {
+      const updatedNodes = nodes.map(node => {
+        const change = processedChanges.find(c => c.id === node.id);
+        if (!change) return node;
+        
+        switch (change.type) {
+          case 'position':
+            return { ...node, position: change.position };
+          case 'dimensions':
+            return { ...node, width: change.dimensions?.width, height: change.dimensions?.height };
+          case 'remove':
+            return null;
+          case 'select':
+            return { ...node, selected: change.selected };
+          default:
+            return node;
+        }
+      }).filter(Boolean) as Node[];
       
-      switch (change.type) {
-        case 'position':
-          return { ...node, position: change.position };
-        case 'dimensions':
-          return { ...node, width: change.dimensions?.width, height: change.dimensions?.height };
-        case 'remove':
-          return null;
-        case 'select':
-          return { ...node, selected: change.selected };
-        default:
-          return node;
-      }
-    }).filter(Boolean) as Node[];
-    
-    updateNodes(updatedNodes);
-  }, [nodes, updateNodes]);
+      updateNodes(updatedNodes);
+    });
+  }, [nodes, updateNodes, handleNodesChangeWithDragDetection]);
 
   /**
    * Handle React Flow edge changes and update workspace

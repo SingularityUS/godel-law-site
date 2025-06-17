@@ -3,12 +3,12 @@
  * useWorkspaceState Hook
  * 
  * Purpose: Main orchestrator for workspace state management
- * Combines storage, auto-save, and update functionality
+ * Combines storage, drag-optimized auto-save, and update functionality
  */
 
 import { useEffect } from "react";
 import { useWorkspaceStorage } from "./workspace/useWorkspaceStorage";
-import { useWorkspaceAutoSave } from "./workspace/useWorkspaceAutoSave";
+import { useDragOptimizedAutoSave } from "./workspace/useDragOptimizedAutoSave";
 import { useWorkspaceUpdaters } from "./workspace/useWorkspaceUpdaters";
 
 export const useWorkspaceState = () => {
@@ -22,16 +22,18 @@ export const useWorkspaceState = () => {
     saveWorkspace
   } = useWorkspaceStorage();
 
+  // Initialize drag-optimized auto-save functionality
+  const { startDragging, isDragging } = useDragOptimizedAutoSave({
+    workspace,
+    saveWorkspace,
+    normalSaveDelay: 3000, // 3 seconds for normal changes
+    dragSaveDelay: 1000    // 1 second after drag stops
+  });
+
   // Initialize update functions
   const { updateNodes, updateEdges } = useWorkspaceUpdaters({
     workspace,
     setWorkspace
-  });
-
-  // Initialize auto-save functionality
-  useWorkspaceAutoSave({
-    workspace,
-    saveWorkspace
   });
 
   // Load workspace on mount
@@ -44,6 +46,8 @@ export const useWorkspaceState = () => {
     saveStatus,
     isLoading,
     updateNodes,
-    updateEdges
+    updateEdges,
+    startDragging,
+    isDragging
   };
 };
