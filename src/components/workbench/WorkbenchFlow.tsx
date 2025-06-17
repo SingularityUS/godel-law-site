@@ -26,27 +26,6 @@ import {
 import "@xyflow/react/dist/style.css";
 import "./dataPreview.css";
 
-/**
- * WorkbenchFlow Component
- * 
- * Purpose: Core React Flow implementation for the AI Workbench
- * This component handles the main flow diagram functionality including
- * node management, event handling, and user interactions.
- * 
- * Key Responsibilities:
- * - Manages React Flow state and configuration
- * - Handles drag-drop operations from palette and library
- * - Processes node clicks for editing and preview
- * - Provides imperative API for external document addition
- * - Coordinates with event handling hooks
- * 
- * Integration Points:
- * - Uses useWorkbenchEvents for complex event management
- * - Integrates with useModuleColors for visual customization
- * - Communicates with parent components via callbacks
- * - Exposes addDocumentNode method for external use
- */
-
 interface WorkbenchFlowProps {
   onModuleEdit: (nodeId: string, node: any) => void;
   editingPromptNodeId?: string;
@@ -58,16 +37,7 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
   { onModuleEdit, editingPromptNodeId, uploadedFiles, reactFlowWrapper },
   ref
 ) {
-  /**
-   * Helper function to get node at coordinates using DOM elements
-   * This is used for drag-and-drop operations to find target nodes
-   */
-  const getNodeAtPosition = useCallback((x: number, y: number) => {
-    const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
-    return getNodeAtScreenPosition(nodes, x, y, reactFlowBounds);
-  }, [nodes, reactFlowWrapper]);
-
-  // Initialize workbench event handling
+  // Initialize workbench event handling FIRST
   const {
     nodes,
     edges,
@@ -81,7 +51,10 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
   } = useWorkbenchEvents({
     initialNodes,
     initialEdges,
-    getNodeAtPosition
+    getNodeAtPosition: (x: number, y: number) => {
+      const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
+      return getNodeAtScreenPosition(nodes, x, y, reactFlowBounds);
+    }
   });
 
   // Add new state for output display

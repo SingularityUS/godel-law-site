@@ -9,6 +9,7 @@
 import { useState, useCallback } from "react";
 import { Node, Edge } from "@xyflow/react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 export interface WorkspaceData {
   id?: string;
@@ -23,6 +24,7 @@ export const useWorkspaceManager = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   /**
    * Save current workspace
@@ -33,15 +35,20 @@ export const useWorkspaceManager = () => {
     edges: Edge[],
     workspaceId?: string
   ): Promise<string | null> => {
+    if (!user) {
+      setSaveError("User not authenticated");
+      return null;
+    }
+
     setIsSaving(true);
     setSaveError(null);
 
     try {
       const workspaceData = {
         name,
-        nodes: JSON.stringify(nodes),
-        edges: JSON.stringify(edges),
-        updated_at: new Date().toISOString()
+        nodes_data: nodes,
+        edges_data: edges,
+        user_id: user.id
       };
 
       let result;
@@ -58,10 +65,7 @@ export const useWorkspaceManager = () => {
         // Create new workspace
         result = await supabase
           .from('workspaces')
-          .insert({
-            ...workspaceData,
-            created_at: new Date().toISOString()
-          })
+          .insert(workspaceData)
           .select()
           .single();
       }
@@ -77,7 +81,7 @@ export const useWorkspaceManager = () => {
     } finally {
       setIsSaving(false);
     }
-  }, []);
+  }, [user]);
 
   /**
    * Load workspace by ID
@@ -97,9 +101,12 @@ export const useWorkspaceManager = () => {
       }
 
       return {
-        ...data,
-        nodes: JSON.parse(data.nodes),
-        edges: JSON.parse(data.edges)
+        id: data.id,
+        name: data.name,
+        nodes: Array.isArray(data.nodes_data) ? data.nodes_data as Node[] : [],
+        edges: Array.isArray(data.edges_data) ? data.edges_data as Edge[] : [],
+        created_at: data.created_at,
+        updated_at: data.updated_at
       };
     } catch (error) {
       console.error('Error loading workspace:', error);
@@ -112,23 +119,33 @@ export const useWorkspaceManager = () => {
   /**
    * Get user's workspaces
    */
-  const getUserWorkspaces = useCallback(async (): Promise<WorkspaceData[]> => {
+  const getUserWorkspaces = useCallback(async () => {
+    if (!user) return [];
+
     try {
       const { data, error } = await supabase
         .from('workspaces')
         .select('id, name, created_at, updated_at')
+        .eq('user_id', user.id)
         .order('updated_at', { ascending: false });
 
       if (error) {
         throw error;
       }
 
-      return data || [];
+      return (data || []).map(item => ({
+        id: item.id,
+        name: item.name,
+        nodes: [] as Node[],
+        edges: [] as Edge[],
+        created_at: item.created_at,
+        updated_at: item.updated_at
+      }));
     } catch (error) {
       console.error('Error fetching workspaces:', error);
       return [];
     }
-  }, []);
+  }, [user]);
 
   /**
    * Auto-save current workspace
