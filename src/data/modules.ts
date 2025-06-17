@@ -1,4 +1,3 @@
-
 import { ArrowDown, ArrowUp, Divide, BookOpen, MessageSquare } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -21,6 +20,8 @@ export interface AIModuleDefinition {
   defaultPrompt: string;
   supportsChatGPT?: boolean;
   outputFormat?: 'text' | 'json' | 'structured';
+  isDeprecated?: boolean;
+  isPassThrough?: boolean;
 }
 
 // Enhanced with legal-specific prompts for law firm document processing
@@ -35,36 +36,13 @@ export const MODULE_DEFINITIONS: AIModuleDefinition[] = [
   {
     type: "text-extractor",
     label: "Text Extractor",
-    color: "bg-slate-600",
+    color: "bg-slate-400",
     icon: ArrowDown,
-    defaultPrompt: `You are a legal document text extraction specialist. Extract all text content from the provided legal document while preserving:
-- Document structure and hierarchy (headings, sections, subsections)
-- Legal formatting (numbered paragraphs, bullet points, indentation)
-- Citations and case references
-- Tables, schedules, and exhibits
-- Signature blocks and date stamps
-- Page numbers and footnotes
-
-Return the extracted text in a structured JSON format:
-{
-  "documentType": "contract|brief|pleading|memo|other",
-  "title": "document title",
-  "sections": [
-    {
-      "heading": "section heading",
-      "content": "section text content",
-      "subsections": []
-    }
-  ],
-  "citations": ["list of citations found"],
-  "metadata": {
-    "pageCount": number,
-    "hasSignatures": boolean,
-    "hasExhibits": boolean
-  }
-}`,
-    supportsChatGPT: true,
-    outputFormat: 'json'
+    defaultPrompt: "DEPRECATED: This module now acts as a pass-through. Text extraction is handled automatically during document processing. This module will be removed in future versions.",
+    supportsChatGPT: false,
+    outputFormat: 'json',
+    isDeprecated: true,
+    isPassThrough: true
   },
   {
     type: "paragraph-splitter",
@@ -78,13 +56,15 @@ Return the extracted text in a structured JSON format:
 - Keep related clauses together
 - Separate whereas clauses, recitals, and operative provisions
 - Maintain citation integrity within paragraphs
+- Process ALL content provided, ensuring no paragraphs are missed
+- Handle both single documents and chunked content appropriately
 
-Return a structured JSON array:
+Return a structured JSON array with ALL paragraphs:
 {
   "paragraphs": [
     {
       "id": "p1",
-      "type": "recital|operative|signature|exhibit",
+      "type": "recital|operative|signature|exhibit|body",
       "sectionNumber": "1.1",
       "content": "paragraph text",
       "containsCitations": boolean,
@@ -92,8 +72,15 @@ Return a structured JSON array:
     }
   ],
   "totalParagraphs": number,
-  "documentStructure": "simple|complex|multi-level"
-}`,
+  "documentStructure": "simple|complex|multi-level",
+  "processingMetadata": {
+    "chunksProcessed": number,
+    "contentLength": number,
+    "estimatedReadingTime": number
+  }
+}
+
+IMPORTANT: Ensure ALL content is processed and no paragraphs are truncated or missed.`,
     supportsChatGPT: true,
     outputFormat: 'json'
   },
@@ -102,7 +89,7 @@ Return a structured JSON array:
     label: "Grammar Checker",
     color: "bg-slate-600",
     icon: ArrowUp,
-    defaultPrompt: `You are a legal writing specialist trained in proper legal grammar, style, and formatting. Analyze each paragraph for:
+    defaultPrompt: `You are a legal writing specialist trained in proper legal grammar, style, and formatting. Analyze ALL paragraphs provided for:
 
 LEGAL WRITING STANDARDS:
 - Proper legal terminology usage
@@ -113,7 +100,7 @@ LEGAL WRITING STANDARDS:
 - Proper use of legal Latin phrases
 - Citation format consistency (Bluebook/local rules)
 
-For each paragraph, provide three-column analysis:
+Process ALL paragraphs in the input array. For each paragraph, provide analysis:
 {
   "analysis": [
     {
@@ -133,11 +120,19 @@ For each paragraph, provide three-column analysis:
     }
   ],
   "overallAssessment": {
+    "totalParagraphs": number,
     "totalErrors": number,
     "writingQuality": "excellent|good|needs_improvement|poor",
-    "recommendations": ["list of general writing improvements"]
+    "recommendations": ["list of general writing improvements"],
+    "processingMetadata": {
+      "paragraphsAnalyzed": number,
+      "averageScore": number,
+      "totalSuggestions": number
+    }
   }
-}`,
+}
+
+CRITICAL: Process every single paragraph provided in the input. Do not truncate or skip any paragraphs.`,
     supportsChatGPT: true,
     outputFormat: 'json'
   },
