@@ -3,7 +3,7 @@
  * usePipelineExecution Hook
  * 
  * Purpose: Orchestrates sequential execution of AI modules in the workbench
- * Enhanced for legal document processing with structured outputs
+ * Enhanced for large document processing with chunking and progress tracking
  */
 
 import { useState, useCallback } from "react";
@@ -14,11 +14,13 @@ import { ExecutionState } from "./types/pipelineTypes";
 import { extractDocumentText } from "./utils/documentProcessor";
 import { createNodeProcessor } from "./utils/nodeProcessor";
 import { createExecutionManager } from "./utils/executionManager";
+import { shouldUseBatchProcessing } from "./utils/batchProcessor";
 
 export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
   const [executionState, setExecutionState] = useState<ExecutionState>({});
   const [isExecuting, setIsExecuting] = useState(false);
   const [finalOutput, setFinalOutput] = useState<any>(null);
+  const [progressInfo, setProgressInfo] = useState<{[nodeId: string]: {completed: number, total: number}}>({});
   const { callChatGPT } = useChatGPTApi();
 
   // Create utility functions
@@ -33,6 +35,7 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
 
     setIsExecuting(true);
     setFinalOutput(null);
+    setProgressInfo({});
     
     try {
       const executionOrder = executionManager.getExecutionOrder(startNodeId);
@@ -47,6 +50,8 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
 
       // Process each node in order
       for (const nodeId of executionOrder) {
+        const node = nodes.find(n => n.id === nodeId);
+        
         // Update status to processing
         setExecutionState(prev => ({
           ...prev,
@@ -54,14 +59,24 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
         }));
 
         try {
-          const node = nodes.find(n => n.id === nodeId);
-          
           if (node?.data?.moduleType === 'document-input') {
             // Extract text from legal document
             currentData = await extractDocumentText(node as DocumentInputNode);
+            
+            // Show chunking info if document was chunked
+            if (currentData.chunks && currentData.chunks.length > 1) {
+              console.log(`Document chunked into ${currentData.chunks.length} parts for processing`);
+            }
           } else {
             // Process with ChatGPT using legal prompts
-            currentData = await processNode(nodeId, currentData);
+            const onProgress = (completed: number, total: number) => {
+              setProgressInfo(prev => ({
+                ...prev,
+                [nodeId]: { completed, total }
+              }));
+            };
+            
+            currentData = await processNode(nodeId, currentData, onProgress);
           }
 
           pipelineResults.push({
@@ -78,6 +93,13 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
               data: currentData 
             }
           }));
+
+          // Clear progress for this node
+          setProgressInfo(prev => {
+            const newProgress = { ...prev };
+            delete newProgress[nodeId];
+            return newProgress;
+          });
 
         } catch (error: any) {
           // Update status to error
@@ -101,6 +123,7 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
       console.error('Legal document processing pipeline failed:', error);
     } finally {
       setIsExecuting(false);
+      setProgressInfo({});
     }
   }, [isExecuting, executionManager, processNode, nodes]);
 
@@ -116,7 +139,6 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
     }
 
     // For now, execute the first pipeline found
-    // In the future, we could execute multiple pipelines in parallel
     await executePipeline(docInputNodes[0].id);
   }, [executePipeline, executionManager]);
 
@@ -124,8 +146,14 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
    * Get execution status for a specific node
    */
   const getNodeExecutionStatus = useCallback((nodeId: string) => {
-    return executionState[nodeId] || { status: 'idle' };
-  }, [executionState]);
+    const baseStatus = executionState[nodeId] || { status: 'idle' };
+    const progress = progressInfo[nodeId];
+    
+    return {
+      ...baseStatus,
+      progress: progress ? `${progress.completed}/${progress.total}` : undefined
+    };
+  }, [executionState, progressInfo]);
 
   /**
    * Reset execution state
@@ -134,12 +162,14 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
     setExecutionState({});
     setFinalOutput(null);
     setIsExecuting(false);
+    setProgressInfo({});
   }, []);
 
   return {
     executionState,
     isExecuting,
     finalOutput,
+    progressInfo,
     executeAllPipelines,
     executePipeline,
     getNodeExecutionStatus,

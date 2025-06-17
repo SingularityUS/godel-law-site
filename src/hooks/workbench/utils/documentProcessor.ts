@@ -2,12 +2,13 @@
 /**
  * Document Processor Utility
  * 
- * Purpose: Handles extraction of text content from legal documents
+ * Purpose: Handles extraction of text content from legal documents with chunking support
  */
 
 import { DocumentInputNode } from "@/types/workbench";
 import mammoth from "mammoth";
 import { supabase } from "@/integrations/supabase/client";
+import { chunkDocument, DocumentChunk } from "./documentChunker";
 
 export const extractDocumentText = async (docNode: DocumentInputNode): Promise<any> => {
   if (!docNode.data?.file) {
@@ -74,16 +75,34 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<a
     
     console.log('Successfully extracted text:', extractedText.substring(0, 200) + '...');
     
+    // Check if document needs chunking
+    const estimatedTokens = Math.ceil(extractedText.length / 4);
+    const needsChunking = estimatedTokens > 3000;
+    
+    let chunks: DocumentChunk[] = [];
+    if (needsChunking) {
+      console.log(`Document is large (${estimatedTokens} estimated tokens), creating chunks...`);
+      chunks = chunkDocument(extractedText, fileName, {
+        maxTokens: 3000,
+        overlapSize: 200,
+        preserveParagraphs: true
+      });
+    }
+    
     return {
       documentType,
       title: fileName,
       content: extractedText.trim(),
+      chunks: chunks.length > 0 ? chunks : undefined,
       metadata: {
         fileName,
         fileType,
         fileSize: file.size,
         contentLength: extractedText.length,
-        extractedSuccessfully: true
+        extractedSuccessfully: true,
+        estimatedTokens,
+        needsChunking,
+        chunkCount: chunks.length
       }
     };
     

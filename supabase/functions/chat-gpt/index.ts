@@ -25,7 +25,36 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured');
     }
 
-    console.log('Processing ChatGPT request:', { model, promptLength: prompt.length });
+    // Estimate input tokens and adjust model if needed
+    const estimatedInputTokens = Math.ceil(prompt.length / 4);
+    let selectedModel = model;
+    let adjustedMaxTokens = maxTokens;
+    
+    // Auto-upgrade model for large inputs
+    if (estimatedInputTokens > 15000 && model === 'gpt-4o-mini') {
+      selectedModel = 'gpt-4o';
+      console.log(`Auto-upgrading to ${selectedModel} for large input (${estimatedInputTokens} tokens)`);
+    }
+    
+    // Ensure we don't exceed model limits
+    const modelLimits = {
+      'gpt-4o-mini': { maxTotal: 128000, maxOutput: 16384 },
+      'gpt-4o': { maxTotal: 128000, maxOutput: 4096 }
+    };
+    
+    const limits = modelLimits[selectedModel as keyof typeof modelLimits] || modelLimits['gpt-4o-mini'];
+    const systemTokens = systemPrompt ? Math.ceil(systemPrompt.length / 4) : 0;
+    const availableOutputTokens = Math.min(
+      adjustedMaxTokens,
+      limits.maxOutput,
+      limits.maxTotal - estimatedInputTokens - systemTokens - 100 // Safety buffer
+    );
+    
+    if (availableOutputTokens < 100) {
+      throw new Error('Input too large for selected model. Consider using document chunking.');
+    }
+
+    console.log(`Processing ChatGPT request: { model: "${selectedModel}", inputTokens: ${estimatedInputTokens}, maxOutputTokens: ${availableOutputTokens} }`);
 
     const messages = [
       ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
@@ -39,9 +68,9 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model,
+        model: selectedModel,
         messages,
-        max_tokens: maxTokens,
+        max_tokens: availableOutputTokens,
         temperature: 0.7,
       }),
     });
@@ -62,7 +91,7 @@ serve(async (req) => {
       processingTime: Date.now(),
     };
 
-    console.log('ChatGPT response generated successfully');
+    console.log(`ChatGPT response generated successfully (${result.usage?.total_tokens || 0} tokens used)`);
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
