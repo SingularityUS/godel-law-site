@@ -16,6 +16,7 @@ export interface StoredDocument {
 export const useDocuments = () => {
   const [documents, setDocuments] = useState<StoredDocument[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const { user } = useAuth();
 
   const fetchDocuments = async () => {
@@ -39,7 +40,15 @@ export const useDocuments = () => {
       setDocuments([]);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const refetch = async () => {
+    setRefreshing(true);
+    // Add a small delay to ensure database transaction completion
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await fetchDocuments();
   };
 
   const deleteDocument = async (documentId: string, storagePath: string) => {
@@ -67,6 +76,47 @@ export const useDocuments = () => {
     }
   };
 
+  // Set up real-time subscription for document changes
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('documents-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'documents',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('New document added:', payload.new);
+          // Add the new document to the list
+          setDocuments(prev => [payload.new as StoredDocument, ...prev]);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'documents',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('Document deleted:', payload.old);
+          // Remove the deleted document from the list
+          setDocuments(prev => prev.filter(doc => doc.id !== payload.old.id));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   useEffect(() => {
     fetchDocuments();
   }, [user]);
@@ -74,7 +124,8 @@ export const useDocuments = () => {
   return {
     documents,
     loading,
-    refetch: fetchDocuments,
+    refreshing,
+    refetch,
     deleteDocument
   };
 };

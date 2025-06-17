@@ -11,6 +11,7 @@ type UploadedFile = File & { preview?: string; extractedText?: string };
 interface DocumentUploadProps {
   onFilesAccepted: (files: UploadedFile[]) => void;
   onUploadComplete?: () => void;
+  onDocumentAdded?: () => void;
 }
 
 const ACCEPTED_FILE_TYPES = {
@@ -30,7 +31,11 @@ function sanitizeFilename(filename: string): string {
   return nameWithoutExt + extension;
 }
 
-const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesAccepted, onUploadComplete }) => {
+const DocumentUpload: React.FC<DocumentUploadProps> = ({ 
+  onFilesAccepted, 
+  onUploadComplete,
+  onDocumentAdded 
+}) => {
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
 
@@ -67,60 +72,65 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesAccepted, onUplo
       const sanitizedFilename = sanitizeFilename(file.name);
       const storagePath = `${user.id}/${Date.now()}_${sanitizedFilename}`;
 
-      const { data: uploadData, error: fileError } = await supabase
-        .storage
-        .from("documents")
-        .upload(storagePath, file, { upsert: false });
+      try {
+        const { data: uploadData, error: fileError } = await supabase
+          .storage
+          .from("documents")
+          .upload(storagePath, file, { upsert: false });
 
-      if (fileError) {
+        if (fileError) {
+          throw new Error(`Upload failed: ${fileError.message}`);
+        }
+
+        const fileUrl = supabase.storage.from("documents").getPublicUrl(storagePath).data.publicUrl;
+
+        const { data: docRow, error: insertError } = await supabase
+          .from("documents")
+          .insert([
+            {
+              name: file.name,
+              storage_path: storagePath,
+              mime_type: file.type,
+              size: file.size,
+              preview_url: fileUrl,
+              user_id: user.id,
+            },
+          ])
+          .select()
+          .single();
+
+        if (insertError) {
+          throw new Error(`Database insert failed: ${insertError.message}`);
+        }
+
+        const uploadedFile: UploadedFile = Object.assign(file, { preview: fileUrl });
+        onFilesAccepted([uploadedFile]);
+        
+        toast({
+          title: "Upload successful",
+          description: "Your document has been uploaded and added to the library.",
+        });
+
+        // Call callbacks with proper timing
+        onUploadComplete?.();
+        
+        // Small delay then notify about document addition
+        setTimeout(() => {
+          onDocumentAdded?.();
+        }, 100);
+
+      } catch (error) {
+        console.error('Upload error:', error);
         toast({
           title: "Upload failed",
-          description: fileError.message,
+          description: error instanceof Error ? error.message : "An unknown error occurred",
           variant: "destructive",
         });
+      } finally {
         setIsLoading(false);
-        return;
       }
-
-      const fileUrl = supabase.storage.from("documents").getPublicUrl(storagePath).data.publicUrl;
-
-      const { data: docRow, error: insertError } = await supabase
-        .from("documents")
-        .insert([
-          {
-            name: file.name,
-            storage_path: storagePath,
-            mime_type: file.type,
-            size: file.size,
-            preview_url: fileUrl,
-            user_id: user.id,
-          },
-        ])
-        .select()
-        .single();
-
-      if (insertError) {
-        toast({
-          title: "DB insert failed",
-          description: insertError.message,
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      const uploadedFile: UploadedFile = Object.assign(file, { preview: fileUrl });
-      onFilesAccepted([uploadedFile]);
-      onUploadComplete?.();
-
-      toast({
-        title: "Upload successful",
-        description: "Your document has been uploaded to the library.",
-      });
-
-      setIsLoading(false);
     },
-    [onFilesAccepted, onUploadComplete, user]
+    [onFilesAccepted, onUploadComplete, onDocumentAdded, user]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
