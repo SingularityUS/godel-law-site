@@ -2,7 +2,7 @@
 /**
  * Module Processor
  * 
- * Purpose: Handles different types of module processing with enhanced data cleaning
+ * Purpose: Handles different types of module processing with minimal cleaning and position tracking
  */
 
 import { AllNodes, HelperNode } from "@/types/workbench";
@@ -26,20 +26,28 @@ export const createModuleProcessor = (callChatGPT: ReturnType<typeof useChatGPTA
   ) => {
     const startTime = Date.now();
     
-    console.log(`=== MODULE PROCESSOR: ${moduleType} ===`);
+    console.log(`=== MODULE PROCESSOR: ${moduleType} (Position-Aware Processing) ===`);
     console.log('Input data structure:', typeof inputData, inputData ? Object.keys(inputData) : 'null');
     
-    // Prepare clean input data for the module
+    // Log if we have position tracking data
+    if (inputData && inputData.positionMap) {
+      console.log('Position tracking available:', {
+        characterMappings: inputData.positionMap.characterMap?.length || 0,
+        paragraphBoundaries: inputData.positionMap.paragraphBoundaries?.length || 0
+      });
+    }
+    
+    // Prepare clean input data for the module (uses processable content)
     const cleanInputData = prepareModuleInput(inputData, moduleType);
     console.log('Prepared input type:', typeof cleanInputData);
 
     // Check if we need batch processing or individual paragraph processing
     if (shouldUseBatchProcessing(cleanInputData) || shouldProcessParagraphsIndividually(cleanInputData, moduleType)) {
-      console.log(`Using batch processing for module ${moduleType}`);
+      console.log(`Using batch processing for module ${moduleType} with position preservation`);
       
-      // Define processing function for individual chunks with module-specific progress
+      // Define processing function for individual chunks with position awareness
       const processChunk = async (chunkContent: string, chunkInfo?: DocumentChunk) => {
-        // Ensure chunk content is clean text
+        // Ensure chunk content is clean text (use processable content)
         const cleanChunkContent = extractCleanContent(chunkContent, moduleType);
         
         // Add chunk context to prompt if available
@@ -59,12 +67,13 @@ export const createModuleProcessor = (callChatGPT: ReturnType<typeof useChatGPTA
             chunkInfo: chunkInfo ? {
               index: chunkInfo.chunkIndex,
               total: chunkInfo.totalChunks
-            } : undefined
+            } : undefined,
+            preservesPositions: true
           }
         };
       };
       
-      // Enhanced progress callback with module-specific information
+      // Enhanced progress callback with position-aware information
       const moduleProgressCallback = (completed: number, total: number, outputCount?: number) => {
         if (onProgress) {
           const inputType = shouldProcessParagraphsIndividually(cleanInputData, moduleType) ? 'paragraphs' : 
@@ -88,7 +97,7 @@ export const createModuleProcessor = (callChatGPT: ReturnType<typeof useChatGPTA
         }
       };
       
-      // Process with batching
+      // Process with batching, preserving any position information
       const result = await processWithBatching(cleanInputData, processChunk, moduleProgressCallback, moduleType);
       
       const processingTime = Date.now() - startTime;
@@ -99,15 +108,18 @@ export const createModuleProcessor = (callChatGPT: ReturnType<typeof useChatGPTA
           ...result.metadata,
           processingTime,
           batchProcessed: true,
-          totalProcessingTime: processingTime
+          totalProcessingTime: processingTime,
+          preservesPositions: true,
+          // Preserve original position tracking data if available
+          originalPositionMap: inputData?.positionMap
         }
       };
       
     } else {
-      // Single document processing with progress tracking
-      console.log(`Processing single document for ${moduleType}`);
+      // Single document processing with position preservation
+      console.log(`Processing single document for ${moduleType} with position tracking`);
       
-      // Extract clean content for processing
+      // Extract clean content for processing (use processable content)
       const cleanContent = extractCleanContent(cleanInputData, moduleType);
       
       // Report progress for single document processing
@@ -143,7 +155,10 @@ export const createModuleProcessor = (callChatGPT: ReturnType<typeof useChatGPTA
         metadata: {
           ...result.metadata,
           processingTime,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          preservesPositions: true,
+          // Preserve original position tracking data
+          originalPositionMap: inputData?.positionMap
         }
       };
     }
@@ -151,14 +166,24 @@ export const createModuleProcessor = (callChatGPT: ReturnType<typeof useChatGPTA
 };
 
 /**
- * Prepare input data for module processing
+ * Prepare input data for module processing (updated for position awareness)
  */
 function prepareModuleInput(inputData: any, moduleType: ModuleKind): any {
   if (!inputData) return inputData;
   
-  // For paragraph splitter, ensure we have clean text content
+  // For paragraph splitter, ensure we have processable content
   if (moduleType === 'paragraph-splitter') {
-    // If inputData has clean content, extract it
+    // Prioritize processable content for AI processing
+    if (inputData.processableContent && typeof inputData.processableContent === 'string') {
+      return { 
+        content: inputData.processableContent,
+        // Preserve position mapping for later use
+        positionMap: inputData.positionMap,
+        originalContent: inputData.originalContent
+      };
+    }
+    
+    // Fallback to existing structure
     if (inputData.content && typeof inputData.content === 'string') {
       return { content: inputData.content };
     }
@@ -173,7 +198,7 @@ function prepareModuleInput(inputData: any, moduleType: ModuleKind): any {
 }
 
 /**
- * Extract clean content based on module type
+ * Extract clean content based on module type (prioritizes processable content)
  */
 function extractCleanContent(inputData: any, moduleType: ModuleKind): string {
   if (typeof inputData === 'string') {
@@ -181,10 +206,14 @@ function extractCleanContent(inputData: any, moduleType: ModuleKind): string {
   }
   
   if (typeof inputData === 'object' && inputData !== null) {
-    // For paragraph splitter, prioritize clean text content
+    // For paragraph splitter, prioritize processable content
     if (moduleType === 'paragraph-splitter') {
       if (inputData.content && typeof inputData.content === 'string') {
         return inputData.content;
+      }
+      // Also check for processable content directly
+      if (inputData.processableContent && typeof inputData.processableContent === 'string') {
+        return inputData.processableContent;
       }
     }
     

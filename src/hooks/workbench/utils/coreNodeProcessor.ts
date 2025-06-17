@@ -2,7 +2,7 @@
 /**
  * Core Node Processor
  * 
- * Purpose: Core processing logic for individual nodes with enhanced data cleaning
+ * Purpose: Core processing logic for individual nodes with minimal cleaning support
  */
 
 import { AllNodes, HelperNode } from "@/types/workbench";
@@ -12,13 +12,13 @@ import { parseJsonResponse, parseGrammarResponse, parseParagraphSplitterResponse
 
 export const createCoreProcessor = (callChatGPT: ReturnType<typeof useChatGPTApi>['callChatGPT']) => {
   return async (node: HelperNode, inputData: string, systemPrompt: string, moduleType: ModuleKind): Promise<any> => {
-    console.log(`=== CORE PROCESSOR: ${moduleType} ===`);
+    console.log(`=== CORE PROCESSOR: ${moduleType} (Minimal Cleaning Mode) ===`);
     console.log('Input data type:', typeof inputData);
     console.log('Input data preview:', inputData.substring(0, 200) + '...');
     
-    // Clean and prepare input data based on module type
+    // Clean and prepare input data based on module type (prioritizes processable content)
     const cleanedInput = prepareInputForModule(inputData, moduleType);
-    console.log('Cleaned input preview:', cleanedInput.substring(0, 200) + '...');
+    console.log('Prepared input preview:', cleanedInput.substring(0, 200) + '...');
     
     // Enhanced system prompt based on module type
     const enhancedPrompt = enhancePromptForModule(systemPrompt, moduleType);
@@ -39,7 +39,8 @@ export const createCoreProcessor = (callChatGPT: ReturnType<typeof useChatGPTApi
           processingTime: Date.now(),
           timestamp: new Date().toISOString(),
           inputLength: cleanedInput.length,
-          outputItems: parsed.output?.paragraphs?.length || parsed.output?.analysis?.length || 0
+          outputItems: parsed.output?.paragraphs?.length || parsed.output?.analysis?.length || 0,
+          preservesPositions: true // Flag indicating this processing preserves position tracking
         }
       };
     } catch (error) {
@@ -50,19 +51,31 @@ export const createCoreProcessor = (callChatGPT: ReturnType<typeof useChatGPTApi
 };
 
 /**
- * Prepare input data for specific module types
+ * Prepare input data for specific module types (updated for minimal cleaning)
  */
 function prepareInputForModule(inputData: string, moduleType: ModuleKind): string {
-  console.log(`Preparing input for module: ${moduleType}`);
+  console.log(`Preparing input for module: ${moduleType} (minimal cleaning mode)`);
   
   try {
-    // Try to parse as JSON to extract actual content
+    // Try to parse as JSON to extract processable content
     const parsed = JSON.parse(inputData);
     
     if (moduleType === 'paragraph-splitter') {
-      // For paragraph splitter, extract only the clean text content
+      // For paragraph splitter, prioritize processable content over original
+      if (parsed.processableContent && typeof parsed.processableContent === 'string') {
+        console.log('Using processable content for paragraph splitter');
+        return parsed.processableContent.trim();
+      }
+      
+      // Fallback to original content if processable not available
+      if (parsed.originalContent && typeof parsed.originalContent === 'string') {
+        console.log('Fallback to original content for paragraph splitter');
+        return parsed.originalContent.trim();
+      }
+      
+      // Legacy support for existing content structure
       if (parsed.content && typeof parsed.content === 'string') {
-        console.log('Extracted clean content for paragraph splitter');
+        console.log('Using legacy content structure for paragraph splitter');
         return parsed.content.trim();
       }
       
@@ -84,20 +97,35 @@ function prepareInputForModule(inputData: string, moduleType: ModuleKind): strin
     }
     
     if (moduleType === 'grammar-checker') {
-      // For grammar checker, we need paragraph content
+      // For grammar checker, we need paragraph content with position information
       if (parsed.output && parsed.output.paragraphs && Array.isArray(parsed.output.paragraphs)) {
-        console.log('Prepared paragraph data for grammar checker');
+        console.log('Prepared paragraph data for grammar checker with position tracking');
         return JSON.stringify({
           paragraphs: parsed.output.paragraphs.map((p: any) => ({
             id: p.id,
             content: p.content || p.text || '',
-            wordCount: p.wordCount || 0
-          }))
+            wordCount: p.wordCount || 0,
+            // Preserve any position information that might be available
+            originalStart: p.originalStart,
+            originalEnd: p.originalEnd,
+            cleanedStart: p.cleanedStart,
+            cleanedEnd: p.cleanedEnd
+          })),
+          // Include position mapping if available for future redlining
+          positionMap: parsed.positionMap
         }, null, 2);
       }
     }
     
-    // For other modules, try to extract meaningful content
+    // For other modules, prioritize processable content
+    if (parsed.processableContent) {
+      console.log('Using processable content for AI processing');
+      return parsed.processableContent;
+    }
+    if (parsed.originalContent) {
+      console.log('Using original content (no processable version available)');
+      return parsed.originalContent;
+    }
     if (parsed.content) {
       return parsed.content;
     }
@@ -110,7 +138,7 @@ function prepareInputForModule(inputData: string, moduleType: ModuleKind): strin
     
   } catch (error) {
     console.log('Input is not JSON, using as-is');
-    // If not JSON, return as-is but clean it up
+    // If not JSON, return as-is
     return inputData.trim();
   }
 }

@@ -2,16 +2,41 @@
 /**
  * Document Processor Utility
  * 
- * Purpose: Handles extraction of text content from legal documents with enhanced debugging
+ * Purpose: Handles extraction of text content from legal documents with minimal cleaning for redlining support
  */
 
 import { DocumentInputNode } from "@/types/workbench";
 import mammoth from "mammoth";
 import { supabase } from "@/integrations/supabase/client";
 import { chunkDocument, DocumentChunk } from "./documentChunker";
+import { performMinimalCleaning, CleaningResult } from "./minimalTextCleaner";
+import { createPositionMap, DocumentPositionMap } from "./positionTracker";
 
-export const extractDocumentText = async (docNode: DocumentInputNode): Promise<any> => {
-  console.log('=== DOCUMENT PROCESSOR DEBUG ===');
+export interface DocumentExtractionResult {
+  documentType: string;
+  title: string;
+  originalContent: string;
+  processableContent: string;
+  positionMap: DocumentPositionMap;
+  cleaningResult: CleaningResult;
+  chunks?: DocumentChunk[];
+  metadata: {
+    fileName: string;
+    fileType: string;
+    fileSize: number;
+    originalLength: number;
+    processableLength: number;
+    extractedSuccessfully: boolean;
+    estimatedTokens: number;
+    needsChunking: boolean;
+    chunkCount: number;
+    cleaningApplied: string[];
+    error?: string;
+  };
+}
+
+export const extractDocumentText = async (docNode: DocumentInputNode): Promise<DocumentExtractionResult> => {
+  console.log('=== DOCUMENT PROCESSOR DEBUG (Minimal Cleaning) ===');
   
   if (!docNode.data?.file) {
     throw new Error('No file attached to document node');
@@ -21,7 +46,7 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<a
   const fileName = docNode.data.documentName;
   const fileType = file.type;
   
-  console.log(`Extracting text from ${fileName} (${fileType})`);
+  console.log(`Extracting text from ${fileName} (${fileType}) with minimal cleaning`);
   console.log('File object:', file);
   
   try {
@@ -69,48 +94,66 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<a
       throw new Error('No text content could be extracted from the document');
     }
     
-    // Clean the extracted text
-    const cleanedText = cleanExtractedText(extractedText);
-    console.log('Text cleaning stats:');
-    console.log(`- Original length: ${extractedText.length}`);
-    console.log(`- Cleaned length: ${cleanedText.length}`);
-    console.log(`- First 200 chars: "${cleanedText.substring(0, 200)}..."`);
+    // Apply minimal cleaning while preserving original
+    console.log('Applying minimal cleaning to preserve document structure...');
+    const cleaningResult = performMinimalCleaning(extractedText);
     
-    // Check if document needs chunking
-    const estimatedTokens = Math.ceil(cleanedText.length / 4);
+    console.log('Cleaning results:');
+    console.log(`- Original length: ${cleaningResult.originalContent.length}`);
+    console.log(`- Processable length: ${cleaningResult.processableContent.length}`);
+    console.log(`- Cleaning applied: ${cleaningResult.cleaningApplied.join(', ')}`);
+    console.log(`- First 200 chars (processable): "${cleaningResult.processableContent.substring(0, 200)}..."`);
+    
+    // Create position mapping for redlining support
+    console.log('Creating position mapping for redlining support...');
+    const positionMap = createPositionMap(cleaningResult.originalContent, cleaningResult.processableContent);
+    console.log(`Position mapping created: ${positionMap.characterMap.length} character mappings, ${positionMap.paragraphBoundaries.length} paragraph boundaries`);
+    
+    // Check if document needs chunking (based on processable content)
+    const estimatedTokens = Math.ceil(cleaningResult.processableContent.length / 4);
     const needsChunking = estimatedTokens > 3000;
     
     let chunks: DocumentChunk[] = [];
     if (needsChunking) {
-      console.log(`Document is large (${estimatedTokens} estimated tokens), creating chunks...`);
-      chunks = chunkDocument(cleanedText, fileName, {
+      console.log(`Document is large (${estimatedTokens} estimated tokens), creating chunks from processable content...`);
+      // Use processable content for chunking since it will be used for AI processing
+      chunks = chunkDocument(cleaningResult.processableContent, fileName, {
         maxTokens: 3000,
         overlapSize: 200,
         preserveParagraphs: true
       });
     }
     
-    const result = {
+    const result: DocumentExtractionResult = {
       documentType,
       title: fileName,
-      content: cleanedText,
+      originalContent: cleaningResult.originalContent,
+      processableContent: cleaningResult.processableContent,
+      positionMap,
+      cleaningResult,
       chunks: chunks.length > 0 ? chunks : undefined,
       metadata: {
         fileName,
         fileType,
         fileSize: file.size,
-        contentLength: cleanedText.length,
+        originalLength: cleaningResult.originalContent.length,
+        processableLength: cleaningResult.processableContent.length,
         extractedSuccessfully: true,
         estimatedTokens,
         needsChunking,
-        chunkCount: chunks.length
+        chunkCount: chunks.length,
+        cleaningApplied: cleaningResult.cleaningApplied
       }
     };
     
-    console.log('Document extraction result:', {
-      contentLength: result.content.length,
+    console.log('Document extraction result (minimal cleaning):', {
+      originalLength: result.originalContent.length,
+      processableLength: result.processableContent.length,
+      positionMappings: result.positionMap.characterMap.length,
+      paragraphBoundaries: result.positionMap.paragraphBoundaries.length,
       chunkCount: result.chunks?.length || 0,
-      estimatedTokens: result.metadata.estimatedTokens
+      estimatedTokens: result.metadata.estimatedTokens,
+      cleaningApplied: result.metadata.cleaningApplied
     });
     
     return result;
@@ -118,42 +161,38 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<a
   } catch (error) {
     console.error('Error extracting document text:', error);
     
-    return {
+    // Return error structure that matches the new interface
+    const errorResult: DocumentExtractionResult = {
       documentType: "error",
       title: fileName,
-      content: `Error extracting text: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
+      originalContent: '',
+      processableContent: `Error extracting text: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
+      positionMap: {
+        characterMap: [],
+        paragraphBoundaries: [],
+        totalOriginalLength: 0,
+        totalCleanedLength: 0
+      },
+      cleaningResult: {
+        originalContent: '',
+        processableContent: '',
+        cleaningApplied: ['error']
+      },
       metadata: {
         fileName,
         fileType,
         fileSize: file.size,
+        originalLength: 0,
+        processableLength: 0,
         extractedSuccessfully: false,
+        estimatedTokens: 0,
+        needsChunking: false,
+        chunkCount: 0,
+        cleaningApplied: ['error'],
         error: error instanceof Error ? error.message : 'Unknown error'
       }
     };
+    
+    return errorResult;
   }
 };
-
-/**
- * Clean extracted text to ensure it's properly formatted
- */
-function cleanExtractedText(text: string): string {
-  if (!text || typeof text !== 'string') {
-    return '';
-  }
-  
-  // Normalize line endings
-  let cleaned = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  
-  // Remove excessive whitespace but preserve paragraph structure
-  cleaned = cleaned.replace(/[ \t]+/g, ' '); // Replace multiple spaces/tabs with single space
-  cleaned = cleaned.replace(/\n\s+/g, '\n'); // Remove leading spaces on new lines
-  cleaned = cleaned.replace(/\s+\n/g, '\n'); // Remove trailing spaces before new lines
-  
-  // Normalize paragraph breaks (convert multiple newlines to double newlines)
-  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
-  
-  // Remove leading/trailing whitespace
-  cleaned = cleaned.trim();
-  
-  return cleaned;
-}
