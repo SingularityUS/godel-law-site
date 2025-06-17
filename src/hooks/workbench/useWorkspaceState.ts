@@ -71,8 +71,8 @@ export const useWorkspaceState = () => {
         setWorkspace({
           id: data.id,
           name: data.name,
-          nodes: data.nodes_data as Node[] || [],
-          edges: data.edges_data as Edge[] || [],
+          nodes: (data.nodes_data as unknown as Node[]) || [],
+          edges: (data.edges_data as unknown as Edge[]) || [],
           isDefault: data.is_default
         });
       } else {
@@ -99,8 +99,8 @@ export const useWorkspaceState = () => {
         .insert({
           user_id: user.id,
           name: 'Default Workspace',
-          nodes_data: [],
-          edges_data: [],
+          nodes_data: JSON.parse(JSON.stringify([])),
+          edges_data: JSON.parse(JSON.stringify([])),
           is_default: true
         })
         .select()
@@ -136,8 +136,8 @@ export const useWorkspaceState = () => {
       const { error } = await supabase
         .from('workspaces')
         .update({
-          nodes_data: workspaceData.nodes,
-          edges_data: workspaceData.edges,
+          nodes_data: JSON.parse(JSON.stringify(workspaceData.nodes)),
+          edges_data: JSON.parse(JSON.stringify(workspaceData.edges)),
           updated_at: new Date().toISOString()
         })
         .eq('id', workspaceData.id);

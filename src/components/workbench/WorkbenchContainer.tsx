@@ -63,6 +63,14 @@ const WorkbenchContainer = forwardRef<any, WorkbenchContainerProps>(function Wor
     resetExecution();
   };
 
+  const handleNodesChange = (nodes: any[]) => {
+    updateNodes(nodes);
+  };
+
+  const handleEdgesChange = (edges: any[]) => {
+    updateEdges(edges);
+  };
+
   // Show loading state while workspace is loading
   if (isLoading) {
     return (
@@ -82,8 +90,8 @@ const WorkbenchContainer = forwardRef<any, WorkbenchContainerProps>(function Wor
         ref={ref}
         nodes={workspace.nodes}
         edges={workspace.edges}
-        onNodesChange={updateNodes}
-        onEdgesChange={updateEdges}
+        onNodesChange={handleNodesChange}
+        onEdgesChange={handleEdgesChange}
       />
       
       <ExecutionButton

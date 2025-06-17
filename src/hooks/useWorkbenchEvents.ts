@@ -13,11 +13,8 @@ import { useWorkbenchNodeEvents } from "./workbench/useWorkbenchNodeEvents";
 import { useWorkbenchKeyboard } from "./workbench/useWorkbenchKeyboard";
 import { useEffect } from "react";
 
-// Type definition for all supported node types in the workbench
-type AllNodes = Node<any>;
-
 interface UseWorkbenchEventsProps {
-  initialNodes: AllNodes[];
+  initialNodes: Node[];
   initialEdges: Edge[];
   getNodeAtPosition: (x: number, y: number) => Node | null;
 }

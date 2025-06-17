@@ -12,8 +12,7 @@ import {
   nodeTypes,
   edgeTypes,
   defaultEdgeOptions,
-  flowOptions,
-  AllNodes
+  flowOptions
 } from "./flow/FlowConfiguration";
 
 import "@xyflow/react/dist/style.css";
@@ -23,9 +22,9 @@ interface WorkbenchFlowProps {
   onModuleEdit: (nodeId: string, node: any) => void;
   editingPromptNodeId?: string;
   uploadedFiles?: any[];
-  nodes: AllNodes[];
+  nodes: Node[];
   edges: Edge[];
-  onNodesChange: (nodes: AllNodes[]) => void;
+  onNodesChange: (nodes: Node[]) => void;
   onEdgesChange: (edges: Edge[]) => void;
 }
 
