@@ -10,6 +10,7 @@ import { useState, useCallback } from "react";
 import { Node, Edge } from "@xyflow/react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { Json } from "@/integrations/supabase/types";
 
 export interface WorkspaceData {
   id?: string;
@@ -44,10 +45,11 @@ export const useWorkspaceManager = () => {
     setSaveError(null);
 
     try {
+      // Convert Node[] and Edge[] to Json for database storage
       const workspaceData = {
         name,
-        nodes_data: nodes,
-        edges_data: edges,
+        nodes_data: JSON.parse(JSON.stringify(nodes)) as Json,
+        edges_data: JSON.parse(JSON.stringify(edges)) as Json,
         user_id: user.id
       };
 
@@ -100,11 +102,15 @@ export const useWorkspaceManager = () => {
         throw error;
       }
 
+      // Convert Json back to Node[] and Edge[] with proper type assertions
+      const nodes = Array.isArray(data.nodes_data) ? data.nodes_data as unknown as Node[] : [];
+      const edges = Array.isArray(data.edges_data) ? data.edges_data as unknown as Edge[] : [];
+
       return {
         id: data.id,
         name: data.name,
-        nodes: Array.isArray(data.nodes_data) ? data.nodes_data as Node[] : [],
-        edges: Array.isArray(data.edges_data) ? data.edges_data as Edge[] : [],
+        nodes,
+        edges,
         created_at: data.created_at,
         updated_at: data.updated_at
       };

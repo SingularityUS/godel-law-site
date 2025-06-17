@@ -1,4 +1,3 @@
-
 /**
  * useWorkflowExecution Hook
  * 
@@ -111,14 +110,14 @@ export const useWorkflowExecution = () => {
       return inputData;
     }
 
-    // Prepare prompt
-    const systemPrompt = customPrompt || moduleDef.defaultPrompt;
+    // Prepare prompt - ensure systemPrompt is a string
+    const systemPrompt = (customPrompt || moduleDef.defaultPrompt || "Process this input:") as string;
     const userPrompt = typeof inputData === 'string' 
       ? inputData 
       : JSON.stringify(inputData);
 
     try {
-      const result = await callChatGPT(userPrompt, systemPrompt || "Process this input:");
+      const result = await callChatGPT(userPrompt, systemPrompt);
       return result.response || result.error;
     } catch (error) {
       console.error(`Error processing module ${node.id}:`, error);
