@@ -10,6 +10,7 @@ import { useState, useCallback } from "react";
 import { Node, Edge } from "@xyflow/react";
 import { useChatGPTApi } from "./useChatGPTApi";
 import { useMockDataGenerator } from "./useMockDataGenerator";
+import { ModuleKind } from "@/data/modules";
 
 interface ExecutionState {
   isExecuting: boolean;
@@ -92,8 +93,8 @@ export const useWorkflowExecution = (nodes: Node[], edges: Edge[]) => {
     const node = nodes.find(n => n.id === nodeId);
     if (!node) throw new Error(`Node ${nodeId} not found`);
 
-    const moduleType = node.data?.moduleType;
-    const customPrompt = node.data?.promptOverride;
+    const moduleType = typeof node.data?.moduleType === 'string' ? node.data.moduleType : 'default';
+    const customPrompt = typeof node.data?.promptOverride === 'string' ? node.data.promptOverride : undefined;
 
     // Handle document input nodes
     if (moduleType === 'document-input') {
@@ -116,8 +117,20 @@ export const useWorkflowExecution = (nodes: Node[], edges: Edge[]) => {
     }
 
     // For other modules, use enhanced mock data generation
-    return await generateMockData(moduleType, false, true, customPrompt);
+    const validModuleType = isValidModuleKind(moduleType) ? moduleType : 'text-extractor';
+    return await generateMockData(validModuleType, false, true, customPrompt);
   }, [nodes, callChatGPT, generateMockData]);
+
+  /**
+   * Type guard to check if a string is a valid ModuleKind
+   */
+  const isValidModuleKind = (type: string): type is ModuleKind => {
+    const validTypes: ModuleKind[] = [
+      'text-extractor', 'data-processor', 'chatgpt-assistant', 
+      'sentiment-analyzer', 'summarizer', 'translator'
+    ];
+    return validTypes.includes(type as ModuleKind);
+  };
 
   /**
    * Execute the entire workflow
