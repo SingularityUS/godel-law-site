@@ -109,7 +109,7 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
   /**
    * Get filtered suggestions based on current state
    */
-  const getFilteredSuggestions = useMemo(() => {
+  const filteredSuggestions = useMemo(() => {
     return document.suggestions.filter(suggestion => {
       // Type filter
       if (redlineState.filterType !== 'all' && suggestion.type !== redlineState.filterType) {
@@ -145,7 +145,7 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
     handleSuggestionAction,
     navigateToSuggestion,
     applyFilters,
-    getFilteredSuggestions: getFilteredSuggestions,
+    filteredSuggestions,
     getCurrentDocument
   };
 };

@@ -31,12 +31,11 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
     handleSuggestionAction,
     navigateToSuggestion,
     applyFilters,
-    getFilteredSuggestions,
+    filteredSuggestions,
     getCurrentDocument
   } = useRedlineDocument(document);
 
   const [showSidebar, setShowSidebar] = useState(true);
-  const filteredSuggestions = getFilteredSuggestions();
   const currentDoc = getCurrentDocument();
 
   const renderDocumentContent = () => {
