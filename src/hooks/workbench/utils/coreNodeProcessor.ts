@@ -2,13 +2,15 @@
 /**
  * Core Node Processor
  * 
- * Purpose: Core processing logic for individual nodes
+ * Purpose: Handles the actual ChatGPT API calls and response processing
  */
 
-import { AllNodes, HelperNode } from "@/types/workbench";
-import { ModuleKind, MODULE_DEFINITIONS } from "@/data/modules";
+import { HelperNode } from "@/types/workbench";
+import { ModuleKind } from "@/data/modules";
 import { useChatGPTApi } from "../useChatGPTApi";
-import { parseJsonResponse, parseGrammarResponse } from "./parsing";
+import { parseJsonResponse } from "./parsing/responseParser";
+import { parseGrammarResponse } from "./parsing/grammarResponseParser";
+import { parseParagraphSplitterResponse } from "./parsing/paragraphSplitterParser";
 
 export const createCoreProcessor = (callChatGPT: ReturnType<typeof useChatGPTApi>['callChatGPT']) => {
   return async (
@@ -17,27 +19,53 @@ export const createCoreProcessor = (callChatGPT: ReturnType<typeof useChatGPTApi
     systemPrompt: string,
     moduleType: ModuleKind
   ) => {
-    const result = await callChatGPT(promptData, systemPrompt, 'gpt-4o-mini');
+    console.log(`Processing ${moduleType} with ${promptData.length} characters of data`);
     
-    if (result.error) {
-      throw new Error(result.error);
-    }
-
-    // Use appropriate parser based on module type
-    let processedOutput: any;
-    if (moduleType === 'grammar-checker') {
-      processedOutput = parseGrammarResponse(result.response);
+    // Call ChatGPT API
+    const response = await callChatGPT(systemPrompt, promptData);
+    
+    // Parse response based on module type
+    let parsedOutput: any;
+    
+    if (moduleType === 'paragraph-splitter') {
+      parsedOutput = parseParagraphSplitterResponse(response);
+    } else if (moduleType === 'grammar-checker') {
+      parsedOutput = parseGrammarResponse(response);
     } else {
-      processedOutput = parseJsonResponse(result.response, moduleType);
+      parsedOutput = parseJsonResponse(response, moduleType);
     }
     
-    return {
-      moduleType,
-      output: processedOutput,
+    // Ensure we have a consistent output structure
+    if (typeof parsedOutput === 'string' || !parsedOutput.output) {
+      parsedOutput = {
+        output: parsedOutput,
+        rawResponse: response
+      };
+    }
+    
+    // Add metadata
+    const result = {
+      ...parsedOutput,
       metadata: {
-        model: result.model,
-        timestamp: new Date().toISOString()
+        ...parsedOutput.metadata,
+        moduleType: moduleType,
+        nodeId: node.id,
+        processingTime: Date.now(),
+        responseLength: response.length
       }
     };
+    
+    // Log processing results
+    if (result.output) {
+      if (Array.isArray(result.output.paragraphs)) {
+        console.log(`${moduleType} processed successfully: ${result.output.paragraphs.length} paragraphs`);
+      } else if (Array.isArray(result.output.analysis)) {
+        console.log(`${moduleType} processed successfully: ${result.output.analysis.length} analysis items`);
+      } else {
+        console.log(`${moduleType} processed successfully`);
+      }
+    }
+    
+    return result;
   };
 };

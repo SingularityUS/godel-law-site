@@ -7,3 +7,4 @@
 
 export { parseJsonResponse } from './responseParser';
 export { parseGrammarResponse } from './grammarResponseParser';
+export { parseParagraphSplitterResponse } from './paragraphSplitterParser';
