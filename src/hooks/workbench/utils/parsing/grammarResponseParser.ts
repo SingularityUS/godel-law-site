@@ -13,15 +13,15 @@ export const parseGrammarResponse = (response: string): any => {
   
   if (typeof response === 'object' && response !== null) {
     // Check if this is a ChatGPT API response object with nested response
-    if ('response' in response && typeof response.response === 'string') {
+    if ('response' in response && response.response && typeof response.response === 'string') {
       responseString = response.response;
       console.log('Extracted JSON from ChatGPT API response object');
-    } else if ('rawResponse' in response && response.rawResponse && 'response' in response.rawResponse) {
+    } else if ('rawResponse' in response && response.rawResponse && response.rawResponse !== null && 'response' in response.rawResponse && response.rawResponse.response) {
       responseString = response.rawResponse.response;
       console.log('Extracted JSON from nested rawResponse object');
     } else {
       // If it's already a parsed object with analysis, return it directly
-      if ('analysis' in response || ('output' in response && response.output && 'analysis' in response.output)) {
+      if ('analysis' in response || ('output' in response && response.output && response.output !== null && 'analysis' in response.output)) {
         console.log('Response is already parsed grammar analysis object');
         return response.output ? response : { output: response };
       }
