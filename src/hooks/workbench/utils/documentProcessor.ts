@@ -7,6 +7,7 @@
 
 import { DocumentInputNode } from "@/types/workbench";
 import mammoth from "mammoth";
+import { supabase } from "@/integrations/supabase/client";
 
 export const extractDocumentText = async (docNode: DocumentInputNode): Promise<any> => {
   if (!docNode.data?.file) {
@@ -18,15 +19,33 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<a
   const fileType = file.type;
   
   console.log(`Extracting text from ${fileName} (${fileType})`);
+  console.log('File object:', file);
   
   try {
     let extractedText = '';
     let documentType = "unknown";
+    let arrayBuffer: ArrayBuffer;
+    
+    // Check if this is a proper File object or a Supabase storage reference
+    if (typeof file.arrayBuffer === 'function') {
+      // This is a proper File object
+      console.log('Using File object arrayBuffer method');
+      arrayBuffer = await file.arrayBuffer();
+    } else if (file.preview) {
+      // This is from Supabase storage, fetch the file content
+      console.log('Fetching file from Supabase storage:', file.preview);
+      const response = await fetch(file.preview);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch file from storage: ${response.statusText}`);
+      }
+      arrayBuffer = await response.arrayBuffer();
+    } else {
+      throw new Error('Unable to access file content - no arrayBuffer method or preview URL');
+    }
     
     // Handle different file types
     if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || fileName.endsWith('.docx')) {
       // Extract text from DOCX files using mammoth
-      const arrayBuffer = await file.arrayBuffer();
       const result = await mammoth.extractRawText({ arrayBuffer });
       extractedText = result.value;
       documentType = "docx";
@@ -38,8 +57,9 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<a
       throw new Error('PDF text extraction requires additional setup. Please convert to DOCX or plain text format.');
       
     } else if (fileType?.startsWith('text/') || fileName.endsWith('.txt')) {
-      // Handle plain text files
-      extractedText = await file.text();
+      // Handle plain text files - convert ArrayBuffer to text
+      const textDecoder = new TextDecoder('utf-8');
+      extractedText = textDecoder.decode(arrayBuffer);
       documentType = "text";
       console.log(`Extracted ${extractedText.length} characters from text file`);
       
@@ -51,6 +71,8 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<a
     if (!extractedText || extractedText.trim().length === 0) {
       throw new Error('No text content could be extracted from the document');
     }
+    
+    console.log('Successfully extracted text:', extractedText.substring(0, 200) + '...');
     
     return {
       documentType,
