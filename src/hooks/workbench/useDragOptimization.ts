@@ -38,8 +38,7 @@ export const useDragOptimization = ({ updateNodes }: UseDragOptimizationProps) =
         case 'position':
           return { 
             ...node, 
-            position: change.position || node.position,
-            positionAbsolute: change.positionAbsolute || node.positionAbsolute
+            position: change.position || node.position
           };
         case 'dimensions':
           return { 
