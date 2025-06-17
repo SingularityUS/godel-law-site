@@ -1,9 +1,9 @@
-
 import React, { useState, useEffect } from "react";
 import { Handle, Position, Node } from "@xyflow/react";
 import { X, Settings } from "lucide-react";
 import { MODULE_DEFINITIONS, ModuleKind } from "@/data/modules";
 import { useModuleColors } from "@/hooks/useModuleColors";
+import ChatGPTIndicator from "./ChatGPTIndicator";
 
 /**
  * HelperNode Component
@@ -89,6 +89,9 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
   const textColor = isWhiteBackground ? 'text-black' : 'text-white';
   const iconColor = isWhiteBackground ? 'text-black' : 'text-white';
 
+  // Check if module supports ChatGPT
+  const supportsChatGPT = module.supportsChatGPT || data.moduleType === 'chatgpt-assistant';
+
   return (
     <div
       className={`w-32 h-24 border-2 border-black cursor-pointer relative group hover:shadow-lg ${nodeColor} ${
@@ -96,6 +99,12 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
       }`}
       style={{ fontFamily: 'Courier New, monospace' }}
     >
+      {/* ChatGPT Indicator */}
+      <ChatGPTIndicator 
+        isActive={supportsChatGPT}
+        className="z-20"
+      />
+
       {/* Action buttons - only visible on hover or when selected */}
       <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" style={{ opacity: selected ? 1 : undefined }}>
         <button
