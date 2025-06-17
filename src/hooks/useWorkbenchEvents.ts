@@ -3,27 +3,7 @@
  * useWorkbenchEvents Hook
  * 
  * Purpose: Orchestrates all workbench event handling systems
- * This hook coordinates multiple specialized hooks to provide a unified
- * interface for workbench event management and state operations.
- * 
- * Key Responsibilities:
- * - Coordinates state management through useWorkbenchState
- * - Manages drag-drop operations via useWorkbenchDragDrop
- * - Handles node events through useWorkbenchNodeEvents
- * - Processes keyboard interactions with useWorkbenchKeyboard
- * - Provides unified API for workbench components
- * 
- * Integration Points:
- * - Used by WorkbenchFlow for complete event management
- * - Coordinates between specialized event handling hooks
- * - Maintains separation of concerns while providing unified interface
- * - Enables independent testing of event handling systems
- * 
- * Architecture Benefits:
- * - Improved maintainability through separation of concerns
- * - Better testability of individual event handling systems
- * - Cleaner interfaces for specific event types
- * - Easier debugging and development workflow
+ * Now works with external state management for workspace persistence
  */
 
 import { Node, Edge } from "@xyflow/react";
@@ -31,6 +11,7 @@ import { useWorkbenchState } from "./workbench/useWorkbenchState";
 import { useWorkbenchDragDrop } from "./workbench/useWorkbenchDragDrop";
 import { useWorkbenchNodeEvents } from "./workbench/useWorkbenchNodeEvents";
 import { useWorkbenchKeyboard } from "./workbench/useWorkbenchKeyboard";
+import { useEffect } from "react";
 
 // Type definition for all supported node types in the workbench
 type AllNodes = Node<any>;
@@ -47,7 +28,7 @@ export const useWorkbenchEvents = ({
   getNodeAtPosition
 }: UseWorkbenchEventsProps) => {
 
-  // Initialize core state management
+  // Initialize core state management with external initial state
   const {
     nodes,
     edges,
@@ -60,6 +41,15 @@ export const useWorkbenchEvents = ({
     initialNodes,
     initialEdges
   });
+
+  // Sync with external state changes
+  useEffect(() => {
+    setNodes(initialNodes);
+  }, [initialNodes, setNodes]);
+
+  useEffect(() => {
+    setEdges(initialEdges);
+  }, [initialEdges, setEdges]);
 
   // Initialize drag-drop handling
   const {

@@ -1,6 +1,6 @@
 
-import React, { forwardRef, useCallback, useMemo } from "react";
-import { ReactFlow } from "@xyflow/react";
+import React, { forwardRef, useCallback, useMemo, useRef } from "react";
+import { ReactFlow, Node, Edge } from "@xyflow/react";
 import { useWorkbenchEvents } from "@/hooks/useWorkbenchEvents";
 import { useDataFlow } from "@/hooks/workbench/useDataFlow";
 import { useDataPreviewSelection } from "@/hooks/workbench/useDataPreviewSelection";
@@ -9,8 +9,6 @@ import WorkbenchControls from "./WorkbenchControls";
 import { useFlowEventHandlers } from "./flow/FlowEventHandlers";
 import { useFlowNodeManager } from "./flow/FlowNodeManager";
 import {
-  initialNodes,
-  initialEdges,
   nodeTypes,
   edgeTypes,
   defaultEdgeOptions,
@@ -25,19 +23,26 @@ interface WorkbenchFlowProps {
   onModuleEdit: (nodeId: string, node: any) => void;
   editingPromptNodeId?: string;
   uploadedFiles?: any[];
-  reactFlowWrapper: React.RefObject<HTMLDivElement>;
-  onNodesChange?: (nodes: AllNodes[]) => void;
-  onEdgesChange?: (edges: any[]) => void;
+  nodes: AllNodes[];
+  edges: Edge[];
+  onNodesChange: (nodes: AllNodes[]) => void;
+  onEdgesChange: (edges: Edge[]) => void;
 }
 
 const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow(
-  { onModuleEdit, editingPromptNodeId, uploadedFiles, reactFlowWrapper, onNodesChange, onEdgesChange },
+  { onModuleEdit, editingPromptNodeId, uploadedFiles, nodes, edges, onNodesChange, onEdgesChange },
   ref
 ) {
-  // Initialize workbench event handling first
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+
+  // Create a proper getNodeAtPosition function
+  const getNodeAtPosition = useCallback((x: number, y: number) => {
+    const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
+    return getNodeAtScreenPosition(nodes, x, y, reactFlowBounds);
+  }, [nodes]);
+
+  // Initialize workbench event handling with persistent state
   const {
-    nodes,
-    edges,
     setNodes,
     onNodesChange: handleNodesChange,
     onEdgesChange: handleEdgesChange,
@@ -46,28 +51,18 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
     onDragLeave: handleDragLeave,
     onConnect
   } = useWorkbenchEvents({
-    initialNodes,
-    initialEdges,
-    getNodeAtPosition: useCallback((x: number, y: number) => {
-      const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
-      // We'll pass the nodes from the closure since they're available here
-      return getNodeAtScreenPosition([], x, y, reactFlowBounds);
-    }, [reactFlowWrapper])
+    initialNodes: nodes,
+    initialEdges: edges,
+    getNodeAtPosition
   });
 
-  // Create a proper getNodeAtPosition function now that nodes is available
-  const getNodeAtPosition = useCallback((x: number, y: number) => {
-    const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
-    return getNodeAtScreenPosition(nodes, x, y, reactFlowBounds);
-  }, [nodes, reactFlowWrapper]);
-
-  // Notify parent of nodes/edges changes
+  // Update parent when nodes/edges change
   React.useEffect(() => {
-    onNodesChange?.(nodes);
+    onNodesChange(nodes);
   }, [nodes, onNodesChange]);
 
   React.useEffect(() => {
-    onEdgesChange?.(edges);
+    onEdgesChange(edges);
   }, [edges, onEdgesChange]);
 
   // Initialize data flow management
@@ -87,7 +82,6 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
   // Initialize node management
   const { getNodeColor } = useFlowNodeManager();
 
-  
   /**
    * Enhanced node click handler that also hides data previews
    */
@@ -135,7 +129,7 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
    */
   const onDrop = useCallback(
     (event: React.DragEvent) => handleDrop(event, reactFlowWrapper),
-    [handleDrop, reactFlowWrapper]
+    [handleDrop]
   );
 
   /**
@@ -143,28 +137,30 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
    */
   const onDragLeave = useCallback(
     (event: React.DragEvent) => handleDragLeave(event, reactFlowWrapper),
-    [handleDragLeave, reactFlowWrapper]
+    [handleDragLeave]
   );
 
   return (
-    <ReactFlow
-      nodes={nodes}
-      edges={enhancedEdges}
-      onNodesChange={handleNodesChange}
-      onEdgesChange={handleEdgesChange}
-      onConnect={onConnect}
-      onDrop={onDrop}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onNodeClick={handleNodeClick}
-      onPaneClick={handlePaneClick}
-      nodeTypes={nodeTypes}
-      edgeTypes={edgeTypes}
-      defaultEdgeOptions={defaultEdgeOptions}
-      {...flowOptions}
-    >
-      <WorkbenchControls getNodeColor={getNodeColor} />
-    </ReactFlow>
+    <div ref={reactFlowWrapper} className="w-full h-full">
+      <ReactFlow
+        nodes={nodes}
+        edges={enhancedEdges}
+        onNodesChange={handleNodesChange}
+        onEdgesChange={handleEdgesChange}
+        onConnect={onConnect}
+        onDrop={onDrop}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onNodeClick={handleNodeClick}
+        onPaneClick={handlePaneClick}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        defaultEdgeOptions={defaultEdgeOptions}
+        {...flowOptions}
+      >
+        <WorkbenchControls getNodeColor={getNodeColor} />
+      </ReactFlow>
+    </div>
   );
 });
 

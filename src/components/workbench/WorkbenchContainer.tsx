@@ -1,27 +1,19 @@
-import React, { forwardRef, useRef, useState } from "react";
+
+import React, { forwardRef, useState } from "react";
 import WorkbenchFlow from "./WorkbenchFlow";
 import DocumentPreviewManager from "./DocumentPreviewManager";
 import ExecutionButton from "./ExecutionButton";
 import ResultsPanel from "./ResultsPanel";
 import SplitScreenLayout from "./SplitScreenLayout";
 import { useWorkflowExecution } from "@/hooks/workbench/useWorkflowExecution";
+import { useWorkspaceState } from "@/hooks/workbench/useWorkspaceState";
 
 /**
  * WorkbenchContainer Component
  * 
- * Purpose: Main container wrapper for the AI Workbench
- * This component provides the physical container and DOM reference needed
- * for React Flow coordinate calculations and drag-drop operations.
- * 
- * Key Responsibilities:
- * - Provides styled container with proper dimensions and background
- * - Maintains DOM reference for coordinate transformations
- * - Passes through all props and refs to child components
- * 
- * Integration Points:
- * - Used by AIWorkbench as the main container
- * - Provides reactFlowWrapper ref to WorkbenchFlow
- * - Coordinates with DocumentPreviewManager for preview functionality
+ * Purpose: Main container wrapper for the AI Workbench with persistent state
+ * Now integrates with Supabase for workspace persistence to prevent state loss
+ * during split-screen operations and component re-renders.
  */
 
 interface WorkbenchContainerProps {
@@ -34,20 +26,24 @@ const WorkbenchContainer = forwardRef<any, WorkbenchContainerProps>(function Wor
   props,
   ref
 ) {
-  const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [showResults, setShowResults] = useState(false);
 
-  // Get nodes and edges from WorkbenchFlow (we'll need to pass these up)
-  const [nodes, setNodes] = useState<any[]>([]);
-  const [edges, setEdges] = useState<any[]>([]);
+  // Use persistent workspace state from Supabase
+  const {
+    workspace,
+    saveStatus,
+    isLoading,
+    updateNodes,
+    updateEdges
+  } = useWorkspaceState();
 
-  // Initialize workflow execution
+  // Initialize workflow execution with persistent nodes and edges
   const {
     executionState,
     executeWorkflow,
     resetExecution,
     isWorkflowValid
-  } = useWorkflowExecution(nodes, edges);
+  } = useWorkflowExecution(workspace.nodes, workspace.edges);
 
   const handleExecute = async () => {
     try {
@@ -67,23 +63,27 @@ const WorkbenchContainer = forwardRef<any, WorkbenchContainerProps>(function Wor
     resetExecution();
   };
 
-  // Update nodes and edges when they change in WorkbenchFlow
-  const handleNodesChange = (newNodes: any[]) => {
-    setNodes(newNodes);
-  };
-
-  const handleEdgesChange = (newEdges: any[]) => {
-    setEdges(newEdges);
-  };
+  // Show loading state while workspace is loading
+  if (isLoading) {
+    return (
+      <div className="w-full grow h-[650px] relative rounded-xl border bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading workspace...</p>
+        </div>
+      </div>
+    );
+  }
 
   const workbenchContent = (
     <div className="w-full grow h-[650px] relative rounded-xl border bg-gradient-to-br from-slate-50 to-blue-50">
       <WorkbenchFlow
         {...props}
         ref={ref}
-        reactFlowWrapper={reactFlowWrapper}
-        onNodesChange={handleNodesChange}
-        onEdgesChange={handleEdgesChange}
+        nodes={workspace.nodes}
+        edges={workspace.edges}
+        onNodesChange={updateNodes}
+        onEdgesChange={updateEdges}
       />
       
       <ExecutionButton
@@ -95,6 +95,23 @@ const WorkbenchContainer = forwardRef<any, WorkbenchContainerProps>(function Wor
         onExecute={handleExecute}
         onStop={handleStopExecution}
       />
+
+      {/* Save status indicator */}
+      {saveStatus.isSaving && (
+        <div className="absolute top-4 right-4 bg-blue-100 text-blue-800 px-3 py-1 rounded-md text-sm">
+          Saving...
+        </div>
+      )}
+      {saveStatus.lastSaved && !saveStatus.isSaving && (
+        <div className="absolute top-4 right-4 bg-green-100 text-green-800 px-3 py-1 rounded-md text-sm">
+          Saved
+        </div>
+      )}
+      {saveStatus.error && (
+        <div className="absolute top-4 right-4 bg-red-100 text-red-800 px-3 py-1 rounded-md text-sm">
+          Save failed
+        </div>
+      )}
     </div>
   );
 
