@@ -76,11 +76,13 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
   const textColor = isWhiteBackground ? 'text-black' : 'text-white';
   const iconColor = isWhiteBackground ? 'text-black' : 'text-white';
 
-  // Check if module supports ChatGPT
+  // Check if module supports ChatGPT and if it's a legal processing module
   const supportsChatGPT = module.supportsChatGPT || data.moduleType === 'chatgpt-assistant';
+  const isLegalModule = ['text-extractor', 'paragraph-splitter', 'grammar-checker', 'citation-finder', 'citation-verifier', 'style-guide-enforcer'].includes(data.moduleType);
 
   // Get execution status
   const executionStatus = data.executionStatus?.status || 'idle';
+  const isProcessing = executionStatus === 'processing';
 
   return (
     <div
@@ -95,9 +97,11 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
         error={data.executionStatus?.error}
       />
 
-      {/* ChatGPT Indicator */}
+      {/* Enhanced ChatGPT Indicator for Legal Processing */}
       <ChatGPTIndicator 
         isActive={supportsChatGPT}
+        isProcessing={isProcessing}
+        isLegalModule={isLegalModule}
         className="z-20"
       />
 

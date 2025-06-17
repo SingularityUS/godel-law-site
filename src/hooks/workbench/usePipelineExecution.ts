@@ -1,10 +1,8 @@
-
 /**
  * usePipelineExecution Hook
  * 
  * Purpose: Orchestrates sequential execution of AI modules in the workbench
- * This hook handles the pipeline execution flow, starting from document inputs
- * and processing through connected modules using ChatGPT API calls.
+ * Enhanced for legal document processing with structured outputs
  */
 
 import { useState, useCallback } from "react";
@@ -18,6 +16,7 @@ interface ExecutionState {
     status: 'idle' | 'queued' | 'processing' | 'completed' | 'error';
     data?: any;
     error?: string;
+    processingTime?: number;
   };
 }
 
@@ -64,9 +63,9 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
   }, [edges]);
 
   /**
-   * Extract text content from document input
+   * Extract text content from legal document
    */
-  const extractDocumentText = useCallback(async (docNode: DocumentInputNode): Promise<string> => {
+  const extractDocumentText = useCallback(async (docNode: DocumentInputNode): Promise<any> => {
     if (!docNode.data?.file) {
       throw new Error('No file attached to document node');
     }
@@ -75,19 +74,40 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
     
     // For text files, read directly
     if (file.type?.startsWith('text/')) {
-      return await file.text();
+      const textContent = await file.text();
+      return {
+        documentType: "unknown",
+        title: docNode.data.documentName,
+        content: textContent,
+        metadata: {
+          fileName: docNode.data.documentName,
+          fileType: file.type,
+          fileSize: file.size
+        }
+      };
     }
     
-    // For other file types, return the file name and basic info as placeholder
-    // In a real implementation, you'd use proper text extraction libraries
-    return `Document: ${docNode.data.documentName}\nFile type: ${file.type}\nSize: ${file.size} bytes`;
+    // For other file types, create structured data for legal processing
+    return {
+      documentType: "unknown",
+      title: docNode.data.documentName,
+      content: `Legal Document Analysis Required\n\nDocument: ${docNode.data.documentName}\nFile type: ${file.type}\nSize: ${file.size} bytes\n\nThis document requires text extraction and legal analysis.`,
+      metadata: {
+        fileName: docNode.data.documentName,
+        fileType: file.type,
+        fileSize: file.size,
+        requiresOCR: !file.type?.startsWith('text/')
+      }
+    };
   }, []);
 
   /**
-   * Process a single node with ChatGPT
+   * Process a single node with ChatGPT using legal-specific prompts
    */
-  const processNode = useCallback(async (nodeId: string, inputData: string): Promise<string> => {
+  const processNode = useCallback(async (nodeId: string, inputData: any): Promise<any> => {
+    const startTime = Date.now();
     const node = nodes.find(n => n.id === nodeId) as HelperNode;
+    
     if (!node || node.data?.moduleType === 'document-input') {
       return inputData; // Skip document input nodes
     }
@@ -100,18 +120,47 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
       return inputData; // Pass through unchanged
     }
 
-    // Use custom prompt if available, otherwise use default
+    // Use custom prompt if available, otherwise use default legal prompt
     const systemPrompt = node.data.promptOverride || moduleDef.defaultPrompt;
     
-    console.log(`Processing node ${nodeId} (${moduleType}) with ChatGPT`);
+    // Format input data for legal processing
+    let promptData: string;
+    if (typeof inputData === 'object') {
+      promptData = JSON.stringify(inputData, null, 2);
+    } else {
+      promptData = String(inputData);
+    }
+
+    console.log(`Processing legal module ${nodeId} (${moduleType}) with ChatGPT`);
     
-    const result = await callChatGPT(inputData, systemPrompt);
+    const result = await callChatGPT(promptData, systemPrompt, 'gpt-4o-mini');
     
     if (result.error) {
       throw new Error(result.error);
     }
+
+    // Try to parse JSON response for structured modules
+    let processedOutput = result.response;
+    if (moduleDef.outputFormat === 'json') {
+      try {
+        processedOutput = JSON.parse(result.response);
+      } catch (parseError) {
+        console.warn(`Failed to parse JSON from ${moduleType}, using text response`);
+        // Keep as text if JSON parsing fails
+      }
+    }
+
+    const processingTime = Date.now() - startTime;
     
-    return result.response || inputData;
+    return {
+      moduleType,
+      output: processedOutput,
+      metadata: {
+        processingTime,
+        model: result.model,
+        timestamp: new Date().toISOString()
+      }
+    };
   }, [nodes, callChatGPT]);
 
   /**
@@ -125,7 +174,7 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
     
     try {
       const executionOrder = getExecutionOrder(startNodeId);
-      console.log('Execution order:', executionOrder);
+      console.log('Legal document processing pipeline execution order:', executionOrder);
 
       // Initialize execution state
       const newExecutionState: ExecutionState = {};
@@ -134,7 +183,8 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
       });
       setExecutionState(newExecutionState);
 
-      let currentData: string = '';
+      let currentData: any = null;
+      const pipelineResults: any[] = [];
 
       // Process each node in order
       for (const nodeId of executionOrder) {
@@ -148,12 +198,18 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
           const node = nodes.find(n => n.id === nodeId);
           
           if (node?.data?.moduleType === 'document-input') {
-            // Extract text from document
+            // Extract text from legal document
             currentData = await extractDocumentText(node as DocumentInputNode);
           } else {
-            // Process with ChatGPT
+            // Process with ChatGPT using legal prompts
             currentData = await processNode(nodeId, currentData);
           }
+
+          pipelineResults.push({
+            nodeId,
+            moduleType: node?.data?.moduleType,
+            result: currentData
+          });
 
           // Update status to completed with data
           setExecutionState(prev => ({
@@ -177,12 +233,23 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
         }
       }
 
-      // Set final output
-      setFinalOutput(currentData);
-      console.log('Pipeline execution completed successfully');
+      // Create comprehensive final output for legal review
+      const finalLegalOutput = {
+        summary: {
+          documentsProcessed: 1,
+          modulesExecuted: pipelineResults.length - 1, // Exclude document input
+          processingCompleted: new Date().toISOString(),
+          pipelineType: "Legal Document Analysis"
+        },
+        results: pipelineResults,
+        finalOutput: currentData
+      };
+
+      setFinalOutput(finalLegalOutput);
+      console.log('Legal document processing pipeline completed successfully');
 
     } catch (error: any) {
-      console.error('Pipeline execution failed:', error);
+      console.error('Legal document processing pipeline failed:', error);
     } finally {
       setIsExecuting(false);
     }
