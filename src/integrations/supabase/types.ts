@@ -45,6 +45,39 @@ export type Database = {
         }
         Relationships: []
       }
+      workspaces: {
+        Row: {
+          created_at: string | null
+          edges_data: Json
+          id: string
+          is_default: boolean | null
+          name: string
+          nodes_data: Json
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          edges_data?: Json
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          nodes_data?: Json
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          edges_data?: Json
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          nodes_data?: Json
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
