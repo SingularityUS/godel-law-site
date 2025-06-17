@@ -28,11 +28,8 @@
 import { useCallback } from "react";
 import { Node } from "@xyflow/react";
 
-// Type definition for all supported node types in the workbench
-type AllNodes = Node<any>;
-
 interface UseWorkbenchDragDropProps {
-  setNodes: React.Dispatch<React.SetStateAction<AllNodes[]>>;
+  setNodes: (nodes: Node[]) => void;
   getNodeAtPosition: (x: number, y: number) => Node | null;
 }
 
@@ -51,19 +48,17 @@ export const useWorkbenchDragDrop = ({
    * Only affects document-input type nodes as they support drag-over styling
    * Helper nodes don't need drag-over states as they don't accept document drops
    */
-  const clearDragOverStates = useCallback(() => {
-    setNodes((nds) =>
-      nds.map((node) => {
-        if (node.type === "document-input") {
-          return {
-            ...node,
-            data: { ...node.data, isDragOver: false }
-          };
-        }
-        return node;
-      })
-    );
-  }, [setNodes]);
+  const clearDragOverStates = useCallback((currentNodes: Node[]) => {
+    return currentNodes.map((node) => {
+      if (node.type === "document-input") {
+        return {
+          ...node,
+          data: { ...node.data, isDragOver: false }
+        };
+      }
+      return node;
+    });
+  }, []);
 
   /**
    * Main Drop Handler: Processes All Drop Operations
@@ -90,7 +85,6 @@ export const useWorkbenchDragDrop = ({
     (event: React.DragEvent, reactFlowWrapper: React.RefObject<HTMLDivElement>) => {
       event.preventDefault();
       console.log('Drop event received in workbench');
-      clearDragOverStates();
       
       // Handle document file drops from library
       const docData = event.dataTransfer.getData("application/lovable-document");
@@ -102,11 +96,11 @@ export const useWorkbenchDragDrop = ({
         // Check if dropping on an existing document node for replacement
         const targetNode = getNodeAtPosition(event.clientX, event.clientY);
         
-        if (targetNode && targetNode.type === "document-input") {
-          console.log('Updating existing document node:', targetNode.id);
-          // Update existing document input node with new document
-          setNodes((nds) =>
-            nds.map((node) =>
+        setNodes((prevNodes: Node[]) => {
+          if (targetNode && targetNode.type === "document-input") {
+            console.log('Updating existing document node:', targetNode.id);
+            // Update existing document input node with new document
+            return prevNodes.map((node) =>
               node.id === targetNode.id
                 ? {
                     ...node,
@@ -118,38 +112,37 @@ export const useWorkbenchDragDrop = ({
                     }
                   }
                 : node
-            )
-          );
-          return;
-        }
-        
-        // Create new document input node at drop position
-        const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
-        console.log('React Flow bounds:', reactFlowBounds);
-        console.log('Drop position:', { x: event.clientX, y: event.clientY });
-        
-        // Calculate position within React Flow coordinate system
-        const pos = reactFlowBounds
-          ? {
-              x: event.clientX - reactFlowBounds.left - 65,
-              y: event.clientY - reactFlowBounds.top - 30,
-            }
-          : { x: 80, y: 420 + Math.random() * 100 }; // Fallback position
-        
-        console.log('Calculated position:', pos);
-        
-        // Create unique node ID and new document node
-        const nodeId = `doc-${Date.now()}-${fileData.name}`;
-        const newNode = {
-          id: nodeId,
-          type: "document-input",
-          position: pos,
-          data: { moduleType: "document-input" as const, documentName: fileData.name, file: fileData },
-          draggable: true,
-        };
-        
-        console.log('Creating new document node:', newNode);
-        setNodes((nds) => [...nds, newNode]);
+            );
+          }
+          
+          // Create new document input node at drop position
+          const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
+          console.log('React Flow bounds:', reactFlowBounds);
+          console.log('Drop position:', { x: event.clientX, y: event.clientY });
+          
+          // Calculate position within React Flow coordinate system
+          const pos = reactFlowBounds
+            ? {
+                x: event.clientX - reactFlowBounds.left - 65,
+                y: event.clientY - reactFlowBounds.top - 30,
+              }
+            : { x: 80, y: 420 + Math.random() * 100 }; // Fallback position
+          
+          console.log('Calculated position:', pos);
+          
+          // Create unique node ID and new document node
+          const nodeId = `doc-${Date.now()}-${fileData.name}`;
+          const newNode = {
+            id: nodeId,
+            type: "document-input",
+            position: pos,
+            data: { moduleType: "document-input" as const, documentName: fileData.name, file: fileData },
+            draggable: true,
+          };
+          
+          console.log('Creating new document node:', newNode);
+          return clearDragOverStates([...prevNodes, newNode]);
+        });
         return;
       }
       
@@ -178,7 +171,8 @@ export const useWorkbenchDragDrop = ({
         position: pos,
         data: { moduleType: module.type },
       };
-      setNodes((nds) => [...nds, newNode]);
+      
+      setNodes((prevNodes: Node[]) => [...prevNodes, newNode]);
     },
     [setNodes, getNodeAtPosition, clearDragOverStates]
   );
@@ -207,8 +201,8 @@ export const useWorkbenchDragDrop = ({
       const targetNode = getNodeAtPosition(event.clientX, event.clientY);
       
       // Update drag-over states: only target node shows as drag-over
-      setNodes((nds) =>
-        nds.map((node) => {
+      setNodes((prevNodes: Node[]) =>
+        prevNodes.map((node) => {
           if (node.type === "document-input") {
             const isDragOver = targetNode?.id === node.id;
             return {
@@ -234,9 +228,9 @@ export const useWorkbenchDragDrop = ({
   const onDragLeave = useCallback((event: React.DragEvent, reactFlowWrapper: React.RefObject<HTMLDivElement>) => {
     // Only clear states if actually leaving the container
     if (!reactFlowWrapper.current?.contains(event.relatedTarget as HTMLElement)) {
-      clearDragOverStates();
+      setNodes((prevNodes: Node[]) => clearDragOverStates(prevNodes));
     }
-  }, [clearDragOverStates]);
+  }, [clearDragOverStates, setNodes]);
 
   return {
     onDrop,

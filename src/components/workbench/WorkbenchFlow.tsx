@@ -1,7 +1,7 @@
 
 import React, { forwardRef, useCallback, useMemo, useRef } from "react";
 import { ReactFlow, Node, Edge } from "@xyflow/react";
-import { useWorkbenchEvents } from "@/hooks/useWorkbenchEvents";
+import { useWorkbenchDragDrop } from "@/hooks/workbench/useWorkbenchDragDrop";
 import { useDataFlow } from "@/hooks/workbench/useDataFlow";
 import { useDataPreviewSelection } from "@/hooks/workbench/useDataPreviewSelection";
 import { getNodeAtScreenPosition } from "@/utils/nodeUtils";
@@ -24,12 +24,12 @@ interface WorkbenchFlowProps {
   uploadedFiles?: any[];
   nodes: Node[];
   edges: Edge[];
-  onNodesChange: (nodes: Node[]) => void;
-  onEdgesChange: (edges: Edge[]) => void;
+  updateNodes: (nodes: Node[]) => void;
+  updateEdges: (edges: Edge[]) => void;
 }
 
 const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow(
-  { onModuleEdit, editingPromptNodeId, uploadedFiles, nodes, edges, onNodesChange, onEdgesChange },
+  { onModuleEdit, editingPromptNodeId, uploadedFiles, nodes, edges, updateNodes, updateEdges },
   ref
 ) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -40,29 +40,15 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
     return getNodeAtScreenPosition(nodes, x, y, reactFlowBounds);
   }, [nodes]);
 
-  // Initialize workbench event handling with persistent state
+  // Initialize drag-drop handling with direct workspace state updates
   const {
-    setNodes,
-    onNodesChange: handleNodesChange,
-    onEdgesChange: handleEdgesChange,
     onDrop: handleDrop,
     onDragOver,
-    onDragLeave: handleDragLeave,
-    onConnect
-  } = useWorkbenchEvents({
-    initialNodes: nodes,
-    initialEdges: edges,
+    onDragLeave: handleDragLeave
+  } = useWorkbenchDragDrop({
+    setNodes: updateNodes,
     getNodeAtPosition
   });
-
-  // Update parent when nodes/edges change
-  React.useEffect(() => {
-    onNodesChange(nodes);
-  }, [nodes, onNodesChange]);
-
-  React.useEffect(() => {
-    onEdgesChange(edges);
-  }, [edges, onEdgesChange]);
 
   // Initialize data flow management
   const { getEdgeData, simulateProcessing } = useDataFlow(nodes, edges);
@@ -73,13 +59,77 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
   // Initialize event handlers
   const { onNodeClick } = useFlowEventHandlers({
     nodes,
-    setNodes,
+    setNodes: updateNodes,
     onModuleEdit,
     ref
   });
 
   // Initialize node management
   const { getNodeColor } = useFlowNodeManager();
+
+  /**
+   * Handle React Flow node changes and update workspace
+   */
+  const handleNodesChange = useCallback((changes: any[]) => {
+    const updatedNodes = nodes.map(node => {
+      const change = changes.find(c => c.id === node.id);
+      if (!change) return node;
+      
+      switch (change.type) {
+        case 'position':
+          return { ...node, position: change.position };
+        case 'dimensions':
+          return { ...node, width: change.dimensions?.width, height: change.dimensions?.height };
+        case 'remove':
+          return null;
+        case 'select':
+          return { ...node, selected: change.selected };
+        default:
+          return node;
+      }
+    }).filter(Boolean) as Node[];
+    
+    updateNodes(updatedNodes);
+  }, [nodes, updateNodes]);
+
+  /**
+   * Handle React Flow edge changes and update workspace
+   */
+  const handleEdgesChange = useCallback((changes: any[]) => {
+    const updatedEdges = edges.map(edge => {
+      const change = changes.find(c => c.id === edge.id);
+      if (!change) return edge;
+      
+      switch (change.type) {
+        case 'remove':
+          return null;
+        case 'select':
+          return { ...edge, selected: change.selected };
+        default:
+          return edge;
+      }
+    }).filter(Boolean) as Edge[];
+    
+    updateEdges(updatedEdges);
+  }, [edges, updateEdges]);
+
+  /**
+   * Handle new connections between nodes
+   */
+  const handleConnect = useCallback((connection: any) => {
+    const newEdge = {
+      id: `edge-${Date.now()}`,
+      source: connection.source,
+      target: connection.target,
+      sourceHandle: connection.sourceHandle,
+      targetHandle: connection.targetHandle,
+      animated: true,
+      type: "dataPreview",
+      data: { label: "JSON" }
+    };
+    
+    updateEdges([...edges, newEdge]);
+  }, [edges, updateEdges]);
 
   /**
    * Enhanced node click handler that also hides data previews
@@ -146,7 +196,7 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
         edges={enhancedEdges}
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
-        onConnect={onConnect}
+        onConnect={handleConnect}
         onDrop={onDrop}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
