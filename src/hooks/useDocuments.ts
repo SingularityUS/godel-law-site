@@ -80,8 +80,10 @@ export const useDocuments = () => {
   useEffect(() => {
     if (!user) return;
 
+    console.log('Setting up real-time subscription for user:', user.id);
+
     const channel = supabase
-      .channel('documents-changes')
+      .channel(`documents-changes-${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -110,12 +112,15 @@ export const useDocuments = () => {
           setDocuments(prev => prev.filter(doc => doc.id !== payload.old.id));
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Subscription status:', status);
+      });
 
     return () => {
+      console.log('Cleaning up real-time subscription');
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user?.id]); // Only depend on user.id to avoid unnecessary re-subscriptions
 
   useEffect(() => {
     fetchDocuments();
