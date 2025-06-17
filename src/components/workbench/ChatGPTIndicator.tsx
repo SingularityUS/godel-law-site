@@ -22,7 +22,7 @@ const ChatGPTIndicator: React.FC<ChatGPTIndicatorProps> = ({
   if (!isActive && !isProcessing) return null;
 
   return (
-    <div className={`absolute -top-1 -left-1 ${className}`}>
+    <div className={`absolute top-1 left-1 ${className}`}>
       <div className={`w-1.5 h-1.5 bg-green-500 rounded-full ${isProcessing ? 'animate-pulse' : ''}`} />
     </div>
   );
