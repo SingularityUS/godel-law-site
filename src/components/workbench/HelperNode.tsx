@@ -5,7 +5,7 @@ import { X, Settings } from "lucide-react";
 import { MODULE_DEFINITIONS, ModuleKind } from "@/data/modules";
 import { useModuleColors } from "@/hooks/useModuleColors";
 import ChatGPTIndicator from "./ChatGPTIndicator";
-import ExecutionDebugIndicator from "./ExecutionDebugIndicator";
+import ExecutionStatusIndicator from "./ExecutionStatusIndicator";
 
 // Add index signature for compatibility with React Flow
 interface HelperNodeData extends Record<string, unknown> {
@@ -15,14 +15,6 @@ interface HelperNodeData extends Record<string, unknown> {
     status: 'idle' | 'queued' | 'processing' | 'completed' | 'error';
     data?: any;
     error?: string;
-    progress?: string;
-    debugInfo?: {
-      totalItems?: number;
-      processedItems?: number;
-      itemType?: string;
-      isPassThrough?: boolean;
-      isDeprecated?: boolean;
-    };
   };
 }
 
@@ -92,32 +84,22 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
   const executionStatus = data.executionStatus?.status || 'idle';
   const isProcessing = executionStatus === 'processing';
 
-  // Apply deprecated styling
-  const isDeprecated = module.isDeprecated;
-  const deprecatedClass = isDeprecated ? 'opacity-60 border-dashed' : '';
-
   return (
     <div
-      className={`w-32 h-24 border-2 border-black cursor-pointer relative group hover:shadow-lg ${nodeColor} ${deprecatedClass} ${
+      className={`w-32 h-24 border-2 border-black cursor-pointer relative group hover:shadow-lg ${nodeColor} ${
         selected ? "ring-4 ring-black z-10" : "ring-0"
       }`}
       style={{ fontFamily: 'Courier New, monospace' }}
     >
-      {/* Enhanced Execution Status Indicator with Debug Info */}
-      <ExecutionDebugIndicator 
+      {/* Execution Status Indicator */}
+      <ExecutionStatusIndicator 
         status={executionStatus}
         error={data.executionStatus?.error}
-        progress={data.executionStatus?.progress}
-        debugInfo={{
-          ...data.executionStatus?.debugInfo,
-          isPassThrough: module.isPassThrough,
-          isDeprecated: module.isDeprecated
-        }}
       />
 
       {/* Enhanced ChatGPT Indicator for Legal Processing */}
       <ChatGPTIndicator 
-        isActive={supportsChatGPT && !module.isPassThrough}
+        isActive={supportsChatGPT}
         isProcessing={isProcessing}
         isLegalModule={isLegalModule}
         className="z-20"
@@ -148,10 +130,7 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
         <span className={`${iconColor} drop-shadow text-lg mb-1`}>
           <module.icon size={20} />
         </span>
-        <span className={`text-xs font-bold ${textColor} text-center leading-tight`}>
-          {module.label}
-          {isDeprecated && <div className="text-xs opacity-75">(deprecated)</div>}
-        </span>
+        <span className={`text-xs font-bold ${textColor} text-center leading-tight`}>{module.label}</span>
       </div>
       
       {/* Prompt status indicator */}
