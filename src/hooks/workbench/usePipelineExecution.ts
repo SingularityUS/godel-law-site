@@ -1,3 +1,4 @@
+
 /**
  * usePipelineExecution Hook
  * 
@@ -7,18 +8,12 @@
 
 import { useState, useCallback } from "react";
 import { Node, Edge } from "@xyflow/react";
-import { AllNodes, DocumentInputNode, HelperNode } from "@/types/workbench";
-import { ModuleKind, MODULE_DEFINITIONS } from "@/data/modules";
+import { AllNodes, DocumentInputNode } from "@/types/workbench";
 import { useChatGPTApi } from "./useChatGPTApi";
-
-interface ExecutionState {
-  [nodeId: string]: {
-    status: 'idle' | 'queued' | 'processing' | 'completed' | 'error';
-    data?: any;
-    error?: string;
-    processingTime?: number;
-  };
-}
+import { ExecutionState } from "./types/pipelineTypes";
+import { extractDocumentText } from "./utils/documentProcessor";
+import { createNodeProcessor } from "./utils/nodeProcessor";
+import { createExecutionManager } from "./utils/executionManager";
 
 export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
   const [executionState, setExecutionState] = useState<ExecutionState>({});
@@ -26,142 +21,9 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
   const [finalOutput, setFinalOutput] = useState<any>(null);
   const { callChatGPT } = useChatGPTApi();
 
-  /**
-   * Find all document input nodes (pipeline starting points)
-   */
-  const getDocumentInputNodes = useCallback((): DocumentInputNode[] => {
-    return nodes.filter(node => node.data?.moduleType === 'document-input') as DocumentInputNode[];
-  }, [nodes]);
-
-  /**
-   * Get connected nodes in execution order using breadth-first traversal
-   */
-  const getExecutionOrder = useCallback((startNodeId: string): string[] => {
-    const visited = new Set<string>();
-    const queue = [startNodeId];
-    const executionOrder: string[] = [];
-
-    while (queue.length > 0) {
-      const currentNodeId = queue.shift()!;
-      if (visited.has(currentNodeId)) continue;
-
-      visited.add(currentNodeId);
-      executionOrder.push(currentNodeId);
-
-      // Find connected nodes (targets of edges from current node)
-      const connectedEdges = edges.filter(edge => edge.source === currentNodeId);
-      const nextNodes = connectedEdges.map(edge => edge.target);
-      
-      nextNodes.forEach(nodeId => {
-        if (!visited.has(nodeId)) {
-          queue.push(nodeId);
-        }
-      });
-    }
-
-    return executionOrder;
-  }, [edges]);
-
-  /**
-   * Extract text content from legal document
-   */
-  const extractDocumentText = useCallback(async (docNode: DocumentInputNode): Promise<any> => {
-    if (!docNode.data?.file) {
-      throw new Error('No file attached to document node');
-    }
-
-    const file = docNode.data.file;
-    
-    // For text files, read directly
-    if (file.type?.startsWith('text/')) {
-      const textContent = await file.text();
-      return {
-        documentType: "unknown",
-        title: docNode.data.documentName,
-        content: textContent,
-        metadata: {
-          fileName: docNode.data.documentName,
-          fileType: file.type,
-          fileSize: file.size
-        }
-      };
-    }
-    
-    // For other file types, create structured data for legal processing
-    return {
-      documentType: "unknown",
-      title: docNode.data.documentName,
-      content: `Legal Document Analysis Required\n\nDocument: ${docNode.data.documentName}\nFile type: ${file.type}\nSize: ${file.size} bytes\n\nThis document requires text extraction and legal analysis.`,
-      metadata: {
-        fileName: docNode.data.documentName,
-        fileType: file.type,
-        fileSize: file.size,
-        requiresOCR: !file.type?.startsWith('text/')
-      }
-    };
-  }, []);
-
-  /**
-   * Process a single node with ChatGPT using legal-specific prompts
-   */
-  const processNode = useCallback(async (nodeId: string, inputData: any): Promise<any> => {
-    const startTime = Date.now();
-    const node = nodes.find(n => n.id === nodeId) as HelperNode;
-    
-    if (!node || node.data?.moduleType === 'document-input') {
-      return inputData; // Skip document input nodes
-    }
-
-    const moduleType = node.data.moduleType as ModuleKind;
-    const moduleDef = MODULE_DEFINITIONS.find(m => m.type === moduleType);
-    
-    if (!moduleDef?.supportsChatGPT) {
-      console.warn(`Module ${moduleType} does not support ChatGPT processing`);
-      return inputData; // Pass through unchanged
-    }
-
-    // Use custom prompt if available, otherwise use default legal prompt
-    const systemPrompt = node.data.promptOverride || moduleDef.defaultPrompt;
-    
-    // Format input data for legal processing
-    let promptData: string;
-    if (typeof inputData === 'object') {
-      promptData = JSON.stringify(inputData, null, 2);
-    } else {
-      promptData = String(inputData);
-    }
-
-    console.log(`Processing legal module ${nodeId} (${moduleType}) with ChatGPT`);
-    
-    const result = await callChatGPT(promptData, systemPrompt, 'gpt-4o-mini');
-    
-    if (result.error) {
-      throw new Error(result.error);
-    }
-
-    // Try to parse JSON response for structured modules
-    let processedOutput = result.response;
-    if (moduleDef.outputFormat === 'json') {
-      try {
-        processedOutput = JSON.parse(result.response);
-      } catch (parseError) {
-        console.warn(`Failed to parse JSON from ${moduleType}, using text response`);
-        // Keep as text if JSON parsing fails
-      }
-    }
-
-    const processingTime = Date.now() - startTime;
-    
-    return {
-      moduleType,
-      output: processedOutput,
-      metadata: {
-        processingTime,
-        model: result.model,
-        timestamp: new Date().toISOString()
-      }
-    };
-  }, [nodes, callChatGPT]);
+  // Create utility functions
+  const executionManager = createExecutionManager(nodes, edges);
+  const processNode = createNodeProcessor(nodes, callChatGPT);
 
   /**
    * Execute pipeline starting from a document input node
@@ -173,14 +35,11 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
     setFinalOutput(null);
     
     try {
-      const executionOrder = getExecutionOrder(startNodeId);
+      const executionOrder = executionManager.getExecutionOrder(startNodeId);
       console.log('Legal document processing pipeline execution order:', executionOrder);
 
       // Initialize execution state
-      const newExecutionState: ExecutionState = {};
-      executionOrder.forEach(nodeId => {
-        newExecutionState[nodeId] = { status: 'queued' };
-      });
+      const newExecutionState = executionManager.initializeExecutionState(executionOrder);
       setExecutionState(newExecutionState);
 
       let currentData: any = null;
@@ -234,17 +93,7 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
       }
 
       // Create comprehensive final output for legal review
-      const finalLegalOutput = {
-        summary: {
-          documentsProcessed: 1,
-          modulesExecuted: pipelineResults.length - 1, // Exclude document input
-          processingCompleted: new Date().toISOString(),
-          pipelineType: "Legal Document Analysis"
-        },
-        results: pipelineResults,
-        finalOutput: currentData
-      };
-
+      const finalLegalOutput = executionManager.createFinalOutput(pipelineResults, currentData);
       setFinalOutput(finalLegalOutput);
       console.log('Legal document processing pipeline completed successfully');
 
@@ -253,13 +102,13 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
     } finally {
       setIsExecuting(false);
     }
-  }, [isExecuting, getExecutionOrder, extractDocumentText, processNode, nodes]);
+  }, [isExecuting, executionManager, processNode, nodes]);
 
   /**
    * Execute all pipelines (from all document input nodes)
    */
   const executeAllPipelines = useCallback(async () => {
-    const docInputNodes = getDocumentInputNodes();
+    const docInputNodes = executionManager.getDocumentInputNodes();
     
     if (docInputNodes.length === 0) {
       console.warn('No document input nodes found');
@@ -269,7 +118,7 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
     // For now, execute the first pipeline found
     // In the future, we could execute multiple pipelines in parallel
     await executePipeline(docInputNodes[0].id);
-  }, [getDocumentInputNodes, executePipeline]);
+  }, [executePipeline, executionManager]);
 
   /**
    * Get execution status for a specific node
@@ -295,7 +144,7 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
     executePipeline,
     getNodeExecutionStatus,
     resetExecution,
-    getDocumentInputNodes,
-    getExecutionOrder
+    getDocumentInputNodes: executionManager.getDocumentInputNodes,
+    getExecutionOrder: executionManager.getExecutionOrder
   };
 };
