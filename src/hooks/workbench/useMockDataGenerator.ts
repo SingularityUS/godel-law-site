@@ -17,7 +17,25 @@ export const useMockDataGenerator = () => {
    * Generate enhanced mock data with potential ChatGPT integration
    */
   const generateMockData = useCallback(async (moduleType: ModuleKind | 'document-input', isInput = false, useRealChatGPT = false, customPrompt?: string) => {
-    // Enhanced mock data for modules
+    // For ChatGPT Assistant module, always use real API if available
+    if (moduleType === 'chatgpt-assistant' && !isInput && useRealChatGPT) {
+      const inputText = "Sample input data for ChatGPT processing...";
+      const systemPrompt = typeof customPrompt === 'string' ? customPrompt : "You are a helpful AI assistant that processes and analyzes content.";
+      
+      const chatGPTResponse = await callChatGPT(inputText, systemPrompt);
+      
+      return {
+        chatgptResponse: chatGPTResponse.response || chatGPTResponse.error,
+        model: chatGPTResponse.model || 'gpt-4o-mini',
+        usage: chatGPTResponse.usage || { total_tokens: 0 },
+        processingTime: chatGPTResponse.processingTime || 0,
+        timestamp: chatGPTResponse.timestamp,
+        isRealResponse: !chatGPTResponse.error,
+        error: chatGPTResponse.error || null
+      };
+    }
+
+    // Enhanced mock data for other modules
     if (moduleType === 'document-input') {
       return {
         type: 'document',
@@ -144,56 +162,167 @@ export const useMockDataGenerator = () => {
                 chatgptEnhanced: useRealChatGPT
               }
             };
-
-      case 'legal-summary':
-      case 'legal-qa':
-      case 'contract-analyzer':
-      case 'legal-translator':
-      case 'legal-researcher':
-      case 'clause-identifier':
-      case 'risk-assessor':
-      case 'compliance-checker':
-        // Use real ChatGPT for legal modules if available and requested
-        if (useRealChatGPT) {
-          const inputText = "Sample legal document content for analysis...";
-          const systemPrompt = typeof customPrompt === 'string' ? customPrompt : `You are a legal AI assistant specialized in ${moduleType.replace('-', ' ')}.`;
-          
-          try {
-            const chatGPTResponse = await callChatGPT(inputText, systemPrompt);
-            
-            return {
-              legalAnalysis: chatGPTResponse.response || chatGPTResponse.error,
-              model: chatGPTResponse.model || 'gpt-4o-mini',
-              usage: chatGPTResponse.usage || { total_tokens: 0 },
-              processingTime: chatGPTResponse.processingTime || 0,
-              timestamp: chatGPTResponse.timestamp,
-              isRealResponse: !chatGPTResponse.error,
-              error: chatGPTResponse.error || null,
-              moduleType: moduleType
+      
+      case 'citation-finder':
+        return isInput
+          ? { 
+              paragraphs: ['Research text containing diverse citation formats, academic references, and bibliographic entries requiring comprehensive identification and extraction...'],
+              citationFormats: ['APA', 'MLA', 'Chicago', 'IEEE']
+            }
+          : { 
+              citations: [
+                { 
+                  text: 'Johnson et al. (2024) demonstrated significant improvements in AI-assisted document processing...',
+                  source: 'Peer-reviewed journal article',
+                  format: 'APA',
+                  confidence: 0.96,
+                  location: { paragraph: 2, position: 67 },
+                  aiVerified: true
+                },
+                {
+                  text: 'According to Smith and Williams (2023), machine learning approaches show promise...',
+                  source: 'Conference proceedings',
+                  format: 'APA', 
+                  confidence: 0.91,
+                  location: { paragraph: 4, position: 23 },
+                  aiVerified: true
+                }
+              ],
+              statistics: {
+                totalFound: 28,
+                verified: 25,
+                needsVerification: 3,
+                averageConfidence: 0.92,
+                aiEnhanced: true,
+                chatgptEnhanced: useRealChatGPT
+              }
             };
-          } catch (error) {
-            console.error('ChatGPT processing failed:', error);
-          }
-        }
-
-        // Fallback to mock data for legal modules
-        return { 
-          legalAnalysis: `Mock ${moduleType.replace('-', ' ')} analysis with comprehensive legal insights and professional recommendations...`,
-          timestamp: new Date().toISOString(),
-          metadata: {
-            processingDuration: Math.random() * 15,
-            confidence: 0.85 + Math.random() * 0.15,
-            version: '2.0.0',
-            aiEnhanced: true
-          },
-          statistics: {
-            inputSize: Math.floor(Math.random() * 25000),
-            outputSize: Math.floor(Math.random() * 20000),
-            compressionRatio: 0.75 + Math.random() * 0.25,
-            chatgptEnhanced: useRealChatGPT
-          },
-          moduleType: moduleType
-        };
+      
+      case 'citation-verifier':
+        return isInput
+          ? { 
+              citations: ['Johnson, A., Smith, B., & Davis, C. (2024). AI-Enhanced Document Processing: A Comprehensive Analysis. Journal of Information Technology, 28(4), 234-267.'],
+              databases: ['PubMed', 'IEEE Xplore', 'ACM Digital Library', 'Google Scholar']
+            }
+          : { 
+              verified: [
+                { 
+                  citation: 'Johnson, A., Smith, B., & Davis, C. (2024). AI-Enhanced Document Processing: A Comprehensive Analysis. Journal of Information Technology, 28(4), 234-267.',
+                  isValid: true,
+                  confidence: 0.97,
+                  source: 'IEEE Xplore Digital Library',
+                  doi: '10.1109/JIT.2024.987654',
+                  verificationDetails: {
+                    authorExists: true,
+                    journalExists: true,
+                    dateValid: true,
+                    pageNumbersValid: true,
+                    doiResolvable: true
+                  },
+                  aiVerified: true
+                }
+              ],
+              statistics: {
+                totalVerified: 25,
+                validCitations: 23,
+                invalidCitations: 2,
+                averageConfidence: 0.94,
+                verificationTime: 67.8,
+                aiEnhanced: true,
+                chatgptEnhanced: useRealChatGPT
+              }
+            };
+      
+      case 'style-guide-enforcer':
+        return isInput
+          ? { 
+              text: 'Academic manuscript requiring comprehensive style guide compliance checking and formatting standardization according to publication requirements...',
+              styleGuide: 'APA 7th Edition',
+              checkTypes: ['formatting', 'citations', 'references', 'structure']
+            }
+          : { 
+              styleChecked: 'Style-corrected manuscript with comprehensive formatting compliance, consistent citation styling, proper heading hierarchy, and enhanced academic readability...',
+              violations: [
+                {
+                  type: 'formatting',
+                  description: 'Inconsistent heading levels in sections 2.1-2.3',
+                  severity: 'medium',
+                  location: 'Methodology section',
+                  suggestion: 'Apply proper APA heading hierarchy (Level 1-5)',
+                  aiCorrected: true
+                },
+                {
+                  type: 'citations',
+                  description: 'Missing page numbers for direct quotes',
+                  severity: 'high',
+                  location: 'Literature Review',
+                  suggestion: 'Add page numbers: (Author, Year, p. XX)',
+                  aiCorrected: true
+                }
+              ],
+              improvements: {
+                formattingScore: 9.4,
+                consistencyScore: 9.1,
+                compliancePercentage: 96.8,
+                aiEnhanced: true,
+                chatgptEnhanced: useRealChatGPT
+              }
+            };
+      
+      case 'chatgpt-assistant':
+        return isInput
+          ? { 
+              input: 'Complex input data requiring AI analysis and intelligent processing with contextual understanding...',
+              configuration: {
+                processingMode: 'intelligent_analysis',
+                options: { enableChatGPT: true, model: 'gpt-4o-mini', maxTokens: 2000 },
+                metadata: { version: '3.0.0', apiIntegration: 'openai' }
+              }
+            }
+          : { 
+              output: 'AI-generated analysis with comprehensive insights, structured recommendations, and intelligent content processing...',
+              aiResponse: 'Based on the input data, I have identified several key patterns and provided detailed analysis with actionable recommendations for optimization.',
+              results: {
+                processingTime: 4.7,
+                tokensUsed: 1247,
+                model: 'gpt-4o-mini',
+                confidence: 0.92
+              },
+              analysis: {
+                complexity: 'high',
+                accuracy: 0.94,
+                recommendations: ['implement_ai_optimization', 'enhance_data_structure', 'improve_processing_workflow'],
+                chatgptEnhanced: true
+              }
+            };
+      
+      case 'custom':
+        return isInput
+          ? { 
+              input: 'Custom input data with flexible structure for specialized AI processing and analysis...',
+              configuration: {
+                processingMode: 'custom_advanced',
+                options: { enableChatGPT: true, customLogic: true, timeout: 45000 },
+                metadata: { version: '2.5.0', customization: 'user_defined' }
+              }
+            }
+          : { 
+              output: 'Custom processed output with specialized transformations and AI-enhanced analysis tailored to specific requirements...',
+              customField: 'ai_enhanced_value',
+              results: {
+                processingTime: 15.8,
+                memoryUsed: '78MB',
+                cacheHits: 12,
+                cacheMisses: 3,
+                aiProcessed: true
+              },
+              analysis: {
+                complexity: 'very_high',
+                accuracy: 0.96,
+                recommendations: ['optimize_ai_processing', 'implement_caching', 'enhance_performance'],
+                chatgptEnhanced: useRealChatGPT
+              }
+            };
       
       default:
         return { 

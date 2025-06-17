@@ -1,5 +1,5 @@
 
-import { ModuleDefinition } from "@/data/modules";
+import { AIModuleDefinition } from "@/data/modules";
 import { useEffect, useState } from "react";
 
 interface PromptDrawerProps {
