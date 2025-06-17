@@ -13,7 +13,7 @@ export const createProgressTracker = (
   onProgress?: (progress: ModuleProgress) => void
 ) => {
   
-  const reportStart = (total: number, inputType: string = 'items') => {
+  const reportStart = (total: number, inputType: 'chunks' | 'paragraphs' | 'documents' = 'documents') => {
     if (onProgress) {
       onProgress({
         completed: 0,
@@ -64,7 +64,7 @@ export const createProgressTracker = (
   };
 };
 
-function getInputType(moduleType: ModuleKind): string {
+function getInputType(moduleType: ModuleKind): 'chunks' | 'paragraphs' | 'documents' {
   switch (moduleType) {
     case 'paragraph-splitter':
       return 'chunks';
