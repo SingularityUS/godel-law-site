@@ -1,24 +1,14 @@
+
 import React from "react";
 import { Handle, Position, Node } from "@xyflow/react";
 import { BookOpen, X } from "lucide-react";
+import ExecutionStatusIndicator from "./ExecutionStatusIndicator";
 
 /**
  * DocumentInputNode Component
  * 
  * Purpose: Renders document input nodes in the AI workflow graph
  * This component represents uploaded documents that can be used as input for AI processing modules.
- * 
- * Features:
- * - Displays document name and metadata
- * - Handles drag-over states for document replacement
- * - Provides visual feedback for user interactions
- * - Includes delete functionality
- * 
- * Integration:
- * - Used by AIWorkbench as a custom node type
- * - Connects to HelperNodes via React Flow edges
- * - Triggers document preview when clicked
- * - Supports drag-and-drop document replacement
  */
 
 export type DocumentInputNodeData = {
@@ -26,6 +16,11 @@ export type DocumentInputNodeData = {
   documentName: string;
   file: any;
   isDragOver?: boolean;
+  executionStatus?: {
+    status: 'idle' | 'queued' | 'processing' | 'completed' | 'error';
+    data?: any;
+    error?: string;
+  };
 };
 
 export type DocumentInputNode = Node<DocumentInputNodeData>;
@@ -47,6 +42,9 @@ const DocumentInputNodeComponent: React.FC<DocumentInputNodeProps> = ({
     window.dispatchEvent(event);
   };
 
+  // Get execution status
+  const executionStatus = data.executionStatus?.status || 'idle';
+
   return (
     <div
       className={`w-32 h-24 border-2 border-black cursor-pointer relative group hover:shadow-lg ${
@@ -63,6 +61,12 @@ const DocumentInputNodeComponent: React.FC<DocumentInputNodeProps> = ({
       }}
       title="Click to preview document"
     >
+      {/* Execution Status Indicator */}
+      <ExecutionStatusIndicator 
+        status={executionStatus}
+        error={data.executionStatus?.error}
+      />
+
       {/* Delete button - only visible on hover or when selected */}
       <button
         onClick={handleDelete}

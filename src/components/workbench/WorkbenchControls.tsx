@@ -1,33 +1,48 @@
 
 import React from "react";
 import { MiniMap, Controls, Background, Node } from "@xyflow/react";
+import PipelineExecutionButton from "./PipelineExecutionButton";
+import { AllNodes } from "@/types/workbench";
+import { Edge } from "@xyflow/react";
 
 /**
  * WorkbenchControls Component
  * 
  * Purpose: Renders React Flow controls and visual elements
- * This component provides the minimap, zoom controls, and background
- * grid pattern for the AI Workbench interface.
- * 
- * Key Responsibilities:
- * - Renders minimap with custom node coloring
- * - Provides zoom and pan controls
- * - Displays background grid pattern
- * - Maintains consistent visual styling
- * 
- * Integration Points:
- * - Used by WorkbenchFlow as part of React Flow setup
- * - Receives node color function for minimap styling
- * - Coordinates with overall workbench theming
+ * This component provides the minimap, zoom controls, background
+ * grid pattern, and pipeline execution controls for the AI Workbench interface.
  */
 
 interface WorkbenchControlsProps {
   getNodeColor: (node: Node) => string;
+  nodes: AllNodes[];
+  edges: Edge[];
+  isExecuting: boolean;
+  onExecutePipeline: () => void;
+  onStopPipeline: () => void;
 }
 
-const WorkbenchControls: React.FC<WorkbenchControlsProps> = ({ getNodeColor }) => {
+const WorkbenchControls: React.FC<WorkbenchControlsProps> = ({ 
+  getNodeColor, 
+  nodes, 
+  edges, 
+  isExecuting, 
+  onExecutePipeline, 
+  onStopPipeline 
+}) => {
   return (
     <>
+      {/* Pipeline execution controls - positioned at top */}
+      <div className="absolute top-4 left-4 z-10">
+        <PipelineExecutionButton
+          nodes={nodes}
+          edges={edges}
+          isExecuting={isExecuting}
+          onExecute={onExecutePipeline}
+          onStop={onStopPipeline}
+        />
+      </div>
+
       {/* Minimap for navigation */}
       <MiniMap 
         nodeColor={getNodeColor}

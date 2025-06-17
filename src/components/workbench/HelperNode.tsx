@@ -1,34 +1,21 @@
+
 import React, { useState, useEffect } from "react";
 import { Handle, Position, Node } from "@xyflow/react";
 import { X, Settings } from "lucide-react";
 import { MODULE_DEFINITIONS, ModuleKind } from "@/data/modules";
 import { useModuleColors } from "@/hooks/useModuleColors";
 import ChatGPTIndicator from "./ChatGPTIndicator";
-
-/**
- * HelperNode Component
- * 
- * Purpose: Renders AI processing module nodes in the workflow graph
- * These nodes represent different AI operations (text extraction, grammar checking, etc.)
- * that can be chained together to create complex document processing pipelines.
- * 
- * Features:
- * - Displays module icon, name, and prompt status
- * - Color-coded based on module type or custom user colors
- * - Handles selection states for prompt editing
- * - Includes delete functionality and settings access
- * 
- * Integration:
- * - Used by AIWorkbench as a custom node type
- * - Connects to other nodes via React Flow edges
- * - Triggers prompt editing when clicked
- * - References MODULE_DEFINITIONS for styling and metadata
- */
+import ExecutionStatusIndicator from "./ExecutionStatusIndicator";
 
 // Add index signature for compatibility with React Flow
 interface HelperNodeData extends Record<string, unknown> {
   moduleType: ModuleKind;
   promptOverride?: string;
+  executionStatus?: {
+    status: 'idle' | 'queued' | 'processing' | 'completed' | 'error';
+    data?: any;
+    error?: string;
+  };
 }
 
 export type HelperNode = Node<HelperNodeData>;
@@ -92,6 +79,9 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
   // Check if module supports ChatGPT
   const supportsChatGPT = module.supportsChatGPT || data.moduleType === 'chatgpt-assistant';
 
+  // Get execution status
+  const executionStatus = data.executionStatus?.status || 'idle';
+
   return (
     <div
       className={`w-32 h-24 border-2 border-black cursor-pointer relative group hover:shadow-lg ${nodeColor} ${
@@ -99,6 +89,12 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
       }`}
       style={{ fontFamily: 'Courier New, monospace' }}
     >
+      {/* Execution Status Indicator */}
+      <ExecutionStatusIndicator 
+        status={executionStatus}
+        error={data.executionStatus?.error}
+      />
+
       {/* ChatGPT Indicator */}
       <ChatGPTIndicator 
         isActive={supportsChatGPT}

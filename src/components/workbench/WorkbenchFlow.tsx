@@ -4,7 +4,10 @@ import { ReactFlow } from "@xyflow/react";
 import { useWorkbenchEvents } from "@/hooks/useWorkbenchEvents";
 import { useDataFlow } from "@/hooks/workbench/useDataFlow";
 import { useDataPreviewSelection } from "@/hooks/workbench/useDataPreviewSelection";
+import { usePipelineExecution } from "@/hooks/workbench/usePipelineExecution";
 import WorkbenchControls from "./WorkbenchControls";
+import ExecutionStatusIndicator from "./ExecutionStatusIndicator";
+import FinalOutputPanel from "./FinalOutputPanel";
 import { useFlowNodeManager } from "./flow/FlowNodeManager";
 import { DocumentInputNode } from "./DocumentInputNode";
 import { HelperNode } from "./HelperNode";
@@ -26,20 +29,7 @@ import "./dataPreview.css";
  * 
  * Purpose: Core React Flow implementation for the AI Workbench
  * This component handles the main flow diagram functionality including
- * node management, event handling, and user interactions.
- * 
- * Key Responsibilities:
- * - Manages React Flow state and configuration
- * - Handles drag-drop operations from palette and library
- * - Processes node clicks for editing and preview
- * - Provides imperative API for external document addition
- * - Coordinates with event handling hooks
- * 
- * Integration Points:
- * - Uses useWorkbenchEvents for complex event management
- * - Integrates with useModuleColors for visual customization
- * - Communicates with parent components via callbacks
- * - Exposes addDocumentNode method for external use
+ * node management, event handling, user interactions, and pipeline execution.
  */
 
 interface WorkbenchFlowProps {
@@ -75,6 +65,15 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
 
   // Initialize data preview selection
   const { toggleEdgePreview, hideAllPreviews, isEdgeSelected } = useDataPreviewSelection();
+
+  // Initialize pipeline execution
+  const {
+    isExecuting,
+    finalOutput,
+    executeAllPipelines,
+    resetExecution,
+    getNodeExecutionStatus
+  } = usePipelineExecution(nodes, edges);
 
   // Initialize node management
   const { getNodeColor } = useFlowNodeManager();
@@ -180,25 +179,53 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
     }));
   }, [edges, getEdgeData, simulateProcessing, isEdgeSelected, toggleEdgePreview, handleClosePreview]);
 
+  /**
+   * Enhance nodes with execution status indicators
+   */
+  const enhancedNodes = useMemo(() => {
+    return nodes.map(node => ({
+      ...node,
+      data: {
+        ...node.data,
+        executionStatus: getNodeExecutionStatus(node.id)
+      }
+    }));
+  }, [nodes, getNodeExecutionStatus]);
+
   return (
-    <ReactFlow
-      nodes={nodes}
-      edges={enhancedEdges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onConnect={onConnect}
-      onDrop={onDrop}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onNodeClick={handleNodeClick}
-      onPaneClick={handlePaneClick}
-      nodeTypes={nodeTypes}
-      edgeTypes={edgeTypes}
-      defaultEdgeOptions={defaultEdgeOptions}
-      {...flowOptions}
-    >
-      <WorkbenchControls getNodeColor={getNodeColor} />
-    </ReactFlow>
+    <>
+      <ReactFlow
+        nodes={enhancedNodes}
+        edges={enhancedEdges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onDrop={onDrop}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onNodeClick={handleNodeClick}
+        onPaneClick={handlePaneClick}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        defaultEdgeOptions={defaultEdgeOptions}
+        {...flowOptions}
+      >
+        <WorkbenchControls 
+          getNodeColor={getNodeColor}
+          nodes={nodes}
+          edges={edges}
+          isExecuting={isExecuting}
+          onExecutePipeline={executeAllPipelines}
+          onStopPipeline={resetExecution}
+        />
+      </ReactFlow>
+
+      {/* Final output panel */}
+      <FinalOutputPanel 
+        output={finalOutput}
+        onClose={resetExecution}
+      />
+    </>
   );
 });
 
