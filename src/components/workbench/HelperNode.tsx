@@ -1,23 +1,37 @@
-
 import React, { useState, useEffect } from "react";
 import { Handle, Position, Node } from "@xyflow/react";
-import { X, Settings, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { X, Settings } from "lucide-react";
 import { MODULE_DEFINITIONS, ModuleKind } from "@/data/modules";
 import { useModuleColors } from "@/hooks/useModuleColors";
 import ChatGPTIndicator from "./ChatGPTIndicator";
 
-export interface HelperNodeData extends Record<string, unknown> {
+/**
+ * HelperNode Component
+ * 
+ * Purpose: Renders AI processing module nodes in the workflow graph
+ * These nodes represent different AI operations (text extraction, grammar checking, etc.)
+ * that can be chained together to create complex document processing pipelines.
+ * 
+ * Features:
+ * - Displays module icon, name, and prompt status
+ * - Color-coded based on module type or custom user colors
+ * - Handles selection states for prompt editing
+ * - Includes delete functionality and settings access
+ * 
+ * Integration:
+ * - Used by AIWorkbench as a custom node type
+ * - Connects to other nodes via React Flow edges
+ * - Triggers prompt editing when clicked
+ * - References MODULE_DEFINITIONS for styling and metadata
+ */
+
+// Add index signature for compatibility with React Flow
+interface HelperNodeData extends Record<string, unknown> {
   moduleType: ModuleKind;
   promptOverride?: string;
-  isProcessing?: boolean;
-  isCompleted?: boolean;
-  hasError?: boolean;
 }
 
-export interface HelperNode extends Node {
-  type: "helper";
-  data: HelperNodeData;
-}
+export type HelperNode = Node<HelperNodeData>;
 
 interface HelperNodeProps {
   data: HelperNodeData;
@@ -25,8 +39,10 @@ interface HelperNodeProps {
   id: string;
 }
 
-const getModuleDef = (type: ModuleKind) =>
-  MODULE_DEFINITIONS.find((m) => m.type === type)!;
+/**
+ * Helper function to get module definition from the modules registry
+ */
+const getModuleDef = (type: ModuleKind) => MODULE_DEFINITIONS.find((m) => m.type === type)!;
 
 const HelperNodeComponent: React.FC<HelperNodeProps> = ({ 
   data, 
@@ -37,7 +53,7 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
   const { getModuleColor } = useModuleColors();
   const [nodeColor, setNodeColor] = useState(getModuleColor(id));
 
-  // Listen for color changes
+  // Listen for color change events and update local state
   useEffect(() => {
     const handleColorChange = (event: CustomEvent) => {
       if (event.detail.nodeId === id) {
@@ -45,9 +61,16 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
       }
     };
 
-    window.addEventListener('nodeColorChanged', handleColorChange as EventListener);
-    return () => window.removeEventListener('nodeColorChanged', handleColorChange as EventListener);
+    window.addEventListener('moduleColorChanged', handleColorChange as EventListener);
+    return () => {
+      window.removeEventListener('moduleColorChanged', handleColorChange as EventListener);
+    };
   }, [id]);
+
+  // Update color when getModuleColor result changes
+  useEffect(() => {
+    setNodeColor(getModuleColor(id));
+  }, [id, getModuleColor]);
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -69,19 +92,9 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
   // Check if module supports ChatGPT
   const supportsChatGPT = module.supportsChatGPT || data.moduleType === 'chatgpt-assistant';
 
-  // Determine node border based on execution state
-  let borderClass = 'border-black';
-  if (data.isProcessing) {
-    borderClass = 'border-yellow-500 border-4';
-  } else if (data.isCompleted) {
-    borderClass = 'border-green-500 border-4';
-  } else if (data.hasError) {
-    borderClass = 'border-red-500 border-4';
-  }
-
   return (
     <div
-      className={`w-32 h-24 border-2 cursor-pointer relative group hover:shadow-lg ${nodeColor} ${borderClass} ${
+      className={`w-32 h-24 border-2 border-black cursor-pointer relative group hover:shadow-lg ${nodeColor} ${
         selected ? "ring-4 ring-black z-10" : "ring-0"
       }`}
       style={{ fontFamily: 'Courier New, monospace' }}
@@ -91,27 +104,6 @@ const HelperNodeComponent: React.FC<HelperNodeProps> = ({
         isActive={supportsChatGPT}
         className="z-20"
       />
-
-      {/* Execution Status Indicator */}
-      {(data.isProcessing || data.isCompleted || data.hasError) && (
-        <div className="absolute -top-1 -left-1 z-20">
-          {data.isProcessing && (
-            <div className="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center">
-              <Loader2 size={12} className="text-white animate-spin" />
-            </div>
-          )}
-          {data.isCompleted && (
-            <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-              <CheckCircle size={12} className="text-white" />
-            </div>
-          )}
-          {data.hasError && (
-            <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-              <AlertCircle size={12} className="text-white" />
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Action buttons - only visible on hover or when selected */}
       <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" style={{ opacity: selected ? 1 : undefined }}>

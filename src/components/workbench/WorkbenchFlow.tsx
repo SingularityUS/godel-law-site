@@ -1,17 +1,12 @@
-
-import React, { forwardRef, useCallback, useMemo, useState } from "react";
+import React, { forwardRef, useCallback, useMemo } from "react";
 import { ReactFlow } from "@xyflow/react";
 import { useWorkbenchEvents } from "@/hooks/useWorkbenchEvents";
 import { useDataFlow } from "@/hooks/workbench/useDataFlow";
 import { useDataPreviewSelection } from "@/hooks/workbench/useDataPreviewSelection";
-import { useWorkflowExecution } from "@/hooks/workbench/useWorkflowExecution";
-import { useWorkspaceManager } from "@/hooks/workbench/useWorkspaceManager";
+import { getNodeAtScreenPosition } from "@/utils/nodeUtils";
 import WorkbenchControls from "./WorkbenchControls";
-import RunWorkflowButton from "./RunWorkflowButton";
-import WorkflowOutput from "./WorkflowOutput";
 import { useFlowEventHandlers } from "./flow/FlowEventHandlers";
 import { useFlowNodeManager } from "./flow/FlowNodeManager";
-import { toast } from "sonner";
 import {
   initialNodes,
   initialEdges,
@@ -25,6 +20,27 @@ import {
 import "@xyflow/react/dist/style.css";
 import "./dataPreview.css";
 
+/**
+ * WorkbenchFlow Component
+ * 
+ * Purpose: Core React Flow implementation for the AI Workbench
+ * This component handles the main flow diagram functionality including
+ * node management, event handling, and user interactions.
+ * 
+ * Key Responsibilities:
+ * - Manages React Flow state and configuration
+ * - Handles drag-drop operations from palette and library
+ * - Processes node clicks for editing and preview
+ * - Provides imperative API for external document addition
+ * - Coordinates with event handling hooks
+ * 
+ * Integration Points:
+ * - Uses useWorkbenchEvents for complex event management
+ * - Integrates with useModuleColors for visual customization
+ * - Communicates with parent components via callbacks
+ * - Exposes addDocumentNode method for external use
+ */
+
 interface WorkbenchFlowProps {
   onModuleEdit: (nodeId: string, node: any) => void;
   editingPromptNodeId?: string;
@@ -36,35 +52,31 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
   { onModuleEdit, editingPromptNodeId, uploadedFiles, reactFlowWrapper },
   ref
 ) {
-  // Initialize workbench event handling with direct reactFlowWrapper reference
+  /**
+   * Helper function to get node at coordinates using DOM elements
+   * This is used for drag-and-drop operations to find target nodes
+   */
+  const getNodeAtPosition = useCallback((x: number, y: number) => {
+    const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
+    return getNodeAtScreenPosition(nodes, x, y, reactFlowBounds);
+  }, []);
+
+  // Initialize workbench event handling
   const {
     nodes,
     edges,
     setNodes,
     onNodesChange,
     onEdgesChange,
-    onDrop,
+    onDrop: handleDrop,
     onDragOver,
-    onDragLeave,
+    onDragLeave: handleDragLeave,
     onConnect
   } = useWorkbenchEvents({
     initialNodes,
     initialEdges,
-    reactFlowWrapper
+    getNodeAtPosition
   });
-
-  // Add new state for output display
-  const [showOutput, setShowOutput] = useState(false);
-  
-  // Initialize new hooks
-  const { 
-    executionState, 
-    executionHistory, 
-    executeWorkflow, 
-    resetExecution 
-  } = useWorkflowExecution();
-  
-  const { autoSave } = useWorkspaceManager();
 
   // Initialize data flow management
   const { getEdgeData, simulateProcessing } = useDataFlow(nodes, edges);
@@ -82,35 +94,6 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
 
   // Initialize node management
   const { getNodeColor } = useFlowNodeManager();
-
-  /**
-   * Handle workflow execution
-   */
-  const handleRunWorkflow = useCallback(async () => {
-    try {
-      // Auto-save workspace before execution
-      toast.loading("Saving workspace...");
-      await autoSave(nodes, edges);
-      toast.dismiss();
-      toast.success("Workspace saved!");
-      
-      // Start workflow execution
-      await executeWorkflow(nodes, edges);
-      
-      // Show output when execution completes
-      setShowOutput(true);
-    } catch (error: any) {
-      toast.error(`Execution failed: ${error.message}`);
-    }
-  }, [nodes, edges, autoSave, executeWorkflow]);
-
-  /**
-   * Handle stopping workflow execution
-   */
-  const handleStopWorkflow = useCallback(() => {
-    resetExecution();
-    toast.info("Workflow execution stopped");
-  }, [resetExecution]);
 
   /**
    * Enhanced node click handler that also hides data previews
@@ -155,61 +138,40 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
   }, [edges, getEdgeData, simulateProcessing, isEdgeSelected, toggleEdgePreview, handleClosePreview]);
 
   /**
-   * Enhance nodes with execution state
+   * Wraps the drop handler to include container reference
    */
-  const enhancedNodes = useMemo(() => {
-    return nodes.map(node => ({
-      ...node,
-      data: {
-        ...node.data,
-        isProcessing: executionState.currentModuleId === node.id,
-        isCompleted: executionState.completedModules.has(node.id),
-        hasError: executionState.error && executionState.currentModuleId === node.id
-      }
-    }));
-  }, [nodes, executionState]);
+  const onDrop = useCallback(
+    (event: React.DragEvent) => handleDrop(event, reactFlowWrapper),
+    [handleDrop, reactFlowWrapper]
+  );
+
+  /**
+   * Wraps the drag leave handler to include container reference
+   */
+  const onDragLeave = useCallback(
+    (event: React.DragEvent) => handleDragLeave(event, reactFlowWrapper),
+    [handleDragLeave, reactFlowWrapper]
+  );
 
   return (
-    <>
-      <div className="relative">
-        {/* Run Workflow Button - positioned in upper right */}
-        <div className="absolute top-4 right-4 z-10">
-          <RunWorkflowButton
-            onRun={handleRunWorkflow}
-            onStop={handleStopWorkflow}
-            executionState={executionState}
-            disabled={nodes.length === 0}
-          />
-        </div>
-
-        <ReactFlow
-          nodes={enhancedNodes}
-          edges={enhancedEdges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onDrop={onDrop}
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          onNodeClick={handleNodeClick}
-          onPaneClick={handlePaneClick}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          defaultEdgeOptions={defaultEdgeOptions}
-          {...flowOptions}
-        >
-          <WorkbenchControls getNodeColor={getNodeColor} />
-        </ReactFlow>
-      </div>
-
-      {/* Workflow Output Modal */}
-      <WorkflowOutput
-        isOpen={showOutput}
-        onClose={() => setShowOutput(false)}
-        finalOutput={executionState.finalOutput}
-        executionHistory={executionHistory}
-      />
-    </>
+    <ReactFlow
+      nodes={nodes}
+      edges={enhancedEdges}
+      onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
+      onConnect={onConnect}
+      onDrop={onDrop}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onNodeClick={handleNodeClick}
+      onPaneClick={handlePaneClick}
+      nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
+      defaultEdgeOptions={defaultEdgeOptions}
+      {...flowOptions}
+    >
+      <WorkbenchControls getNodeColor={getNodeColor} />
+    </ReactFlow>
   );
 });
 
