@@ -6,7 +6,7 @@
  * Enhanced with legal-specific validation and guidance
  */
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Play, Square, AlertCircle, Scale, FileText } from "lucide-react";
 import { AllNodes } from "@/types/workbench";
@@ -27,6 +27,33 @@ const PipelineExecutionButton: React.FC<PipelineExecutionButtonProps> = ({
   onExecute,
   onStop
 }) => {
+  // Get execution order for proper pipeline validation
+  const getExecutionOrder = (startNodeId: string): string[] => {
+    const visited = new Set<string>();
+    const queue = [startNodeId];
+    const executionOrder: string[] = [];
+
+    while (queue.length > 0) {
+      const currentNodeId = queue.shift()!;
+      if (visited.has(currentNodeId)) continue;
+
+      visited.add(currentNodeId);
+      executionOrder.push(currentNodeId);
+
+      // Find connected nodes (targets of edges from current node)
+      const connectedEdges = edges.filter(edge => edge.source === currentNodeId);
+      const nextNodes = connectedEdges.map(edge => edge.target);
+      
+      nextNodes.forEach(nodeId => {
+        if (!visited.has(nodeId)) {
+          queue.push(nodeId);
+        }
+      });
+    }
+
+    return executionOrder;
+  };
+
   // Enhanced validation for legal document processing
   const validateLegalPipeline = () => {
     const documentInputNodes = nodes.filter(node => node.data?.moduleType === 'document-input');
@@ -52,21 +79,19 @@ const PipelineExecutionButton: React.FC<PipelineExecutionButtonProps> = ({
       };
     }
 
-    // Check for recommended legal processing sequence
-    const connectedModuleTypes = new Set();
-    edges.forEach(edge => {
-      const sourceNode = nodes.find(n => n.id === edge.source);
-      const targetNode = nodes.find(n => n.id === edge.target);
-      
-      if (sourceNode?.data?.moduleType === 'document-input' && targetNode) {
-        connectedModuleTypes.add(targetNode.data?.moduleType);
-      }
-    });
+    // Get the full execution order for the first document input node
+    const firstDocNode = documentInputNodes[0];
+    const executionOrder = getExecutionOrder(firstDocNode.id);
+    
+    // Get all module types in the execution pipeline
+    const pipelineModuleTypes = executionOrder
+      .map(nodeId => nodes.find(n => n.id === nodeId)?.data?.moduleType)
+      .filter(type => type && type !== 'document-input');
 
-    // Recommend legal processing best practices
-    const hasTextExtractor = connectedModuleTypes.has('text-extractor');
-    const hasParagraphSplitter = connectedModuleTypes.has('paragraph-splitter');
-    const hasGrammarChecker = connectedModuleTypes.has('grammar-checker');
+    // Check for recommended legal processing sequence
+    const hasTextExtractor = pipelineModuleTypes.includes('text-extractor');
+    const hasParagraphSplitter = pipelineModuleTypes.includes('paragraph-splitter');
+    const hasGrammarChecker = pipelineModuleTypes.includes('grammar-checker');
 
     if (!hasTextExtractor) {
       return {
@@ -113,6 +138,23 @@ const PipelineExecutionButton: React.FC<PipelineExecutionButtonProps> = ({
     }
   };
 
+  // Add keyboard event handler for Ctrl+Enter
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        if (validation.isValid && !isExecuting) {
+          handleExecute();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [validation.isValid, isExecuting, handleExecute]);
+
   const getValidationIcon = () => {
     switch (validation.severity) {
       case 'error':
@@ -153,7 +195,7 @@ const PipelineExecutionButton: React.FC<PipelineExecutionButtonProps> = ({
           className="flex items-center gap-2"
         >
           <Square size={14} />
-          Stop Legal Analysis
+          Stop
         </Button>
       ) : (
         <Button
@@ -162,9 +204,10 @@ const PipelineExecutionButton: React.FC<PipelineExecutionButtonProps> = ({
           variant="default"
           size="sm"
           className="flex items-center gap-2"
+          title="Press Ctrl+Enter to execute"
         >
-          <Scale size={14} />
-          Run Legal Analysis
+          <Play size={14} />
+          Enter
         </Button>
       )}
     </div>
