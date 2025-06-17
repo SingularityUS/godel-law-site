@@ -1,12 +1,13 @@
-import React, { forwardRef, useCallback, useMemo } from "react";
+
+import React, { forwardRef, useCallback, useMemo, useEffect, useImperativeHandle } from "react";
 import { ReactFlow } from "@xyflow/react";
 import { useWorkbenchEvents } from "@/hooks/useWorkbenchEvents";
 import { useDataFlow } from "@/hooks/workbench/useDataFlow";
 import { useDataPreviewSelection } from "@/hooks/workbench/useDataPreviewSelection";
-import { getNodeAtScreenPosition } from "@/utils/nodeUtils";
 import WorkbenchControls from "./WorkbenchControls";
-import { useFlowEventHandlers } from "./flow/FlowEventHandlers";
 import { useFlowNodeManager } from "./flow/FlowNodeManager";
+import { DocumentInputNode } from "./DocumentInputNode";
+import { HelperNode } from "./HelperNode";
 import {
   initialNodes,
   initialEdges,
@@ -52,15 +53,6 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
   { onModuleEdit, editingPromptNodeId, uploadedFiles, reactFlowWrapper },
   ref
 ) {
-  /**
-   * Helper function to get node at coordinates using DOM elements
-   * This is used for drag-and-drop operations to find target nodes
-   */
-  const getNodeAtPosition = useCallback((x: number, y: number) => {
-    const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
-    return getNodeAtScreenPosition(nodes, x, y, reactFlowBounds);
-  }, []);
-
   // Initialize workbench event handling
   const {
     nodes,
@@ -68,14 +60,14 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
     setNodes,
     onNodesChange,
     onEdgesChange,
-    onDrop: handleDrop,
+    onDrop,
     onDragOver,
-    onDragLeave: handleDragLeave,
+    onDragLeave,
     onConnect
   } = useWorkbenchEvents({
     initialNodes,
     initialEdges,
-    getNodeAtPosition
+    reactFlowWrapper
   });
 
   // Initialize data flow management
@@ -84,16 +76,67 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
   // Initialize data preview selection
   const { toggleEdgePreview, hideAllPreviews, isEdgeSelected } = useDataPreviewSelection();
 
-  // Initialize event handlers
-  const { onNodeClick } = useFlowEventHandlers({
-    nodes,
-    setNodes,
-    onModuleEdit,
-    ref
-  });
-
   // Initialize node management
   const { getNodeColor } = useFlowNodeManager();
+
+  /**
+   * Listen for settings button clicks from HelperNode components
+   */
+  useEffect(() => {
+    const handleOpenNodeSettings = (event: any) => {
+      const { nodeId } = event.detail;
+      const node = nodes.find(n => n.id === nodeId) as HelperNode;
+      if (node) {
+        onModuleEdit(nodeId, node);
+      }
+    };
+
+    window.addEventListener('openNodeSettings', handleOpenNodeSettings);
+    return () => window.removeEventListener('openNodeSettings', handleOpenNodeSettings);
+  }, [nodes, onModuleEdit]);
+
+  /**
+   * Expose imperative API for adding document nodes from external sources
+   */
+  useImperativeHandle(ref, () => ({
+    addDocumentNode: (file: any) => {
+      const nodeId = `doc-${Date.now()}-${file.name}`;
+      const position = { x: 80, y: 420 + Math.random() * 100 };
+      const newNode: DocumentInputNode = {
+        id: nodeId,
+        type: "document-input",
+        position,
+        data: { moduleType: "document-input" as const, documentName: file.name, file },
+        draggable: true,
+      };
+      setNodes((nds) => [...nds, newNode]);
+    },
+  }));
+
+  /**
+   * Handles node clicks for both editing and preview functionality
+   */
+  const onNodeClick = useCallback(
+    (_: React.MouseEvent, node: AllNodes) => {
+      if (node.type === "document-input") {
+        // Handle document nodes for preview
+        const docNode = node as DocumentInputNode;
+        if (docNode.data?.file) {
+          const previewEvent = new CustomEvent('openDocumentPreview', {
+            detail: {
+              name: docNode.data.documentName,
+              type: docNode.data.file.type,
+              size: docNode.data.file.size,
+              preview: docNode.data.file.preview,
+              file: docNode.data.file
+            }
+          });
+          window.dispatchEvent(previewEvent);
+        }
+      }
+    },
+    []
+  );
 
   /**
    * Enhanced node click handler that also hides data previews
@@ -136,22 +179,6 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
       }
     }));
   }, [edges, getEdgeData, simulateProcessing, isEdgeSelected, toggleEdgePreview, handleClosePreview]);
-
-  /**
-   * Wraps the drop handler to include container reference
-   */
-  const onDrop = useCallback(
-    (event: React.DragEvent) => handleDrop(event, reactFlowWrapper),
-    [handleDrop, reactFlowWrapper]
-  );
-
-  /**
-   * Wraps the drag leave handler to include container reference
-   */
-  const onDragLeave = useCallback(
-    (event: React.DragEvent) => handleDragLeave(event, reactFlowWrapper),
-    [handleDragLeave, reactFlowWrapper]
-  );
 
   return (
     <ReactFlow

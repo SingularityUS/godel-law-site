@@ -5,28 +5,19 @@ import WorkbenchContainer from "./workbench/WorkbenchContainer";
 /**
  * AIWorkbench Component
  * 
- * Purpose: Main entry point for the AI workflow editor
- * This component serves as the primary interface for the visual workflow
- * editor, now refactored into smaller, focused components for better
- * maintainability and separation of concerns.
+ * Purpose: Backward compatibility wrapper for the AI Workbench
+ * This component maintains the existing API while delegating all
+ * functionality to the refactored WorkbenchContainer component.
  * 
  * Architecture Changes:
- * - Simplified to be a thin wrapper around WorkbenchContainer
- * - Delegates all functionality to specialized child components
- * - Maintains the same external API for backward compatibility
- * - Passes through all props and refs to child components
- * 
- * Key Benefits of Refactoring:
- * - Improved code organization and maintainability
- * - Better separation of concerns between components
- * - Easier testing of individual component pieces
- * - Reduced complexity in each component file
+ * - Now a simple wrapper around WorkbenchContainer
+ * - Maintains same external API for backward compatibility
+ * - All functionality moved to WorkbenchContainer
+ * - Simplified component hierarchy
  * 
  * Integration Points:
  * - Used by Index page as the main workspace component
- * - Receives uploaded files and editing state from parent
- * - Communicates module editing events via callbacks
- * - Exposes imperative API for document node creation
+ * - Passes through all props and refs to WorkbenchContainer
  */
 
 interface AIWorkbenchProps {

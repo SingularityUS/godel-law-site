@@ -25,15 +25,11 @@
  * - Simplifies testing of configuration values
  */
 
-import { Node, Edge } from "@xyflow/react";
-import { HelperNode } from "../HelperNode";
-import { DocumentInputNode } from "../DocumentInputNode";
+import { Edge } from "@xyflow/react";
+import { HelperNode, AllNodes } from "@/types/workbench";
 import HelperNodeComponent from "../HelperNode";
 import DocumentInputNodeComponent from "../DocumentInputNode";
 import DataPreviewEdge from "../DataPreviewEdge";
-
-// Union type for all supported node types
-export type AllNodes = HelperNode | DocumentInputNode;
 
 // Default workflow configuration
 export const initialNodes: HelperNode[] = [
@@ -100,3 +96,6 @@ export const flowOptions = {
   panOnScroll: true,
   proOptions: { hideAttribution: true },
 };
+
+// Re-export types for backward compatibility
+export type { AllNodes };
