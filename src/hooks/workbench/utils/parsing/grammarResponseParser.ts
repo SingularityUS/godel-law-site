@@ -1,3 +1,4 @@
+
 /**
  * Grammar Response Parser Utility
  * 
@@ -5,46 +6,11 @@
  */
 
 export const parseGrammarResponse = (response: string): any => {
-  console.log('Parsing grammar response, type:', typeof response);
+  console.log('Parsing grammar response, length:', response.length);
   
-  // Handle the ChatGPT API response structure where actual JSON is nested in response.response
-  let responseString: string;
-  
-  if (typeof response === 'object' && response !== null) {
-    // Check if this is a ChatGPT API response object with nested response
-    if ('response' in response && response.response !== null && typeof response.response === 'string') {
-      responseString = response.response;
-      console.log('Extracted JSON from ChatGPT API response object');
-    } else if ('rawResponse' in response && response.rawResponse !== null && typeof response.rawResponse === 'object' && 'response' in response.rawResponse && response.rawResponse.response !== null && typeof response.rawResponse.response === 'string') {
-      responseString = response.rawResponse.response;
-      console.log('Extracted JSON from nested rawResponse object');
-    } else {
-      // If it's already a parsed object with analysis, return it directly
-      if ('analysis' in response || ('output' in response && response.output !== null && typeof response.output === 'object' && 'analysis' in response.output)) {
-        console.log('Response is already parsed grammar analysis object');
-        return response.output ? response : { output: response };
-      }
-      responseString = JSON.stringify(response);
-    }
-  } else if (typeof response === 'string') {
-    responseString = response;
-  } else {
-    console.error('Invalid response type for grammar parser:', typeof response);
-    return {
-      output: {
-        analysis: [],
-        overallAssessment: {
-          totalErrors: 0,
-          writingQuality: "Unknown",
-          error: "Invalid response format"
-        }
-      }
-    };
-  }
-
   // Try direct JSON parsing first for structured responses
   try {
-    const parsed = JSON.parse(responseString);
+    const parsed = JSON.parse(response);
     if (parsed.analysis) {
       // Handle both single analysis and array of analysis
       const analysis = Array.isArray(parsed.analysis) ? parsed.analysis : [parsed.analysis];
@@ -55,8 +21,7 @@ export const parseGrammarResponse = (response: string): any => {
           overallAssessment: parsed.overallAssessment || {
             totalErrors: analysis.reduce((sum, item) => sum + (item.suggestions?.length || 0), 0),
             averageScore: analysis.length > 0 ? 
-              analysis.reduce((sum, item) => sum + (item.legalWritingScore || 0), 0) / analysis.length : 0,
-            writingQuality: parsed.overallAssessment?.writingQuality || "Fair"
+              analysis.reduce((sum, item) => sum + (item.legalWritingScore || 0), 0) / analysis.length : 0
           },
           processingStats: parsed.processingStats || {
             paragraphsAnalyzed: analysis.length,
@@ -79,7 +44,7 @@ export const parseGrammarResponse = (response: string): any => {
     ];
     
     for (const pattern of jsonPatterns) {
-      const match = responseString.match(pattern);
+      const match = response.match(pattern);
       if (match) {
         const jsonString = match[1] || match[0];
         try {
@@ -93,8 +58,7 @@ export const parseGrammarResponse = (response: string): any => {
                 overallAssessment: parsed.overallAssessment || {
                   totalErrors: analysis.reduce((sum, item) => sum + (item.suggestions?.length || 0), 0),
                   averageScore: analysis.length > 0 ? 
-                    analysis.reduce((sum, item) => sum + (item.legalWritingScore || 0), 0) / analysis.length : 0,
-                  writingQuality: parsed.overallAssessment?.writingQuality || "Fair"
+                    analysis.reduce((sum, item) => sum + (item.legalWritingScore || 0), 0) / analysis.length : 0
                 }
               }
             };
@@ -109,7 +73,7 @@ export const parseGrammarResponse = (response: string): any => {
   }
   
   // Enhanced fallback parsing for better data extraction
-  const sections = responseString.split(/\n\s*\n/);
+  const sections = response.split(/\n\s*\n/);
   const analysis: any[] = [];
   let totalErrorsFound = 0;
   
@@ -202,7 +166,7 @@ export const parseGrammarResponse = (response: string): any => {
     console.log('No structured content found, creating analysis from full response');
     
     // Split the response into reasonable paragraph-sized chunks
-    const chunks = responseString.split(/\n\s*\n/);
+    const chunks = response.split(/\n\s*\n/);
     chunks.forEach((chunk, index) => {
       if (chunk.trim().length > 100) { // Only process substantial chunks
         analysis.push({
