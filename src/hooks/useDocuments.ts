@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -18,6 +18,10 @@ export const useDocuments = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { user } = useAuth();
+  
+  // Track subscription state to prevent multiple subscriptions
+  const subscriptionRef = useRef<any>(null);
+  const isSubscribedRef = useRef(false);
 
   const fetchDocuments = async () => {
     if (!user) {
@@ -76,51 +80,81 @@ export const useDocuments = () => {
     }
   };
 
-  // Set up real-time subscription for document changes
+  // Set up real-time subscription with proper state management
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id || isSubscribedRef.current) return;
 
     console.log('Setting up real-time subscription for user:', user.id);
 
-    const channel = supabase
-      .channel(`documents-changes-${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'documents',
-          filter: `user_id=eq.${user.id}`
-        },
-        (payload) => {
-          console.log('New document added:', payload.new);
-          // Add the new document to the list
-          setDocuments(prev => [payload.new as StoredDocument, ...prev]);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'documents',
-          filter: `user_id=eq.${user.id}`
-        },
-        (payload) => {
-          console.log('Document deleted:', payload.old);
-          // Remove the deleted document from the list
-          setDocuments(prev => prev.filter(doc => doc.id !== payload.old.id));
-        }
-      )
-      .subscribe((status) => {
-        console.log('Subscription status:', status);
-      });
+    const setupSubscription = () => {
+      try {
+        const channelName = `documents-changes-${user.id}-${Date.now()}`;
+        const channel = supabase
+          .channel(channelName)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'documents',
+              filter: `user_id=eq.${user.id}`
+            },
+            (payload) => {
+              console.log('New document added:', payload.new);
+              setDocuments(prev => [payload.new as StoredDocument, ...prev]);
+            }
+          )
+          .on(
+            'postgres_changes',
+            {
+              event: 'DELETE',
+              schema: 'public',
+              table: 'documents',
+              filter: `user_id=eq.${user.id}`
+            },
+            (payload) => {
+              console.log('Document deleted:', payload.old);
+              setDocuments(prev => prev.filter(doc => doc.id !== payload.old.id));
+            }
+          )
+          .subscribe((status) => {
+            console.log('Subscription status:', status);
+            if (status === 'SUBSCRIBED') {
+              isSubscribedRef.current = true;
+            } else if (status === 'CLOSED') {
+              isSubscribedRef.current = false;
+            }
+          });
+
+        subscriptionRef.current = channel;
+        
+        return channel;
+      } catch (error) {
+        console.error('Error setting up subscription:', error);
+        isSubscribedRef.current = false;
+        return null;
+      }
+    };
+
+    // Add a small delay to prevent rapid subscription attempts
+    const timeoutId = setTimeout(() => {
+      setupSubscription();
+    }, 100);
 
     return () => {
-      console.log('Cleaning up real-time subscription');
-      supabase.removeChannel(channel);
+      clearTimeout(timeoutId);
+      if (subscriptionRef.current && isSubscribedRef.current) {
+        console.log('Cleaning up real-time subscription');
+        try {
+          supabase.removeChannel(subscriptionRef.current);
+        } catch (error) {
+          console.error('Error removing channel:', error);
+        }
+        subscriptionRef.current = null;
+        isSubscribedRef.current = false;
+      }
     };
-  }, [user?.id]); // Only depend on user.id to avoid unnecessary re-subscriptions
+  }, [user?.id]);
 
   useEffect(() => {
     fetchDocuments();

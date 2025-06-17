@@ -4,6 +4,7 @@ import ModuleSettingsDrawer from "@/components/ModuleSettingsDrawer";
 import DocumentLibrary from "@/components/DocumentLibrary";
 import AppHeader from "@/components/layout/AppHeader";
 import MainWorkspace from "@/components/layout/MainWorkspace";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { MODULE_DEFINITIONS, ModuleKind } from "@/data/modules";
 import { useDocuments } from "@/hooks/useDocuments";
 import React from "react";
@@ -13,7 +14,7 @@ const getModuleDef = (type: ModuleKind) =>
 
 export type UploadedFile = File & { preview?: string; extractedText?: string };
 
-const Index = () => {
+const IndexContent = () => {
   const [editingNodeId, setEditingNodeId] = useState<string | undefined>();
   const [editingNode, setEditingNode] = useState<any>();
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -106,6 +107,14 @@ const Index = () => {
         onSave={handlePromptSave}
       />
     </div>
+  );
+};
+
+const Index = () => {
+  return (
+    <ErrorBoundary>
+      <IndexContent />
+    </ErrorBoundary>
   );
 }
 
