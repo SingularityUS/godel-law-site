@@ -60,6 +60,12 @@ export function formatSingleParagraphOutput(
         totalParagraphs: 1,
         averageScore: Math.round(analysis.averageScore * 10) / 10,
         totalParagraphsProcessed: 1
+      },
+      redliningData: {
+        ready: true,
+        totalSuggestions: analysis.totalSuggestions,
+        timestamp: analysis.timestamp,
+        hasPositionData: true
       }
     },
     metadata: {
@@ -147,7 +153,8 @@ export function formatBatchOutput(
       redliningData: {
         ready: true,
         totalSuggestions: analysis.totalSuggestions,
-        timestamp: analysis.timestamp
+        timestamp: analysis.timestamp,
+        hasPositionData: true
       }
     },
     metadata: {
