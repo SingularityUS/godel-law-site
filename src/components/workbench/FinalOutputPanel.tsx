@@ -9,7 +9,7 @@
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Copy, Download, X, Maximize2, Minimize2, FileText, Scale } from "lucide-react";
+import { Copy, Download, X, Maximize2, Minimize2, FileText, Scale, Info } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -145,7 +145,10 @@ const FinalOutputPanel: React.FC<FinalOutputPanelProps> = ({
             return (
               <div className="space-y-4">
                 <div className="p-4 border rounded bg-blue-50">
-                  <h3 className="font-bold mb-2">Grammar Analysis Summary</h3>
+                  <h3 className="font-bold mb-2 flex items-center gap-2">
+                    <Scale size={18} />
+                    Grammar Analysis Summary
+                  </h3>
                   <div className="grid grid-cols-3 gap-4 text-sm">
                     <div>
                       <strong>Total Errors:</strong> {grammarData.overallAssessment?.totalErrors || 0}
@@ -157,12 +160,34 @@ const FinalOutputPanel: React.FC<FinalOutputPanelProps> = ({
                       <strong>Paragraphs Analyzed:</strong> {grammarData.analysis?.length || 0}
                     </div>
                   </div>
+                  
+                  {/* Show chunking information if available */}
+                  {grammarData.chunkingInfo && (
+                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Info size={16} />
+                        <strong>Document Processing Info:</strong>
+                      </div>
+                      <div className="text-xs mt-1 space-y-1">
+                        <div>Document was split into {grammarData.chunkingInfo.totalChunks} chunks for processing</div>
+                        <div>Total paragraphs found: {grammarData.chunkingInfo.totalParagraphs}</div>
+                        <div>Reassembled at: {new Date(grammarData.chunkingInfo.reassembledAt).toLocaleString()}</div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {grammarData.analysis?.map((paragraph: any, index: number) => (
                   <Card key={index}>
                     <CardHeader>
-                      <CardTitle className="text-sm">Paragraph {paragraph.paragraphId}</CardTitle>
+                      <CardTitle className="text-sm flex items-center justify-between">
+                        <span>Paragraph {paragraph.paragraphId}</span>
+                        {paragraph.chunkInfo && (
+                          <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                            Chunk {paragraph.chunkInfo.chunkIndex + 1}/{paragraph.chunkInfo.totalChunks}
+                          </span>
+                        )}
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <div>

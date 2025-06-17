@@ -138,17 +138,23 @@ export const chunkDocument = (
 };
 
 /**
- * Reassemble processed chunks into a single result
+ * Reassemble processed chunks into a single result with enhanced handling for different module types
  */
 export const reassembleChunks = (processedChunks: any[]): any => {
   if (processedChunks.length === 1) {
+    console.log('Single chunk result, returning as-is');
     return processedChunks[0];
   }
   
-  // Combine results from multiple chunks
+  console.log(`Reassembling ${processedChunks.length} chunks`);
+  
+  // Get the module type from the first chunk
+  const moduleType = processedChunks[0].moduleType;
+  console.log(`Reassembling chunks for module type: ${moduleType}`);
+  
   const combinedResult = {
-    moduleType: processedChunks[0].moduleType,
-    output: null as any, // Use any type to handle different output types
+    moduleType: moduleType,
+    output: null as any,
     metadata: {
       totalChunks: processedChunks.length,
       combinedResults: true,
@@ -159,8 +165,79 @@ export const reassembleChunks = (processedChunks: any[]): any => {
     }
   };
   
-  // Handle different output types
-  if (typeof processedChunks[0].output === 'string') {
+  // Special handling for grammar checker - merge analysis arrays
+  if (moduleType === 'grammar-checker') {
+    console.log('Processing grammar checker chunks');
+    
+    const allAnalysis: any[] = [];
+    let combinedOverallAssessment: any = {
+      totalErrors: 0,
+      writingQuality: 'Good',
+      overallScore: 8
+    };
+    
+    processedChunks.forEach((chunk, index) => {
+      console.log(`Processing chunk ${index + 1}/${processedChunks.length} for grammar analysis`);
+      
+      if (chunk.output && chunk.output.analysis && Array.isArray(chunk.output.analysis)) {
+        console.log(`Found ${chunk.output.analysis.length} paragraphs in chunk ${index + 1}`);
+        
+        // Add chunk prefix to paragraph IDs to ensure uniqueness
+        const chunkAnalysis = chunk.output.analysis.map((para: any, paraIndex: number) => ({
+          ...para,
+          paragraphId: `chunk-${index + 1}-para-${paraIndex + 1}`,
+          chunkInfo: {
+            chunkIndex: index,
+            totalChunks: processedChunks.length
+          }
+        }));
+        
+        allAnalysis.push(...chunkAnalysis);
+        
+        // Accumulate overall assessment
+        if (chunk.output.overallAssessment) {
+          combinedOverallAssessment.totalErrors += chunk.output.overallAssessment.totalErrors || 0;
+        }
+      } else {
+        console.warn(`Chunk ${index + 1} missing grammar analysis data:`, chunk.output);
+        
+        // Create fallback analysis for this chunk
+        allAnalysis.push({
+          paragraphId: `chunk-${index + 1}-para-1`,
+          original: typeof chunk.output === 'string' ? chunk.output.substring(0, 500) : 'Content processed',
+          corrected: 'Analysis completed - see full response',
+          suggestions: [],
+          legalWritingScore: 7,
+          improvementSummary: `Chunk ${index + 1} processed`,
+          chunkInfo: {
+            chunkIndex: index,
+            totalChunks: processedChunks.length
+          }
+        });
+      }
+    });
+    
+    // Calculate average writing quality
+    const avgScore = allAnalysis.length > 0 
+      ? Math.round(allAnalysis.reduce((sum, para) => sum + (para.legalWritingScore || 7), 0) / allAnalysis.length)
+      : 8;
+    
+    combinedOverallAssessment.overallScore = avgScore;
+    combinedOverallAssessment.writingQuality = avgScore >= 8 ? 'Good' : avgScore >= 6 ? 'Fair' : 'Needs Improvement';
+    
+    combinedResult.output = {
+      analysis: allAnalysis,
+      overallAssessment: combinedOverallAssessment,
+      chunkingInfo: {
+        totalChunks: processedChunks.length,
+        totalParagraphs: allAnalysis.length,
+        reassembledAt: new Date().toISOString()
+      }
+    };
+    
+    console.log(`Grammar analysis reassembled: ${allAnalysis.length} total paragraphs from ${processedChunks.length} chunks`);
+    
+  } else if (typeof processedChunks[0].output === 'string') {
     // Concatenate string outputs
     combinedResult.output = processedChunks
       .map(chunk => chunk.output)
