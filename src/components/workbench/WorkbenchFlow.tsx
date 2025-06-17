@@ -46,10 +46,12 @@ interface WorkbenchFlowProps {
   editingPromptNodeId?: string;
   uploadedFiles?: any[];
   reactFlowWrapper: React.RefObject<HTMLDivElement>;
+  onNodesChange?: (nodes: AllNodes[]) => void;
+  onEdgesChange?: (edges: any[]) => void;
 }
 
 const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow(
-  { onModuleEdit, editingPromptNodeId, uploadedFiles, reactFlowWrapper },
+  { onModuleEdit, editingPromptNodeId, uploadedFiles, reactFlowWrapper, onNodesChange, onEdgesChange },
   ref
 ) {
   /**
@@ -59,15 +61,15 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
   const getNodeAtPosition = useCallback((x: number, y: number) => {
     const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
     return getNodeAtScreenPosition(nodes, x, y, reactFlowBounds);
-  }, []);
+  }, [nodes, reactFlowWrapper]);
 
   // Initialize workbench event handling
   const {
     nodes,
     edges,
     setNodes,
-    onNodesChange,
-    onEdgesChange,
+    onNodesChange: handleNodesChange,
+    onEdgesChange: handleEdgesChange,
     onDrop: handleDrop,
     onDragOver,
     onDragLeave: handleDragLeave,
@@ -77,6 +79,15 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
     initialEdges,
     getNodeAtPosition
   });
+
+  // Notify parent of nodes/edges changes
+  React.useEffect(() => {
+    onNodesChange?.(nodes);
+  }, [nodes, onNodesChange]);
+
+  React.useEffect(() => {
+    onEdgesChange?.(edges);
+  }, [edges, onEdgesChange]);
 
   // Initialize data flow management
   const { getEdgeData, simulateProcessing } = useDataFlow(nodes, edges);
@@ -157,8 +168,8 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
     <ReactFlow
       nodes={nodes}
       edges={enhancedEdges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
+      onNodesChange={handleNodesChange}
+      onEdgesChange={handleEdgesChange}
       onConnect={onConnect}
       onDrop={onDrop}
       onDragOver={onDragOver}
