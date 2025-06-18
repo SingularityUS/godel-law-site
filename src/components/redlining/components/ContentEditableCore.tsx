@@ -167,32 +167,163 @@ const ContentEditableCore = forwardRef<HTMLDivElement, ContentEditableCoreProps>
   }, []);
 
   return (
-    <div 
-      ref={ref}
-      className={`prose prose-sm max-w-none min-h-96 outline-none ${className}`}
-      style={{
-        fontFamily: 'Calibri, "Segoe UI", Tahoma, Geneva, Verdana, sans-serif',
-        fontSize: '11pt',
-        lineHeight: '1.15',
-        color: '#000000',
-        ...style
-      }}
-      contentEditable={true}
-      suppressContentEditableWarning={true}
-      onClick={onRedlineClick}
-      onInput={handleContentChange}
-      onKeyDown={handleKeyDown}
-      onCompositionStart={() => {
-        console.log('Composition started');
-        setIsComposing(true);
-      }}
-      onCompositionEnd={() => {
-        console.log('Composition ended');
-        setIsComposing(false);
-        setTimeout(handleContentChange, 0);
-      }}
-      dangerouslySetInnerHTML={{ __html: content }}
-    />
+    <>
+      <div 
+        ref={ref}
+        className={`prose prose-sm max-w-none min-h-96 outline-none document-content ${className}`}
+        style={{
+          fontFamily: 'Calibri, "Segoe UI", Tahoma, Geneva, Verdana, sans-serif',
+          fontSize: '11pt',
+          lineHeight: '1.15',
+          color: '#000000',
+          ...style
+        }}
+        contentEditable={true}
+        suppressContentEditableWarning={true}
+        onClick={onRedlineClick}
+        onInput={handleContentChange}
+        onKeyDown={handleKeyDown}
+        onCompositionStart={() => {
+          console.log('Composition started');
+          setIsComposing(true);
+        }}
+        onCompositionEnd={() => {
+          console.log('Composition ended');
+          setIsComposing(false);
+          setTimeout(handleContentChange, 0);
+        }}
+        dangerouslySetInnerHTML={{ __html: content }}
+      />
+      
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          .document-content .text-center {
+            text-align: center !important;
+          }
+          
+          .document-content .text-right {
+            text-align: right !important;
+          }
+          
+          .document-content .text-justify {
+            text-align: justify !important;
+          }
+          
+          .document-content .text-indent {
+            text-indent: 0.5in !important;
+          }
+          
+          .document-content .margin-left {
+            margin-left: 0.5in !important;
+          }
+          
+          .document-content .document-title {
+            font-size: 16pt !important;
+            font-weight: bold !important;
+            text-align: center !important;
+            margin: 12pt 0 !important;
+            line-height: 1.2 !important;
+          }
+          
+          .document-content .heading-1 {
+            font-size: 14pt !important;
+            font-weight: bold !important;
+            margin: 12pt 0 6pt 0 !important;
+            line-height: 1.2 !important;
+          }
+          
+          .document-content .heading-2 {
+            font-size: 13pt !important;
+            font-weight: bold !important;
+            margin: 10pt 0 6pt 0 !important;
+            line-height: 1.2 !important;
+          }
+          
+          .document-content .heading-3 {
+            font-size: 12pt !important;
+            font-weight: bold !important;
+            margin: 8pt 0 4pt 0 !important;
+            line-height: 1.2 !important;
+          }
+          
+          .document-content ul, .document-content ol {
+            margin: 6pt 0 !important;
+            padding-left: 24pt !important;
+          }
+          
+          .document-content li {
+            margin: 3pt 0 !important;
+            line-height: 1.15 !important;
+          }
+          
+          .document-content u {
+            text-decoration: underline !important;
+          }
+          
+          .document-content s {
+            text-decoration: line-through !important;
+          }
+          
+          .document-content strong {
+            font-weight: bold !important;
+          }
+          
+          .document-content em {
+            font-style: italic !important;
+          }
+          
+          .document-content p {
+            margin: 6pt 0 !important;
+            line-height: 1.15 !important;
+          }
+          
+          .document-content .list-paragraph {
+            margin-left: 0.5in !important;
+          }
+          
+          .document-content .tab-1 {
+            margin-left: 0.5in !important;
+          }
+          
+          .document-content .tab-2 {
+            margin-left: 1in !important;
+          }
+          
+          .document-content .tab-3 {
+            margin-left: 1.5in !important;
+          }
+          
+          .document-content .tab-4 {
+            margin-left: 2in !important;
+          }
+          
+          .formatted-document {
+            line-height: 1.15 !important;
+          }
+          
+          .formatted-document p {
+            margin: 6pt 0 !important;
+          }
+          
+          .formatted-document ul {
+            list-style-type: disc !important;
+            margin: 6pt 0 !important;
+            padding-left: 24pt !important;
+          }
+          
+          .formatted-document ol {
+            list-style-type: decimal !important;  
+            margin: 6pt 0 !important;
+            padding-left: 24pt !important;
+          }
+          
+          .formatted-document li {
+            margin: 3pt 0 !important;
+            line-height: 1.15 !important;
+          }
+        `
+      }} />
+    </>
   );
 });
 
