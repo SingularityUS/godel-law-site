@@ -46,39 +46,53 @@ export const getTypeIcon = (type: string): string => {
 };
 
 /**
+ * Detects if content contains HTML markup
+ */
+const hasHtmlMarkup = (content: string): boolean => {
+  return /<[^>]+>/.test(content);
+};
+
+/**
  * Converts plain text to HTML while preserving existing HTML markup
  */
 export const convertTextToHtml = (content: string): string => {
   console.log('Converting text to HTML, preserving existing markup');
   
-  // Check if content already contains HTML elements (redline spans)
-  const hasHtmlMarkup = /<span[^>]*class="redline-suggestion"/.test(content);
-  
-  if (!hasHtmlMarkup) {
-    // Plain text - convert line breaks to paragraphs
-    return content
-      .split('\n')
-      .map(line => line.trim() === '' ? '<br>' : `<p>${line}</p>`)
-      .join('');
+  // If content already contains HTML markup, return it as-is
+  if (hasHtmlMarkup(content)) {
+    console.log('Content already contains HTML markup, preserving structure');
+    return content;
   }
   
-  // Content has HTML markup - preserve it and only convert non-markup text
-  const lines = content.split('\n');
-  const htmlLines = lines.map(line => {
-    if (line.trim() === '') {
-      return '<br>';
-    }
+  // Plain text - convert line breaks to paragraphs
+  console.log('Converting plain text to HTML paragraphs');
+  return content
+    .split('\n')
+    .map(line => {
+      const trimmedLine = line.trim();
+      if (trimmedLine === '') {
+        return '<br>';
+      }
+      return `<p>${trimmedLine}</p>`;
+    })
+    .join('');
+};
+
+/**
+ * Validates and cleans up HTML content
+ */
+const validateHtml = (content: string): string => {
+  try {
+    // Create a temporary div to validate HTML structure
+    const div = document.createElement('div');
+    div.innerHTML = content;
     
-    // If line contains redline markup, preserve it
-    if (/<span[^>]*class="redline-suggestion"/.test(line)) {
-      return `<p>${line}</p>`;
-    }
-    
-    // Plain text line - wrap in paragraph
-    return `<p>${line}</p>`;
-  });
-  
-  return htmlLines.join('');
+    // Return the cleaned HTML
+    return div.innerHTML;
+  } catch (error) {
+    console.warn('HTML validation failed, returning original content:', error);
+    return content;
+  }
 };
 
 /**
@@ -127,17 +141,7 @@ export const injectRedlineMarkup = (
       const severityClass = getSeverityClass(suggestion.severity);
       const typeClass = getTypeClass(suggestion.type);
       
-      const redlineMarkup = `<span 
-          class="redline-suggestion ${severityClass} ${typeClass} ${isSelected ? 'selected' : ''}" 
-          data-suggestion-id="${suggestion.id}"
-          data-type="${suggestion.type}"
-          data-severity="${suggestion.severity}"
-          title="${escapeHtml(suggestion.explanation)}"
-        >
-          <span class="original-text">${escapeHtml(originalText)}</span>
-          <span class="suggested-text">${escapeHtml(suggestion.suggestedText)}</span>
-          <span class="redline-indicator">${getTypeIcon(suggestion.type)}</span>
-        </span>`;
+      const redlineMarkup = `<span class="redline-suggestion ${severityClass} ${typeClass} ${isSelected ? 'selected' : ''}" data-suggestion-id="${suggestion.id}" data-type="${suggestion.type}" data-severity="${suggestion.severity}" title="${escapeHtml(suggestion.explanation)}"><span class="original-text">${escapeHtml(originalText)}</span><span class="suggested-text">${escapeHtml(suggestion.suggestedText)}</span><span class="redline-indicator">${getTypeIcon(suggestion.type)}</span></span>`;
       
       enhancedContent = beforeText + redlineMarkup + afterText;
       
@@ -149,8 +153,11 @@ export const injectRedlineMarkup = (
   });
   
   // Convert plain text formatting to HTML while preserving redlines
-  enhancedContent = convertTextToHtml(enhancedContent);
+  const finalContent = convertTextToHtml(enhancedContent);
+  
+  // Validate the final HTML structure
+  const validatedContent = validateHtml(finalContent);
   
   console.log('Redline markup injection complete');
-  return enhancedContent;
+  return validatedContent;
 };
