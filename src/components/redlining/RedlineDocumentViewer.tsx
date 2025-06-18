@@ -24,7 +24,7 @@ interface RedlineDocumentViewerProps {
 }
 
 const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
-  document,
+  document: redlineDocument,
   originalDocument,
   onClose,
   onSave,
@@ -37,7 +37,7 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
     applyFilters,
     filteredSuggestions,
     getCurrentDocument
-  } = useRedlineDocument(document);
+  } = useRedlineDocument(redlineDocument);
 
   const [showSidebar, setShowSidebar] = useState(true);
   const [tooltipState, setTooltipState] = useState<{
@@ -58,10 +58,10 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
           suggestion,
           position: { x: event.clientX, y: event.clientY }
         });
-        document.removeEventListener('mousemove', handleMouseMove);
+        window.document.removeEventListener('mousemove', handleMouseMove);
       };
       
-      document.addEventListener('mousemove', handleMouseMove);
+      window.document.addEventListener('mousemove', handleMouseMove);
     }
   };
 
@@ -79,8 +79,8 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
     };
 
     if (tooltipState) {
-      document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
+      window.document.addEventListener('click', handleClickOutside);
+      return () => window.document.removeEventListener('click', handleClickOutside);
     }
   }, [tooltipState]);
 
