@@ -1,28 +1,69 @@
 
 /**
- * Direct Editable Renderer Component
+ * DirectEditableRenderer Component
  * 
- * Purpose: Provides Word-like direct editing with cursor support while preserving redline markup
+ * Purpose: Orchestrates Word-like direct editing with preserved redline markup
+ * 
+ * Module Relationships:
+ * - Integrates: ContentEditableCore for editing, CursorPositionManager for cursor handling
+ * - Uses: RedlineInteractionHandler for suggestion interactions
+ * - Depends on: useRedlineContent hook for content processing
+ * - Communicates with: Parent components via comprehensive callback system
+ * 
+ * Architecture Overview:
+ * This component acts as the main coordinator for direct document editing.
+ * It combines several specialized modules to provide a seamless editing experience
+ * while maintaining the integrity of redline suggestions and document structure.
+ * 
+ * Data Flow:
+ * 1. Receives document and suggestions from parent
+ * 2. useRedlineContent processes and injects redline markup
+ * 3. ContentEditableCore renders editable content
+ * 4. User interactions flow through RedlineInteractionHandler
+ * 5. Content changes are processed and sent back to parent
+ * 6. CursorPositionManager maintains cursor during updates
  */
 
-import React, { useRef, useEffect, useCallback, useState } from "react";
+import React, { useRef, useEffect, useCallback } from "react";
 import { RedlineDocument, RedlineSuggestion } from "@/types/redlining";
 import { useRedlineContent } from "../hooks/useRedlineContent";
 import RedlineStyles from "./RedlineStyles";
+import ContentEditableCore from "./ContentEditableCore";
+import RedlineInteractionHandler from "./RedlineInteractionHandler";
+import { useCursorPositionManager } from "./CursorPositionManager";
 import { TextRange } from "../utils/textSelection";
 
 interface DirectEditableRendererProps {
+  /** The redline document containing content and metadata */
   document: RedlineDocument;
+  /** Original document reference for content extraction */
   originalDocument: { type: string; preview?: string };
+  /** Array of redline suggestions to display */
   suggestions: RedlineSuggestion[];
+  /** ID of currently selected suggestion for highlighting */
   selectedSuggestionId: string | null;
+  /** Callback when user clicks on a suggestion */
   onSuggestionClick: (suggestionId: string) => void;
+  /** Callback when user accepts a suggestion via accept button */
   onSuggestionAccept?: (suggestionId: string) => void;
+  /** Callback when user modifies a suggestion */
   onSuggestionModify?: (suggestionId: string, newText: string) => void;
+  /** Callback for manual text edits */
   onManualEdit?: (range: TextRange, newText: string) => void;
+  /** Callback when document content changes */
   onContentChange: (newContent: string) => void;
 }
 
+/**
+ * Main component providing Word-like document editing with redline support
+ * 
+ * Key Features:
+ * - Direct cursor-based editing without popups
+ * - Preserved redline markup during editing
+ * - Real-time content synchronization
+ * - Interactive redline suggestions
+ * - Automatic cursor position management
+ */
 const DirectEditableRenderer: React.FC<DirectEditableRendererProps> = ({
   document: redlineDocument,
   originalDocument,
@@ -34,6 +75,7 @@ const DirectEditableRenderer: React.FC<DirectEditableRendererProps> = ({
   onManualEdit,
   onContentChange
 }) => {
+  // Content processing hook - converts document + suggestions to rich HTML
   const { richContent, isLoading } = useRedlineContent({
     document: redlineDocument,
     originalDocument,
@@ -42,143 +84,64 @@ const DirectEditableRenderer: React.FC<DirectEditableRendererProps> = ({
   });
 
   const editorRef = useRef<HTMLDivElement>(null);
-  const [isComposing, setIsComposing] = useState(false);
-  const lastContentRef = useRef<string>('');
+  const { saveCursorPosition, restoreCursor } = useCursorPositionManager(editorRef);
 
-  // Extract plain text from HTML content
-  const extractPlainText = useCallback((htmlContent: string): string => {
-    const tempDiv = window.document.createElement('div');
-    tempDiv.innerHTML = htmlContent;
-    
-    // Remove redline markup but preserve the suggested text
-    const redlineSuggestions = tempDiv.querySelectorAll('.redline-suggestion');
-    redlineSuggestions.forEach(suggestion => {
-      const suggestedText = suggestion.querySelector('.suggested-text');
-      if (suggestedText) {
-        const textNode = window.document.createTextNode(suggestedText.textContent || '');
-        suggestion.parentNode?.replaceChild(textNode, suggestion);
-      }
-    });
-    
-    return tempDiv.textContent || '';
-  }, []);
-
-  // Handle content changes from direct editing
-  const handleContentChange = useCallback(() => {
-    if (!editorRef.current || isComposing) return;
-
-    const currentHtml = editorRef.current.innerHTML;
-    const plainText = extractPlainText(currentHtml);
-    
-    // Only trigger change if content actually changed
-    if (plainText !== lastContentRef.current) {
-      lastContentRef.current = plainText;
-      onContentChange(plainText);
-    }
-  }, [extractPlainText, onContentChange, isComposing]);
-
-  // Handle click events for redline interactions
-  const handleEditorClick = useCallback((event: React.MouseEvent) => {
-    const target = event.target as HTMLElement;
-    
-    // Handle accept button clicks
-    const acceptBtn = target.closest('.redline-accept-btn');
-    if (acceptBtn) {
-      event.preventDefault();
-      event.stopPropagation();
-      const suggestionId = acceptBtn.getAttribute('data-suggestion-id');
-      if (suggestionId && onSuggestionAccept) {
-        onSuggestionAccept(suggestionId);
-      }
-      return;
-    }
-
-    // Handle suggestion clicks
-    const suggestionElement = target.closest('.redline-suggestion');
-    if (suggestionElement) {
-      const suggestionId = suggestionElement.getAttribute('data-suggestion-id');
-      if (suggestionId) {
-        onSuggestionClick(suggestionId);
-      }
-      return;
-    }
-  }, [onSuggestionClick, onSuggestionAccept]);
-
-  // Handle keyboard shortcuts
-  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
-    // Prevent editing within redline suggestions
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      const container = range.commonAncestorContainer;
-      const suggestionElement = (container.nodeType === Node.TEXT_NODE ? 
-        container.parentElement : container as HTMLElement)?.closest('.redline-suggestion');
-      
-      if (suggestionElement) {
-        event.preventDefault();
-        return;
-      }
-    }
-
-    // Handle Ctrl+Z for undo (optional - browser handles this naturally)
-    if (event.ctrlKey && event.key === 'z') {
-      // Let browser handle undo naturally
-      return;
-    }
-  }, []);
-
-  // Update editor content when richContent changes
+  /**
+   * Synchronizes rich content updates while preserving cursor position
+   * 
+   * Update Strategy:
+   * 1. Save current cursor position before update
+   * 2. Update the HTML content with new redline markup
+   * 3. Restore cursor to approximately the same location
+   * 4. Handle edge cases where content length changes significantly
+   */
   useEffect(() => {
     if (editorRef.current && richContent !== editorRef.current.innerHTML) {
-      const selection = window.getSelection();
-      const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+      // Save cursor position before content update
+      saveCursorPosition();
       
-      // Store cursor position
-      let cursorPosition = 0;
-      if (range && editorRef.current.contains(range.startContainer)) {
-        const preCaretRange = range.cloneRange();
-        preCaretRange.selectNodeContents(editorRef.current);
-        preCaretRange.setEnd(range.startContainer, range.startOffset);
-        cursorPosition = preCaretRange.toString().length;
-      }
-
-      // Update content
+      // Update content with new redline markup
       editorRef.current.innerHTML = richContent;
-      lastContentRef.current = extractPlainText(richContent);
-
-      // Restore cursor position
-      if (cursorPosition > 0) {
-        try {
-          const walker = window.document.createTreeWalker(
-            editorRef.current,
-            NodeFilter.SHOW_TEXT,
-            null
-          );
-          
-          let currentPos = 0;
-          let textNode = walker.nextNode() as Text;
-          
-          while (textNode) {
-            const nodeLength = textNode.textContent?.length || 0;
-            if (currentPos + nodeLength >= cursorPosition) {
-              const offset = cursorPosition - currentPos;
-              const newRange = window.document.createRange();
-              newRange.setStart(textNode, Math.min(offset, nodeLength));
-              newRange.collapse(true);
-              selection?.removeAllRanges();
-              selection?.addRange(newRange);
-              break;
-            }
-            currentPos += nodeLength;
-            textNode = walker.nextNode() as Text;
-          }
-        } catch (error) {
-          console.warn('Could not restore cursor position:', error);
-        }
-      }
+      
+      // Restore cursor position after update
+      setTimeout(() => {
+        restoreCursor();
+      }, 0);
     }
-  }, [richContent, extractPlainText]);
+  }, [richContent, saveCursorPosition, restoreCursor]);
 
+  /**
+   * Handles content changes from direct user editing
+   * 
+   * Processing Flow:
+   * 1. Receives plain text from ContentEditableCore
+   * 2. Validates content has actually changed
+   * 3. Forwards to parent component for document state update
+   * 4. Parent will trigger re-render with updated redline positions
+   */
+  const handleContentChange = useCallback((newContent: string) => {
+    onContentChange(newContent);
+  }, [onContentChange]);
+
+  /**
+   * Handles redline-specific interactions
+   * 
+   * Interaction Types:
+   * - Suggestion clicks for selection/highlighting
+   * - Accept button clicks for quick approval
+   * - Future: Inline editing capabilities
+   */
+  const handleRedlineInteraction = useCallback((suggestionId: string) => {
+    onSuggestionClick(suggestionId);
+  }, [onSuggestionClick]);
+
+  const handleSuggestionAccept = useCallback((suggestionId: string) => {
+    if (onSuggestionAccept) {
+      onSuggestionAccept(suggestionId);
+    }
+  }, [onSuggestionAccept]);
+
+  // Loading state with professional appearance
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -192,30 +155,24 @@ const DirectEditableRenderer: React.FC<DirectEditableRendererProps> = ({
 
   return (
     <div className="bg-gray-100 w-full h-full overflow-y-auto relative">
+      {/* Redline styling definitions */}
       <RedlineStyles />
+      
       <div className="max-w-4xl mx-auto py-8 px-4">
         <div className="bg-white shadow-lg p-16 relative">
-          <div 
-            ref={editorRef}
-            className="prose prose-sm max-w-none min-h-96 outline-none"
-            style={{
-              fontFamily: 'Calibri, "Segoe UI", Tahoma, Geneva, Verdana, sans-serif',
-              fontSize: '11pt',
-              lineHeight: '1.15',
-              color: '#000000'
-            }}
-            contentEditable={true}
-            suppressContentEditableWarning={true}
-            onClick={handleEditorClick}
-            onInput={handleContentChange}
-            onKeyDown={handleKeyDown}
-            onCompositionStart={() => setIsComposing(true)}
-            onCompositionEnd={() => {
-              setIsComposing(false);
-              setTimeout(handleContentChange, 0);
-            }}
-            dangerouslySetInnerHTML={{ __html: richContent }}
-          />
+          {/* Redline interaction wrapper */}
+          <RedlineInteractionHandler
+            onSuggestionClick={handleRedlineInteraction}
+            onSuggestionAccept={handleSuggestionAccept}
+          >
+            {/* Core contentEditable component */}
+            <ContentEditableCore
+              ref={editorRef}
+              content={richContent}
+              onContentChange={handleContentChange}
+              onRedlineClick={() => {}} // Handled by RedlineInteractionHandler
+            />
+          </RedlineInteractionHandler>
         </div>
       </div>
     </div>
