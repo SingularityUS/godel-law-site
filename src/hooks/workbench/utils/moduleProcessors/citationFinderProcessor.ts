@@ -54,7 +54,9 @@ export const processCitationFinder = async (
     paragraphs = inputData.paragraphs;
     console.log(`Processing ${paragraphs.length} paragraphs for citation detection`);
   } else {
-    console.warn('No paragraph data found for citation finder');
+    console.warn('Citation finder: No paragraph data found');
+    console.log('Input data structure:', typeof inputData, inputData ? Object.keys(inputData) : 'null');
+    
     return {
       output: {
         citations: [],
@@ -68,7 +70,10 @@ export const processCitationFinder = async (
       metadata: {
         processingTime: Date.now(),
         method: 'citation-finder',
-        error: 'No paragraph data available'
+        error: 'No paragraph data available - connect Citation Finder to Paragraph Splitter output',
+        userFriendlyError: 'Citation Finder needs paragraph data to analyze citations. Connect it to the Paragraph Splitter output.',
+        citationAware: true,
+        redliningReady: true
       }
     };
   }
@@ -175,7 +180,9 @@ ${paragraphContent}`;
       processingTime: Date.now(),
       method: 'citation-finder',
       paragraphsProcessed: paragraphs.length,
-      citationsFound: allCitations.length
+      citationsFound: allCitations.length,
+      citationAware: true,
+      redliningReady: true
     }
   };
 };

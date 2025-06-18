@@ -62,14 +62,6 @@ const getProcessingStats = (data: any, moduleType: ModuleKind): string | null =>
   if (!data) return null;
   
   try {
-    // For text extractor (pass-through)
-    if (moduleType === 'text-extractor') {
-      if (data.metadata?.passedThrough) {
-        return `Pass-through`;
-      }
-      return null;
-    }
-    
     // For paragraph splitter
     if (moduleType === 'paragraph-splitter' && data.output) {
       const paragraphs = data.output.paragraphs || data.output.totalParagraphs;

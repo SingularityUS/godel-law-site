@@ -2,11 +2,11 @@
 /**
  * Text Extractor Handler
  * 
- * Purpose: Handles text extractor module processing (deprecated behavior)
+ * Purpose: Handles text extractor module processing (pass-through behavior)
  */
 
 export const handleTextExtractor = (nodeId: string, inputData: any, startTime: number) => {
-  console.log(`Text extractor ${nodeId} operating as pass-through (deprecated behavior)`);
+  console.log(`Text extractor ${nodeId} operating as pass-through`);
   const processingTime = Date.now() - startTime;
   
   return {
@@ -16,8 +16,7 @@ export const handleTextExtractor = (nodeId: string, inputData: any, startTime: n
       processingTime,
       passedThrough: true,
       moduleType: 'text-extractor',
-      timestamp: new Date().toISOString(),
-      note: 'Text extraction handled by document processor - this module is now pass-through'
+      timestamp: new Date().toISOString()
     }
   };
 };

@@ -69,7 +69,7 @@ const PipelineValidation: React.FC<PipelineValidationProps> = ({ nodes, edges })
     if (!hasConnectedNodes) {
       return { 
         isValid: false, 
-        message: 'No processing modules connected. Connect text extractor, grammar checker, or other modules.',
+        message: 'No processing modules connected. Connect paragraph splitter, grammar checker, or citation finder.',
         severity: 'error'
       };
     }
@@ -84,30 +84,22 @@ const PipelineValidation: React.FC<PipelineValidationProps> = ({ nodes, edges })
       .filter(type => type && type !== 'document-input');
 
     // Check for recommended legal processing sequence
-    const hasTextExtractor = pipelineModuleTypes.includes('text-extractor');
     const hasParagraphSplitter = pipelineModuleTypes.includes('paragraph-splitter');
     const hasGrammarChecker = pipelineModuleTypes.includes('grammar-checker');
+    const hasCitationFinder = pipelineModuleTypes.includes('citation-finder');
 
-    if (!hasTextExtractor) {
+    if (!hasParagraphSplitter) {
       return {
         isValid: true,
-        message: 'Consider adding Text Extractor for better document processing.',
+        message: 'Consider adding Paragraph Splitter to structure your document for analysis.',
         severity: 'warning'
       };
     }
 
-    if (hasTextExtractor && !hasParagraphSplitter) {
+    if (hasParagraphSplitter && !hasGrammarChecker && !hasCitationFinder) {
       return {
         isValid: true,
-        message: 'Consider adding Paragraph Splitter after Text Extractor for structured analysis.',
-        severity: 'warning'
-      };
-    }
-
-    if (hasParagraphSplitter && !hasGrammarChecker) {
-      return {
-        isValid: true,
-        message: 'Consider adding Grammar Checker for complete legal document review.',
+        message: 'Consider adding Grammar Checker or Citation Finder after Paragraph Splitter.',
         severity: 'warning'
       };
     }
