@@ -6,7 +6,7 @@
  */
 
 import { RedlineSuggestion } from "@/types/redlining";
-import { convertTextToHtml, validateHtml } from "./htmlUtils";
+import { validateHtml } from "./htmlUtils";
 import { processSuggestions } from "./markupInjection";
 
 // Re-export utilities for backward compatibility
@@ -15,7 +15,7 @@ export { getSeverityClass, getTypeClass, getTypeIcon } from "./styleUtils";
 export { processSuggestions } from "./markupInjection";
 
 /**
- * Injects redline markup into content
+ * Injects redline markup into content while preserving paragraph structure
  */
 export const injectRedlineMarkup = (
   content: string, 
@@ -28,15 +28,12 @@ export const injectRedlineMarkup = (
     return '<p>No content available</p>';
   }
   
-  // Process suggestions and apply markup
+  // Process suggestions and apply markup - this now handles paragraph preservation internally
   const enhancedContent = processSuggestions(content, suggestions, selectedId);
   
-  // Convert plain text formatting to HTML while preserving redlines
-  const finalContent = convertTextToHtml(enhancedContent);
-  
   // Validate the final HTML structure
-  const validatedContent = validateHtml(finalContent);
+  const validatedContent = validateHtml(enhancedContent);
   
-  console.log('Redline markup injection complete');
+  console.log('Redline markup injection complete with paragraph preservation');
   return validatedContent;
 };

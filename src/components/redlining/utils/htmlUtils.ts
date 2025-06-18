@@ -22,10 +22,23 @@ export const hasHtmlMarkup = (content: string): boolean => {
 };
 
 /**
+ * Detects if content contains redline markup specifically
+ */
+export const hasRedlineMarkup = (content: string): boolean => {
+  return /class="redline-suggestion/.test(content);
+};
+
+/**
  * Converts plain text to HTML while preserving existing HTML markup
  */
 export const convertTextToHtml = (content: string): string => {
   console.log('Converting text to HTML, preserving existing markup');
+  
+  // If content already contains redline markup, it should already be in HTML format
+  if (hasRedlineMarkup(content)) {
+    console.log('Content contains redline markup, preserving as-is');
+    return content;
+  }
   
   // If content already contains HTML markup, return it as-is
   if (hasHtmlMarkup(content)) {
