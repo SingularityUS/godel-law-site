@@ -72,7 +72,7 @@ const SidebarTabsContent: React.FC<SidebarTabsContentProps> = ({
 
           <TabsContent value="analysis" className="h-full m-0 overflow-hidden">
             <div className="h-full overflow-auto">
-              <AnalysisContent output={output} />
+              <AnalysisContent analysisData={output?.output?.analysis || []} />
             </div>
           </TabsContent>
         </div>
