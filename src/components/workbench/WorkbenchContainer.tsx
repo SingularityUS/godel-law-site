@@ -1,8 +1,9 @@
 
 import React, { forwardRef, useRef } from "react";
-import WorkbenchFlow from "./WorkbenchFlow";
 import DocumentPreviewManager from "./DocumentPreviewManager";
-import ModulePalette from "../ModulePalette";
+import ModulePaletteSection from "./sections/ModulePaletteSection";
+import WorkspaceSection from "./sections/WorkspaceSection";
+import { useWorkbenchDragDropHandlers } from "@/hooks/workbench/useWorkbenchDragDropHandlers";
 
 /**
  * WorkbenchContainer Component
@@ -13,7 +14,7 @@ import ModulePalette from "../ModulePalette";
  * Previously AIWorkbench, now merged for simplified architecture.
  * 
  * Key Responsibilities:
- * - Provides styled container with proper dimensions and background
+ * - Orchestrates workbench sections (palette, workspace, preview)
  * - Maintains DOM reference for coordinate transformations
  * - Manages workbench state and event coordination
  * - Provides imperative API for external document addition
@@ -23,6 +24,11 @@ import ModulePalette from "../ModulePalette";
  * - Receives uploaded files and editing state from parent
  * - Communicates module editing events via callbacks
  * - Exposes imperative API for document node creation
+ * 
+ * Architecture:
+ * - Composed of focused section components
+ * - Uses specialized hooks for drag-drop handling
+ * - Maintains clean separation of concerns
  */
 
 interface WorkbenchContainerProps {
@@ -36,29 +42,19 @@ const WorkbenchContainer = forwardRef<any, WorkbenchContainerProps>(function Wor
   ref
 ) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-
-  const handlePaletteDragStart = (mod: any, event: React.DragEvent) => {
-    event.dataTransfer.setData("application/json", JSON.stringify(mod));
-  };
+  const { handlePaletteDragStart } = useWorkbenchDragDropHandlers();
 
   return (
     <>
-      {/* Module Palette */}
-      <div className="w-full border-b-2 border-black bg-white">
-        <ModulePalette onDragStart={handlePaletteDragStart} />
-      </div>
+      {/* Module Palette Section */}
+      <ModulePaletteSection onDragStart={handlePaletteDragStart} />
 
-      {/* Main React Flow workspace container */}
-      <div 
-        ref={reactFlowWrapper} 
-        className="w-full grow h-[650px] relative rounded-xl border bg-gradient-to-br from-slate-50 to-blue-50"
-      >
-        <WorkbenchFlow
-          {...props}
-          ref={ref}
-          reactFlowWrapper={reactFlowWrapper}
-        />
-      </div>
+      {/* Main Workspace Section */}
+      <WorkspaceSection
+        reactFlowWrapper={reactFlowWrapper}
+        forwardedRef={ref}
+        {...props}
+      />
 
       {/* Document Preview Manager */}
       <DocumentPreviewManager />

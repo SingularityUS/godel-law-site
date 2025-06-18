@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -6,11 +7,30 @@ import { X, ChevronRight, ChevronLeft } from "lucide-react";
 import { RedlineDocument } from "@/types/redlining";
 import EmbeddedRedlineViewer from "@/components/redlining/EmbeddedRedlineViewer";
 import { useRedlineDataTransform } from "@/hooks/redlining/useRedlineDataTransform";
+import { useWorkspaceSidebarState } from "@/hooks/workbench/useWorkspaceSidebarState";
 import { toast } from "@/hooks/use-toast";
 import LegalSummaryTab from "./output/LegalSummaryTab";
 import LegalAnalysisTab from "./output/LegalAnalysisTab";
 import GrammarAnalysisTab from "./output/GrammarAnalysisTab";
 import RawDataTab from "./output/RawDataTab";
+
+/**
+ * WorkspaceSidebar Component
+ * 
+ * Purpose: Integrated sidebar for pipeline results and redlining
+ * Refactored to use focused state management hooks
+ * 
+ * Key Responsibilities:
+ * - Displays pipeline results in organized tabs
+ * - Provides redline document generation and editing
+ * - Manages sidebar visibility and resize states
+ * - Integrates with pipeline output data
+ * 
+ * Architecture:
+ * - Uses focused state management hook
+ * - Maintains existing functionality with better organization
+ * - Provides clear separation between UI and business logic
+ */
 
 interface WorkspaceSidebarProps {
   output: any;
@@ -25,34 +45,22 @@ const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   onClose,
   onToggle
 }) => {
-  const [activeTab, setActiveTab] = useState("redline");
   const [redlineDocument, setRedlineDocument] = useState<RedlineDocument | null>(null);
-  const [isGeneratingRedline, setIsGeneratingRedline] = useState(false);
   const { transformGrammarData } = useRedlineDataTransform();
-
-  // Enhanced pipeline type detection
-  const isLegalPipeline = React.useMemo(() => {
-    console.log('Checking pipeline type for output:', output);
-    
-    // Check multiple possible locations for pipeline type
-    const pipelineType = output?.summary?.pipelineType || 
-                        output?.metadata?.pipelineType ||
-                        output?.pipelineType;
-    
-    const hasAnalysisData = output?.output?.analysis || 
-                           output?.finalOutput?.output?.analysis ||
-                           output?.analysis;
-    
-    console.log('Pipeline type detected:', pipelineType);
-    console.log('Has analysis data:', !!hasAnalysisData);
-    
-    return pipelineType === "Legal Document Analysis" || !!hasAnalysisData;
-  }, [output]);
+  
+  // Use focused state management hook
+  const {
+    activeTab,
+    setActiveTab,
+    isGeneratingRedline,
+    toggleGeneratingRedline,
+    isLegalPipeline
+  } = useWorkspaceSidebarState(output);
 
   // Generate redline document when output is available
   React.useEffect(() => {
     if (output && isLegalPipeline && !redlineDocument && !isGeneratingRedline) {
-      setIsGeneratingRedline(true);
+      toggleGeneratingRedline(true);
       try {
         console.log('Generating redline document from output:', output);
         console.log('Output structure:', {
@@ -100,10 +108,10 @@ const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           variant: "destructive"
         });
       } finally {
-        setIsGeneratingRedline(false);
+        toggleGeneratingRedline(false);
       }
     }
-  }, [output, isLegalPipeline, redlineDocument, isGeneratingRedline, transformGrammarData]);
+  }, [output, isLegalPipeline, redlineDocument, isGeneratingRedline, transformGrammarData, toggleGeneratingRedline]);
 
   const handleSaveRedline = useCallback((document: RedlineDocument) => {
     console.log('Saving redline document:', document);
