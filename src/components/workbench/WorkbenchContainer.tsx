@@ -35,6 +35,7 @@ interface WorkbenchContainerProps {
   onModuleEdit: (nodeId: string, node: any) => void;
   editingPromptNodeId?: string;
   uploadedFiles?: any[];
+  onOpenSidebar: () => void;
 }
 
 const WorkbenchContainer = forwardRef<any, WorkbenchContainerProps>(function WorkbenchContainer(
@@ -53,6 +54,7 @@ const WorkbenchContainer = forwardRef<any, WorkbenchContainerProps>(function Wor
       <WorkspaceSection
         reactFlowWrapper={reactFlowWrapper}
         forwardedRef={ref}
+        onOpenSidebar={props.onOpenSidebar}
         {...props}
       />
 

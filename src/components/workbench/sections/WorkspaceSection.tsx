@@ -20,6 +20,7 @@ interface WorkspaceSectionProps {
   editingPromptNodeId?: string;
   uploadedFiles?: any[];
   forwardedRef?: React.Ref<any>;
+  onOpenSidebar: () => void;
 }
 
 const WorkspaceSection: React.FC<WorkspaceSectionProps> = ({
@@ -27,7 +28,8 @@ const WorkspaceSection: React.FC<WorkspaceSectionProps> = ({
   onModuleEdit,
   editingPromptNodeId,
   uploadedFiles,
-  forwardedRef
+  forwardedRef,
+  onOpenSidebar
 }) => {
   return (
     <div 
@@ -40,6 +42,7 @@ const WorkspaceSection: React.FC<WorkspaceSectionProps> = ({
         uploadedFiles={uploadedFiles}
         ref={forwardedRef}
         reactFlowWrapper={reactFlowWrapper}
+        onOpenSidebar={onOpenSidebar}
       />
     </div>
   );

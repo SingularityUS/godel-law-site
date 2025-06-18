@@ -31,7 +31,7 @@ const AIWorkbench = forwardRef<any, AIWorkbenchProps>(function AIWorkbench(
   props,
   ref
 ) {
-  return <WorkbenchContainer {...props} ref={ref} />;
+  return <WorkbenchContainer {...props} onOpenSidebar={props.onOpenSidebar || (() => {})} ref={ref} />;
 });
 
 export default AIWorkbench;

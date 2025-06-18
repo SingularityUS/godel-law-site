@@ -11,12 +11,14 @@ interface UseExecutionKeyboardProps {
   isValid: boolean;
   isExecuting: boolean;
   onExecute: () => void;
+  onOpenSidebar: () => void;
 }
 
 export const useExecutionKeyboard = ({ 
   isValid, 
   isExecuting, 
-  onExecute
+  onExecute,
+  onOpenSidebar
 }: UseExecutionKeyboardProps) => {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -26,8 +28,9 @@ export const useExecutionKeyboard = ({
         console.log('⌨️ useExecutionKeyboard: isValid:', isValid, 'isExecuting:', isExecuting);
         
         if (isValid && !isExecuting) {
-          console.log('⌨️ useExecutionKeyboard: Calling onExecute');
-          // Use the same execution function as the button
+          console.log('⌨️ useExecutionKeyboard: Opening sidebar and executing');
+          // Open sidebar first, then execute
+          onOpenSidebar();
           onExecute();
         } else {
           console.log('⌨️ useExecutionKeyboard: Execution blocked - invalid or already executing');
@@ -39,5 +42,5 @@ export const useExecutionKeyboard = ({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isValid, isExecuting, onExecute]);
+  }, [isValid, isExecuting, onExecute, onOpenSidebar]);
 };

@@ -45,38 +45,28 @@ const MainWorkspace: React.FC<MainWorkspaceProps> = ({
     }
   }, [finalOutput, openOutput]);
 
-  // Listen for pipeline execution start to open sidebar immediately
-  React.useEffect(() => {
-    const handlePipelineStart = () => {
-      console.log('🎯 MainWorkspace: pipelineExecutionStart event received');
-      console.log('🎯 MainWorkspace: workbenchRef.current:', workbenchRef?.current);
-      console.log('🎯 MainWorkspace: workbenchRef.current?.getNodes:', workbenchRef?.current?.getNodes);
-      
-      if (workbenchRef?.current?.getNodes) {
-        const nodes = workbenchRef.current.getNodes();
-        console.log('🎯 MainWorkspace: Retrieved nodes:', nodes?.length, 'nodes');
-        
-        const document = extractDocumentFromNodes(nodes);
-        console.log('🎯 MainWorkspace: Extracted document:', document);
-        
-        if (document) {
-          console.log('🎯 MainWorkspace: Calling startProcessing with document:', document.name);
-          startProcessing(document);
-        } else {
-          console.log('❌ MainWorkspace: No document found to start processing');
-        }
-      } else {
-        console.log('❌ MainWorkspace: workbenchRef or getNodes not available');
-      }
-    };
-
-    console.log('🎯 MainWorkspace: Adding pipelineExecutionStart event listener');
-    window.addEventListener('pipelineExecutionStart', handlePipelineStart);
+  // Direct callback to open sidebar - replaces event system
+  const handleOpenSidebar = React.useCallback(() => {
+    console.log('🎯 MainWorkspace: handleOpenSidebar called');
+    console.log('🎯 MainWorkspace: workbenchRef.current:', workbenchRef?.current);
+    console.log('🎯 MainWorkspace: workbenchRef.current?.getNodes:', workbenchRef?.current?.getNodes);
     
-    return () => {
-      console.log('🎯 MainWorkspace: Removing pipelineExecutionStart event listener');
-      window.removeEventListener('pipelineExecutionStart', handlePipelineStart);
-    };
+    if (workbenchRef?.current?.getNodes) {
+      const nodes = workbenchRef.current.getNodes();
+      console.log('🎯 MainWorkspace: Retrieved nodes:', nodes?.length, 'nodes');
+      
+      const document = extractDocumentFromNodes(nodes);
+      console.log('🎯 MainWorkspace: Extracted document:', document);
+      
+      if (document) {
+        console.log('🎯 MainWorkspace: Calling startProcessing with document:', document.name);
+        startProcessing(document);
+      } else {
+        console.log('❌ MainWorkspace: No document found to start processing');
+      }
+    } else {
+      console.log('❌ MainWorkspace: workbenchRef or getNodes not available');
+    }
   }, [extractDocumentFromNodes, startProcessing, workbenchRef]);
 
   const handleClose = () => {
@@ -96,6 +86,7 @@ const MainWorkspace: React.FC<MainWorkspaceProps> = ({
             onModuleEdit={onModuleEdit || (() => {})}
             editingPromptNodeId={editingPromptNodeId}
             uploadedFiles={uploadedFiles}
+            onOpenSidebar={handleOpenSidebar}
             ref={workbenchRef}
           />
         </ResizablePanel>

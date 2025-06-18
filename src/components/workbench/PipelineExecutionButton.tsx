@@ -19,6 +19,7 @@ interface PipelineExecutionButtonProps {
   isExecuting: boolean;
   onExecute: () => void;
   onStop: () => void;
+  onOpenSidebar: () => void;
 }
 
 const PipelineExecutionButton: React.FC<PipelineExecutionButtonProps> = ({
@@ -26,7 +27,8 @@ const PipelineExecutionButton: React.FC<PipelineExecutionButtonProps> = ({
   edges,
   isExecuting,
   onExecute,
-  onStop
+  onStop,
+  onOpenSidebar
 }) => {
   // Validate pipeline to check if execution is possible
   const validatePipeline = () => {
@@ -49,11 +51,10 @@ const PipelineExecutionButton: React.FC<PipelineExecutionButtonProps> = ({
   const handleExecute = () => {
     console.log('🚀 PipelineExecutionButton: handleExecute called');
     
-    // Emit pipeline start event for immediate sidebar opening
-    console.log('📡 PipelineExecutionButton: Emitting pipelineExecutionStart event');
-    const event = new CustomEvent('pipelineExecutionStart');
-    window.dispatchEvent(event);
-    console.log('✅ PipelineExecutionButton: pipelineExecutionStart event dispatched');
+    // Open sidebar immediately with direct callback
+    console.log('📡 PipelineExecutionButton: Calling onOpenSidebar directly');
+    onOpenSidebar();
+    console.log('✅ PipelineExecutionButton: onOpenSidebar called');
     
     // Execute the pipeline
     console.log('⚡ PipelineExecutionButton: Calling onExecute');
@@ -64,7 +65,8 @@ const PipelineExecutionButton: React.FC<PipelineExecutionButtonProps> = ({
   useExecutionKeyboard({ 
     isValid, 
     isExecuting, 
-    onExecute: handleExecute
+    onExecute: handleExecute,
+    onOpenSidebar
   });
 
   return (
