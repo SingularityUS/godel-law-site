@@ -11,10 +11,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { RedlineDocument, RedlineState, RedlineSuggestion } from "@/types/redlining";
 import RedlineToolbar from "./RedlineToolbar";
 import RedlineSuggestionComponent from "./RedlineSuggestion";
+import EnhancedDocumentRenderer from "./EnhancedDocumentRenderer";
+import RedlineSuggestionTooltip from "./RedlineSuggestionTooltip";
 import { useRedlineDocument } from "@/hooks/redlining/useRedlineDocument";
 
 interface RedlineDocumentViewerProps {
   document: RedlineDocument;
+  originalDocument?: { type: string; preview?: string; name: string };
   onClose: () => void;
   onSave: (document: RedlineDocument) => void;
   onExport: (document: RedlineDocument, format: string) => void;
@@ -22,6 +25,7 @@ interface RedlineDocumentViewerProps {
 
 const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
   document,
+  originalDocument,
   onClose,
   onSave,
   onExport
@@ -36,47 +40,53 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
   } = useRedlineDocument(document);
 
   const [showSidebar, setShowSidebar] = useState(true);
+  const [tooltipState, setTooltipState] = useState<{
+    suggestion: RedlineSuggestion | null;
+    position: { x: number; y: number };
+  } | null>(null);
+
   const currentDoc = getCurrentDocument();
 
-  const renderDocumentContent = () => {
-    const content = currentDoc.currentContent;
-    const suggestions = filteredSuggestions.filter(s => s.status === 'pending');
-    
-    // Simple rendering for now - will enhance with proper text highlighting
-    return (
-      <div className="prose prose-sm max-w-none p-8">
-        <div
-          style={{
-            fontFamily: 'Calibri, "Segoe UI", Tahoma, Geneva, Verdana, sans-serif',
-            fontSize: '11pt',
-            lineHeight: '1.5',
-            color: '#000000'
-          }}
-        >
-          {content.split('\n').map((paragraph, index) => {
-            const paragraphSuggestions = suggestions.filter(s => 
-              content.substring(s.startPos, s.endPos).includes(paragraph.substring(0, 50))
-            );
-            
-            return (
-              <div key={index} className="mb-4 relative">
-                <p className="mb-2">{paragraph}</p>
-                {paragraphSuggestions.map(suggestion => (
-                  <RedlineSuggestionComponent
-                    key={suggestion.id}
-                    suggestion={suggestion}
-                    onAccept={() => handleSuggestionAction(suggestion.id, 'accepted')}
-                    onReject={() => handleSuggestionAction(suggestion.id, 'rejected')}
-                    onModify={(newText) => handleSuggestionAction(suggestion.id, 'modified', newText)}
-                    isSelected={redlineState.selectedSuggestionId === suggestion.id}
-                  />
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
+  const handleSuggestionClick = (suggestionId: string) => {
+    const suggestion = filteredSuggestions.find(s => s.id === suggestionId);
+    if (suggestion) {
+      navigateToSuggestion(suggestionId);
+      
+      // Show tooltip at cursor position
+      const handleMouseMove = (event: MouseEvent) => {
+        setTooltipState({
+          suggestion,
+          position: { x: event.clientX, y: event.clientY }
+        });
+        document.removeEventListener('mousemove', handleMouseMove);
+      };
+      
+      document.addEventListener('mousemove', handleMouseMove);
+    }
+  };
+
+  const handleCloseTooltip = () => {
+    setTooltipState(null);
+  };
+
+  // Close tooltip when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.redline-suggestion') && !target.closest('[data-tooltip]')) {
+        handleCloseTooltip();
+      }
+    };
+
+    if (tooltipState) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [tooltipState]);
+
+  const handleSuggestionActionWithTooltipClose = (suggestionId: string, action: 'accepted' | 'rejected' | 'modified', newText?: string) => {
+    handleSuggestionAction(suggestionId, action, newText);
+    handleCloseTooltip();
   };
 
   return (
@@ -101,7 +111,13 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
         <CardContent className="flex-1 flex p-0">
           <div className={`flex-1 ${showSidebar ? 'mr-80' : ''}`}>
             <ScrollArea className="h-full">
-              {renderDocumentContent()}
+              <EnhancedDocumentRenderer
+                document={currentDoc}
+                originalDocument={originalDocument || { type: 'text/plain' }}
+                suggestions={filteredSuggestions}
+                selectedSuggestionId={redlineState.selectedSuggestionId}
+                onSuggestionClick={handleSuggestionClick}
+              />
             </ScrollArea>
           </div>
           
@@ -128,6 +144,9 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
                       <div className="text-xs text-gray-600 mt-1">
                         {suggestion.explanation}
                       </div>
+                      <div className="text-xs text-gray-500 mt-2">
+                        "{suggestion.originalText}" → "{suggestion.suggestedText}"
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -136,6 +155,22 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
           )}
         </CardContent>
       </Card>
+
+      {/* Suggestion Tooltip */}
+      {tooltipState && (
+        <RedlineSuggestionTooltip
+          suggestion={tooltipState.suggestion}
+          position={tooltipState.position}
+          onAccept={() => handleSuggestionActionWithTooltipClose(tooltipState.suggestion.id, 'accepted')}
+          onReject={() => handleSuggestionActionWithTooltipClose(tooltipState.suggestion.id, 'rejected')}
+          onModify={() => {
+            // For now, just open the sidebar and focus on the suggestion
+            setShowSidebar(true);
+            navigateToSuggestion(tooltipState.suggestion.id);
+            handleCloseTooltip();
+          }}
+        />
+      )}
     </div>
   );
 };
