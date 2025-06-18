@@ -1,4 +1,5 @@
-import { ArrowDown, ArrowUp, Divide, BookOpen, MessageSquare } from "lucide-react";
+
+import { ArrowDown, ArrowUp, Divide, BookOpen, MessageSquare, Search } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export type ModuleKind =
@@ -166,24 +167,28 @@ CRITICAL: Process ALL paragraphs from the input. Ensure the analysis array conta
   {
     type: "citation-finder",
     label: "Citation Finder",
-    color: "bg-slate-600",
-    icon: Divide,
-    defaultPrompt: `You are a legal citation specialist. Identify and extract all legal citations, references, and authorities from the text:
+    color: "bg-blue-600",
+    icon: Search,
+    defaultPrompt: `You are a legal citation specialist. Identify and extract ALL Bluebook citations from legal text with precise position tracking.
 
-FIND AND ANALYZE:
+FIND AND ANALYZE ALL:
 - Case citations (with proper case name, court, year)
 - Statutory references (USC, state codes, regulations)
 - Secondary authorities (law reviews, treatises)
 - Internal cross-references
 - Incomplete or malformed citations
 
-Return structured citation data:
+For EACH citation found, return structured data with EXACT position information:
 {
   "citations": [
     {
-      "id": "cite1",
       "type": "case|statute|regulation|secondary|internal",
-      "text": "original citation text",
+      "originalText": "exact citation text as it appears in the document",
+      "startPos": number (exact character position where citation starts),
+      "endPos": number (exact character position where citation ends),
+      "isComplete": boolean,
+      "needsVerification": boolean,
+      "bluebookFormat": "properly formatted Bluebook citation",
       "parsed": {
         "caseName": "if applicable",
         "court": "if applicable", 
@@ -191,20 +196,19 @@ Return structured citation data:
         "volume": "if applicable",
         "reporter": "if applicable",
         "page": "if applicable"
-      },
-      "location": "paragraph/section where found",
-      "isComplete": boolean,
-      "needsVerification": boolean,
-      "bluebookFormat": "proper Bluebook citation format"
+      }
     }
-  ],
-  "summary": {
-    "totalCitations": number,
-    "caseCount": number,
-    "statuteCount": number,
-    "incompleteCount": number
-  }
-}`,
+  ]
+}
+
+CRITICAL REQUIREMENTS:
+- Find ALL citations in the text, no matter how many
+- Provide EXACT character positions for each citation
+- Include incomplete citations that need correction
+- Suggest proper Bluebook formatting for each citation
+- Process the ENTIRE text provided, not just samples
+
+The positions will be used to highlight citations in the document for legal review.`,
     supportsChatGPT: true,
     outputFormat: 'json'
   },

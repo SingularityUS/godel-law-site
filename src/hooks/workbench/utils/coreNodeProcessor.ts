@@ -11,6 +11,7 @@ import { useChatGPTApi } from "../useChatGPTApi";
 import { parseJsonResponse, parseGrammarResponse, parseParagraphSplitterResponse } from "./parsing";
 import { processParagraphSplitter } from "./moduleProcessors/paragraphSplitterProcessor";
 import { processGrammarAnalysis } from "./moduleProcessors/grammarAnalysisProcessor";
+import { processCitationFinder } from "./moduleProcessors/citationFinderProcessor";
 
 export const createCoreProcessor = (callChatGPT: ReturnType<typeof useChatGPTApi>['callChatGPT']) => {
   return async (node: HelperNode, inputData: string, systemPrompt: string, moduleType: ModuleKind): Promise<any> => {
@@ -53,6 +54,29 @@ export const createCoreProcessor = (callChatGPT: ReturnType<typeof useChatGPTApi
           method: 'streamlined',
           redliningReady: true,
           positionAware: true,
+          ...result.metadata
+        }
+      };
+    }
+    
+    if (moduleType === 'citation-finder') {
+      console.log('Using citation finder analysis');
+      
+      // Progress callback for citation analysis
+      const onProgress = (completed: number, total: number) => {
+        console.log(`Citation analysis progress: ${completed}/${total} paragraphs`);
+      };
+      
+      const result = await processCitationFinder(inputData, callChatGPT, onProgress);
+      return {
+        output: result.output,
+        metadata: {
+          moduleType,
+          processingTime: result.metadata?.processingTime || Date.now(),
+          timestamp: new Date().toISOString(),
+          method: 'citation-finder',
+          redliningReady: true,
+          citationAware: true,
           ...result.metadata
         }
       };
