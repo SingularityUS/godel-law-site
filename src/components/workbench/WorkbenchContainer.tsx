@@ -2,6 +2,7 @@
 import React, { forwardRef, useRef } from "react";
 import WorkbenchFlow from "./WorkbenchFlow";
 import DocumentPreviewManager from "./DocumentPreviewManager";
+import ModulePalette from "../ModulePalette";
 
 /**
  * WorkbenchContainer Component
@@ -36,8 +37,17 @@ const WorkbenchContainer = forwardRef<any, WorkbenchContainerProps>(function Wor
 ) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
+  const handlePaletteDragStart = (mod: any, event: React.DragEvent) => {
+    event.dataTransfer.setData("application/json", JSON.stringify(mod));
+  };
+
   return (
     <>
+      {/* Module Palette */}
+      <div className="w-full border-b-2 border-black bg-white">
+        <ModulePalette onDragStart={handlePaletteDragStart} />
+      </div>
+
       {/* Main React Flow workspace container */}
       <div 
         ref={reactFlowWrapper} 
