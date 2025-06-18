@@ -24,6 +24,7 @@ interface AIWorkbenchProps {
   onModuleEdit: (nodeId: string, node: any) => void;
   editingPromptNodeId?: string;
   uploadedFiles?: any[];
+  onOpenSidebar?: () => void;
 }
 
 const AIWorkbench = forwardRef<any, AIWorkbenchProps>(function AIWorkbench(
