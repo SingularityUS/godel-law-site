@@ -29,14 +29,30 @@ export const useRedlineGeneration = ({
       setIsGeneratingRedline(true);
       try {
         console.log('=== ENHANCED REDLINE GENERATION START ===');
-        console.log('Output structure:', {
+        console.log('Output structure for redline generation:', {
           hasEndpointResults: !!output.endpointResults,
           endpointCount: output.endpointResults?.length || 0,
           hasPipelineResults: !!output.pipelineResults,
           pipelineResultsLength: output.pipelineResults?.length || 0,
           hasEndpoints: !!output.endpoints,
-          endpointsCount: output.endpoints?.length || 0
+          endpointsCount: output.endpoints?.length || 0,
+          outputKeys: Object.keys(output)
         });
+        
+        // Log detailed endpoint results for debugging
+        if (output.endpointResults) {
+          console.log('Endpoint results detail:', output.endpointResults.map((r: any) => ({
+            nodeId: r.nodeId,
+            moduleType: r.moduleType,
+            hasResult: !!r.result,
+            resultKeys: r.result ? Object.keys(r.result) : [],
+            resultStructure: r.result ? {
+              hasOutput: !!r.result.output,
+              hasAnalysis: !!r.result.output?.analysis,
+              analysisLength: r.result.output?.analysis?.length || 0
+            } : null
+          })));
+        }
         
         let redlineDoc = null;
         
@@ -111,40 +127,6 @@ export const useRedlineGeneration = ({
     }
   }, [output?.summary?.processingCompleted]);
 
-  /**
-   * Check if output has analyzable data
-   */
-  const hasAnalyzableData = (output: any): boolean => {
-    return !!(
-      output?.output?.analysis ||
-      output?.output?.citations ||
-      output?.analysis ||
-      output?.citations
-    );
-  };
-
-  /**
-   * Log available data sources for debugging
-   */
-  const logAvailableDataSources = (output: any) => {
-    console.log('=== AVAILABLE DATA SOURCES DEBUG ===');
-    console.log('Top level keys:', Object.keys(output || {}));
-    console.log('Has endpoint results:', !!output.endpointResults);
-    console.log('Has pipeline results:', !!output.pipelineResults);
-    console.log('Has direct analysis:', !!output?.output?.analysis);
-    console.log('Has direct citations:', !!output?.output?.citations);
-    console.log('Has metadata with original content:', !!output?.metadata?.originalContent);
-    
-    if (output.endpointResults) {
-      console.log('Endpoint results detail:', output.endpointResults.map((r: any) => ({
-        nodeId: r.nodeId,
-        moduleType: r.moduleType,
-        hasResult: !!r.result,
-        resultKeys: r.result ? Object.keys(r.result) : []
-      })));
-    }
-  };
-
   const handleSaveRedline = useCallback((document: RedlineDocument) => {
     console.log('Saving enhanced redline document:', document);
     setRedlineDocument(document);
@@ -168,4 +150,38 @@ export const useRedlineGeneration = ({
     handleSaveRedline,
     handleExportRedline
   };
+};
+
+/**
+ * Check if output has analyzable data
+ */
+const hasAnalyzableData = (output: any): boolean => {
+  return !!(
+    output?.output?.analysis ||
+    output?.output?.citations ||
+    output?.analysis ||
+    output?.citations
+  );
+};
+
+/**
+ * Log available data sources for debugging
+ */
+const logAvailableDataSources = (output: any) => {
+  console.log('=== AVAILABLE DATA SOURCES DEBUG ===');
+  console.log('Top level keys:', Object.keys(output || {}));
+  console.log('Has endpoint results:', !!output.endpointResults);
+  console.log('Has pipeline results:', !!output.pipelineResults);
+  console.log('Has direct analysis:', !!output?.output?.analysis);
+  console.log('Has direct citations:', !!output?.output?.citations);
+  console.log('Has metadata with original content:', !!output?.metadata?.originalContent);
+  
+  if (output.endpointResults) {
+    console.log('Endpoint results detail:', output.endpointResults.map((r: any) => ({
+      nodeId: r.nodeId,
+      moduleType: r.moduleType,
+      hasResult: !!r.result,
+      resultKeys: r.result ? Object.keys(r.result) : []
+    })));
+  }
 };

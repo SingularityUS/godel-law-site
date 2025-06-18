@@ -6,6 +6,7 @@
 
 import { RedlineDocument, RedlineSuggestion } from "@/types/redlining";
 import { convertCitationsToRedline } from "@/utils/redlining/citationToRedline";
+import { convertGrammarDataToRedlineSuggestions } from "./grammarTransformUtils";
 
 export interface ModuleDataExtraction {
   nodeId: string;
@@ -28,14 +29,32 @@ export class RedlineAggregator {
     fallbackOutput?: any
   ): RedlineDocument | null {
     console.log('=== REDLINE AGGREGATOR: CREATING COMPREHENSIVE REDLINE ===');
-    console.log('Endpoint results:', endpointResults.length);
+    console.log('Endpoint results count:', endpointResults.length);
+    console.log('Endpoint results structure:', endpointResults.map(r => ({
+      nodeId: r.nodeId,
+      moduleType: r.moduleType,
+      hasResult: !!r.result,
+      resultKeys: r.result ? Object.keys(r.result) : []
+    })));
     
     // Extract data from all endpoint modules
     const moduleExtractions = this.extractDataFromAllModules(endpointResults, fallbackOutput);
-    console.log('Module extractions:', moduleExtractions);
+    console.log('Module extractions:', moduleExtractions.map(m => ({
+      nodeId: m.nodeId,
+      moduleType: m.moduleType,
+      hasGrammarData: m.hasGrammarData,
+      hasCitationData: m.hasCitationData,
+      hasOriginalContent: !!m.originalContent
+    })));
     
     // Find the best source for original content
     const originalContent = this.extractBestOriginalContent(moduleExtractions, fallbackOutput);
+    console.log('Original content extraction result:', {
+      found: !!originalContent,
+      length: originalContent?.length || 0,
+      preview: originalContent ? originalContent.substring(0, 100) + '...' : 'none'
+    });
+    
     if (!originalContent || originalContent.length === 0) {
       console.warn('No original content available for redline generation');
       return null;
@@ -43,6 +62,11 @@ export class RedlineAggregator {
     
     // Combine all suggestions from different modules
     const allSuggestions = this.combineAllSuggestions(moduleExtractions);
+    console.log('Combined suggestions result:', {
+      totalSuggestions: allSuggestions.length,
+      suggestionTypes: allSuggestions.map(s => s.type)
+    });
+    
     if (allSuggestions.length === 0) {
       console.warn('No suggestions generated from any endpoint modules');
       return null;
@@ -67,6 +91,7 @@ export class RedlineAggregator {
     };
     
     console.log('Comprehensive redline document created successfully:', {
+      id: redlineDocument.id,
       suggestionCount: redlineDocument.suggestions.length,
       sourceModules: redlineDocument.metadata.sourceModules
     });
@@ -84,10 +109,21 @@ export class RedlineAggregator {
     const extractions: ModuleDataExtraction[] = [];
     
     // Process each endpoint result
-    endpointResults.forEach(result => {
+    endpointResults.forEach((result, index) => {
+      console.log(`Processing endpoint result ${index}:`, {
+        nodeId: result.nodeId,
+        moduleType: result.moduleType,
+        hasResult: !!result.result
+      });
+      
       const extraction = this.extractModuleData(result);
       if (extraction) {
         extractions.push(extraction);
+        console.log(`Extracted data from ${result.moduleType}:`, {
+          hasGrammarData: extraction.hasGrammarData,
+          hasCitationData: extraction.hasCitationData,
+          hasOriginalContent: !!extraction.originalContent
+        });
       }
     });
     
@@ -112,6 +148,7 @@ export class RedlineAggregator {
    */
   private static extractModuleData(moduleResult: any): ModuleDataExtraction | null {
     if (!moduleResult || !moduleResult.result) {
+      console.warn('No result in module result:', moduleResult);
       return null;
     }
     
@@ -123,11 +160,18 @@ export class RedlineAggregator {
       hasCitationData: false
     };
     
-    // Look for grammar analysis data
-    const grammarData = this.findGrammarData(result);
-    if (grammarData) {
+    console.log(`Extracting data from ${extraction.moduleType} module:`, {
+      resultKeys: Object.keys(result),
+      hasOutput: !!result.output,
+      outputKeys: result.output ? Object.keys(result.output) : []
+    });
+    
+    // Look for grammar analysis data with enhanced detection
+    const hasGrammarData = this.findGrammarData(result);
+    if (hasGrammarData) {
       extraction.hasGrammarData = true;
       extraction.grammarAnalysis = result;
+      console.log(`Found grammar data in ${extraction.moduleType}`);
     }
     
     // Look for citation data
@@ -135,29 +179,53 @@ export class RedlineAggregator {
     if (citationData && citationData.length > 0) {
       extraction.hasCitationData = true;
       extraction.citationData = citationData;
+      console.log(`Found ${citationData.length} citations in ${extraction.moduleType}`);
     }
     
     // Extract original content and metadata
     extraction.originalContent = this.extractOriginalContent(result);
     extraction.metadata = result.metadata || {};
     
+    console.log(`Module extraction complete for ${extraction.moduleType}:`, {
+      hasGrammarData: extraction.hasGrammarData,
+      hasCitationData: extraction.hasCitationData,
+      originalContentLength: extraction.originalContent?.length || 0
+    });
+    
     return extraction;
   }
   
   /**
-   * Find grammar analysis data in any object structure
+   * Enhanced grammar data detection
    */
   private static findGrammarData(obj: any): boolean {
     if (!obj || typeof obj !== 'object') return false;
     
-    // Direct analysis array check
-    if (obj.analysis && Array.isArray(obj.analysis) && obj.analysis.length > 0) {
-      return true;
-    }
+    console.log('Checking for grammar data in object:', {
+      hasOutput: !!obj.output,
+      hasAnalysis: !!obj.output?.analysis,
+      analysisIsArray: Array.isArray(obj.output?.analysis),
+      analysisLength: obj.output?.analysis?.length || 0,
+      hasFinalOutput: !!obj.finalOutput,
+      hasDirectAnalysis: !!obj.analysis
+    });
     
-    // Check nested output
-    if (obj.output && obj.output.analysis && Array.isArray(obj.output.analysis) && obj.output.analysis.length > 0) {
-      return true;
+    // Check multiple paths for analysis data
+    const analysisPaths = [
+      obj.output?.analysis,
+      obj.finalOutput?.output?.analysis,
+      obj.analysis,
+      obj.result?.output?.analysis
+    ];
+    
+    for (const path of analysisPaths) {
+      if (path && Array.isArray(path) && path.length > 0) {
+        console.log('Found grammar analysis data:', {
+          pathLength: path.length,
+          firstItem: path[0]
+        });
+        return true;
+      }
     }
     
     return false;
@@ -243,16 +311,21 @@ export class RedlineAggregator {
   }
   
   /**
-   * Combine suggestions from all modules
+   * Combine suggestions from all modules with enhanced conversion
    */
   private static combineAllSuggestions(extractions: ModuleDataExtraction[]): RedlineSuggestion[] {
     const allSuggestions: RedlineSuggestion[] = [];
     
     extractions.forEach((extraction, index) => {
-      // Add grammar suggestions
+      console.log(`Processing suggestions for ${extraction.moduleType} (${extraction.nodeId})`);
+      
+      // Add grammar suggestions using direct conversion
       if (extraction.hasGrammarData && extraction.grammarAnalysis) {
         try {
-          const grammarSuggestions = this.convertGrammarToRedline(extraction.grammarAnalysis, extraction.nodeId);
+          const grammarSuggestions = convertGrammarDataToRedlineSuggestions(
+            extraction.grammarAnalysis, 
+            extraction.nodeId
+          );
           allSuggestions.push(...grammarSuggestions);
           console.log(`Added ${grammarSuggestions.length} grammar suggestions from ${extraction.moduleType}`);
         } catch (error) {
@@ -272,21 +345,7 @@ export class RedlineAggregator {
       }
     });
     
+    console.log(`Total combined suggestions: ${allSuggestions.length}`);
     return allSuggestions;
-  }
-  
-  /**
-   * Convert grammar analysis to redline suggestions (simplified)
-   */
-  private static convertGrammarToRedline(grammarResult: any, sourceId: string): RedlineSuggestion[] {
-    // This is a simplified version - we'll use the existing transformation logic
-    try {
-      const { transformGrammarData } = require('@/hooks/redlining/useRedlineDataTransform')();
-      const transformed = transformGrammarData(grammarResult);
-      return transformed?.suggestions || [];
-    } catch (error) {
-      console.error('Error in grammar transformation:', error);
-      return [];
-    }
   }
 }
