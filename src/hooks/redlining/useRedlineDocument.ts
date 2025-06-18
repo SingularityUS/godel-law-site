@@ -32,7 +32,7 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
   }, []);
 
   /**
-   * Update the entire document
+   * Update the entire document - FIXED to properly handle content changes
    */
   const updateDocument = useCallback((updatedDocument: RedlineDocument) => {
     console.log('Updating document with new content');
@@ -47,6 +47,37 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
   }, [autoSave]);
 
   /**
+   * Handle manual content changes from user typing - FIXED to update currentContent properly
+   */
+  const handleContentChange = useCallback((newContent: string) => {
+    console.log('Handling content change from user typing, length:', newContent.length);
+    
+    setDocument(prev => {
+      const updatedDocument = {
+        ...prev,
+        currentContent: newContent, // Update currentContent to preserve user edits
+        metadata: {
+          ...prev.metadata,
+          lastModified: new Date().toISOString()
+        }
+      };
+      
+      // Trigger auto-save for user edits
+      autoSave(updatedDocument);
+      
+      return updatedDocument;
+    });
+    
+    setRedlineState(prev => ({
+      ...prev,
+      document: {
+        ...prev.document!,
+        currentContent: newContent
+      }
+    }));
+  }, [autoSave]);
+
+  /**
    * Handle manual text edits
    */
   const handleManualEdit = useCallback((textRange: TextRange, newText: string) => {
@@ -54,7 +85,7 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
     
     try {
       setDocument(prev => {
-        // Replace the text in the content
+        // Replace the text in the current content (not original)
         const newContent = replaceTextInRange(prev.currentContent, textRange, newText);
         
         // Adjust suggestion positions
@@ -63,8 +94,7 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
         
         const updatedDocument = {
           ...prev,
-          currentContent: newContent,
-          originalContent: newContent, // Update original content too for consistency
+          currentContent: newContent, // Update current content to preserve edits
           suggestions: adjustedSuggestions,
           metadata: {
             ...prev.metadata,
@@ -107,7 +137,7 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
           return suggestion;
         });
 
-        // Apply the change to the document content if accepted or modified
+        // Apply the change to the current content if accepted or modified
         let currentContent = prev.currentContent;
         if (action === 'accepted' || action === 'modified') {
           const suggestion = suggestions.find(s => s.id === suggestionId);
@@ -122,7 +152,7 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
         const updatedDocument = {
           ...prev,
           suggestions,
-          currentContent,
+          currentContent, // Update current content with applied suggestions
           metadata: {
             ...prev.metadata,
             lastModified: new Date().toISOString(),
@@ -246,6 +276,7 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
     filteredSuggestions,
     getCurrentDocument,
     updateDocument,
-    handleManualEdit
+    handleManualEdit,
+    handleContentChange // Export the new content change handler
   };
 };

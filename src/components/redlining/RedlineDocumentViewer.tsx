@@ -35,14 +35,15 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
     filteredSuggestions,
     getCurrentDocument,
     updateDocument,
-    handleManualEdit
+    handleManualEdit,
+    handleContentChange // Use the new content change handler
   } = useRedlineDocument(redlineDocument);
 
   const {
     isEditMode,
     hasUnsavedChanges,
     toggleEditMode,
-    handleContentChange,
+    handleContentChange: editModeContentChange,
     saveDocument
   } = useEditMode(currentDocument, updateDocument);
 
@@ -60,6 +61,9 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
     saveDocument();
     onSave(getCurrentDocument());
   };
+
+  // Use the appropriate content change handler based on mode
+  const contentChangeHandler = isEditMode ? editModeContentChange : handleContentChange;
 
   return (
     <div className="fixed inset-0 z-50 bg-white flex flex-col">
@@ -94,7 +98,7 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
             showSidebar={showSidebar && !isEditMode}
             isEditMode={isEditMode}
             onSuggestionClick={handleSuggestionClick}
-            onContentChange={handleContentChange}
+            onContentChange={contentChangeHandler}
             onSuggestionAccept={acceptSuggestion}
             onSuggestionModify={modifySuggestion}
             onManualEdit={handleManualEdit}
