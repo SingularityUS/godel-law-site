@@ -5,9 +5,10 @@
  * Purpose: Renders documents with original formatting and inline redline suggestions
  */
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { RedlineDocument, RedlineSuggestion } from "@/types/redlining";
-import { extractDocumentContent } from "@/components/DocumentPreview/documentUtils";
+import { useRedlineContent } from "./hooks/useRedlineContent";
+import RedlineStyles from "./components/RedlineStyles";
 
 interface EnhancedDocumentRendererProps {
   document: RedlineDocument;
@@ -24,198 +25,12 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
   selectedSuggestionId,
   onSuggestionClick
 }) => {
-  const [richContent, setRichContent] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const loadRichContent = async () => {
-      setIsLoading(true);
-      try {
-        console.log('Loading rich content for redlining');
-        console.log('Document original content length:', document.originalContent.length);
-        console.log('Suggestions count:', suggestions.length);
-        
-        let baseContent = '';
-        
-        // Try to get the best available content
-        if (originalDocument?.preview) {
-          console.log('Using original document preview');
-          const content = await extractDocumentContent(originalDocument);
-          baseContent = content;
-        } else if (document.originalContent && document.originalContent.trim().length > 0) {
-          console.log('Using document original content');
-          baseContent = document.originalContent;
-        } else {
-          console.log('Using document current content as fallback');
-          baseContent = document.currentContent;
-        }
-        
-        // Validate that we have meaningful content
-        if (!baseContent || baseContent.trim().length === 0) {
-          console.warn('No meaningful content found for redlining');
-          baseContent = 'No document content available for redlining.';
-        }
-        
-        console.log('Base content preview:', baseContent.substring(0, 200) + '...');
-        
-        // Apply redline markup to the full content
-        const enhancedContent = injectRedlineMarkup(baseContent, suggestions, selectedSuggestionId);
-        setRichContent(enhancedContent);
-        
-      } catch (error) {
-        console.error('Error loading rich content:', error);
-        // Use document content as absolute fallback
-        const fallbackContent = document.originalContent || document.currentContent || 'Error loading document content.';
-        const enhancedContent = injectRedlineMarkup(fallbackContent, suggestions, selectedSuggestionId);
-        setRichContent(enhancedContent);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadRichContent();
-  }, [document, originalDocument, suggestions, selectedSuggestionId]);
-
-  const injectRedlineMarkup = (content: string, suggestions: RedlineSuggestion[], selectedId: string | null): string => {
-    console.log(`Injecting redline markup into content (${content.length} chars) with ${suggestions.length} suggestions`);
-    
-    if (!content || content.trim().length === 0) {
-      return '<p>No content available</p>';
-    }
-    
-    let enhancedContent = content;
-    
-    // Sort suggestions by position (reverse order to maintain positions)
-    const validSuggestions = suggestions.filter(s => 
-      s.status === 'pending' && 
-      s.startPos !== undefined && 
-      s.endPos !== undefined &&
-      s.startPos >= 0 && 
-      s.endPos <= content.length &&
-      s.startPos < s.endPos
-    );
-    
-    console.log(`Applying ${validSuggestions.length} valid suggestions`);
-    
-    const sortedSuggestions = [...validSuggestions].sort((a, b) => b.startPos - a.startPos);
-    
-    sortedSuggestions.forEach((suggestion, index) => {
-      try {
-        const beforeText = enhancedContent.substring(0, suggestion.startPos);
-        const originalText = enhancedContent.substring(suggestion.startPos, suggestion.endPos);
-        const afterText = enhancedContent.substring(suggestion.endPos);
-        
-        // Validate that we're highlighting the expected text
-        const expectedText = suggestion.originalText;
-        if (expectedText && originalText.trim() !== expectedText.trim()) {
-          console.warn(`Text mismatch for suggestion ${suggestion.id}: expected "${expectedText}" but found "${originalText}"`);
-        }
-        
-        const isSelected = selectedId === suggestion.id;
-        const severityClass = getSeverityClass(suggestion.severity);
-        const typeClass = getTypeClass(suggestion.type);
-        
-        const redlineMarkup = `<span 
-            class="redline-suggestion ${severityClass} ${typeClass} ${isSelected ? 'selected' : ''}" 
-            data-suggestion-id="${suggestion.id}"
-            data-type="${suggestion.type}"
-            data-severity="${suggestion.severity}"
-            title="${escapeHtml(suggestion.explanation)}"
-          >
-            <span class="original-text">${escapeHtml(originalText)}</span>
-            <span class="suggested-text">${escapeHtml(suggestion.suggestedText)}</span>
-            <span class="redline-indicator">${getTypeIcon(suggestion.type)}</span>
-          </span>`;
-        
-        enhancedContent = beforeText + redlineMarkup + afterText;
-        
-        console.log(`Applied suggestion ${index + 1}/${sortedSuggestions.length}: "${originalText.substring(0, 30)}..."`);
-        
-      } catch (error) {
-        console.error(`Error applying suggestion ${suggestion.id}:`, error);
-      }
-    });
-    
-    // Convert plain text formatting to HTML while preserving redlines
-    enhancedContent = convertTextToHtml(enhancedContent);
-    
-    console.log('Redline markup injection complete');
-    return enhancedContent;
-  };
-
-  /**
-   * Converts plain text to HTML while preserving existing HTML markup
-   */
-  const convertTextToHtml = (content: string): string => {
-    console.log('Converting text to HTML, preserving existing markup');
-    
-    // Check if content already contains HTML elements (redline spans)
-    const hasHtmlMarkup = /<span[^>]*class="redline-suggestion"/.test(content);
-    
-    if (!hasHtmlMarkup) {
-      // Plain text - convert line breaks to paragraphs
-      return content
-        .split('\n')
-        .map(line => line.trim() === '' ? '<br>' : `<p>${line}</p>`)
-        .join('');
-    }
-    
-    // Content has HTML markup - preserve it and only convert non-markup text
-    const lines = content.split('\n');
-    const htmlLines = lines.map(line => {
-      if (line.trim() === '') {
-        return '<br>';
-      }
-      
-      // If line contains redline markup, preserve it
-      if (/<span[^>]*class="redline-suggestion"/.test(line)) {
-        return `<p>${line}</p>`;
-      }
-      
-      // Plain text line - wrap in paragraph
-      return `<p>${line}</p>`;
-    });
-    
-    return htmlLines.join('');
-  };
-
-  /**
-   * Escapes HTML characters to prevent XSS
-   */
-  const escapeHtml = (text: string): string => {
-    const div = window.document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  };
-
-  const getSeverityClass = (severity: string): string => {
-    switch (severity) {
-      case 'high': return 'severity-high';
-      case 'medium': return 'severity-medium';
-      case 'low': return 'severity-low';
-      default: return 'severity-medium';
-    }
-  };
-
-  const getTypeClass = (type: string): string => {
-    switch (type) {
-      case 'grammar': return 'type-grammar';
-      case 'style': return 'type-style';
-      case 'legal': return 'type-legal';
-      case 'clarity': return 'type-clarity';
-      default: return 'type-grammar';
-    }
-  };
-
-  const getTypeIcon = (type: string): string => {
-    switch (type) {
-      case 'grammar': return '✓';
-      case 'style': return '✦';
-      case 'legal': return '⚖';
-      case 'clarity': return '💡';
-      default: return '✓';
-    }
-  };
+  const { richContent, isLoading } = useRedlineContent({
+    document,
+    originalDocument,
+    suggestions,
+    selectedSuggestionId
+  });
 
   const handleContentClick = (event: React.MouseEvent) => {
     const target = event.target as HTMLElement;
@@ -240,72 +55,9 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
     );
   }
 
-  const redlineStyles = `
-    .redline-suggestion {
-      position: relative;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      border-radius: 2px;
-      padding: 1px 2px;
-      display: inline;
-    }
-    
-    .redline-suggestion:hover {
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      z-index: 10;
-    }
-    
-    .redline-suggestion.selected {
-      box-shadow: 0 0 0 2px #3b82f6;
-      z-index: 20;
-    }
-    
-    .original-text {
-      text-decoration: line-through;
-      opacity: 0.7;
-      color: #dc2626;
-    }
-    
-    .suggested-text {
-      background-color: #dcfce7;
-      color: #166534;
-      font-weight: 500;
-      margin-left: 4px;
-    }
-    
-    .redline-indicator {
-      display: inline-block;
-      margin-left: 2px;
-      font-size: 10px;
-      opacity: 0.7;
-    }
-    
-    /* Severity styles */
-    .severity-high {
-      background-color: #fef2f2;
-      border-left: 3px solid #dc2626;
-    }
-    
-    .severity-medium {
-      background-color: #fefce8;
-      border-left: 3px solid #ca8a04;
-    }
-    
-    .severity-low {
-      background-color: #f0fdf4;
-      border-left: 3px solid #16a34a;
-    }
-    
-    /* Type styles */
-    .type-grammar { border-color: #3b82f6; }
-    .type-style { border-color: #8b5cf6; }
-    .type-legal { border-color: #f97316; }
-    .type-clarity { border-color: #06b6d4; }
-  `;
-
   return (
     <div className="bg-gray-100 w-full h-full overflow-y-auto">
-      <style dangerouslySetInnerHTML={{ __html: redlineStyles }} />
+      <RedlineStyles />
       <div className="max-w-4xl mx-auto py-8 px-4">
         <div className="bg-white shadow-lg p-16 relative">
           <div 
