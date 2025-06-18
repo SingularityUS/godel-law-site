@@ -58,6 +58,7 @@ export const usePipelineExecutor = (nodes: AllNodes[], edges: Edge[]) => {
       initializeState(executionOrder);
 
       let currentData: any = null;
+      let documentExtractionResult: any = null; // Store initial document result
       const pipelineResults: any[] = [];
 
       // Process each node in order
@@ -70,6 +71,13 @@ export const usePipelineExecutor = (nodes: AllNodes[], edges: Edge[]) => {
         try {
           if (node?.data?.moduleType === 'document-input') {
             currentData = await processDocumentNode(node as DocumentInputNode);
+            documentExtractionResult = currentData; // Preserve the initial document extraction
+            console.log('Document extraction result preserved:', {
+              hasOriginalContent: !!documentExtractionResult?.originalContent,
+              hasProcessableContent: !!documentExtractionResult?.processableContent,
+              fileName: documentExtractionResult?.fileName,
+              contentLength: documentExtractionResult?.originalContent?.length || 0
+            });
           } else {
             currentData = await processModuleNode(
               nodeId, 
@@ -105,8 +113,8 @@ export const usePipelineExecutor = (nodes: AllNodes[], edges: Edge[]) => {
         }
       }
 
-      // Create comprehensive final output for legal review
-      const finalLegalOutput = executionManager.createFinalOutput(pipelineResults, currentData);
+      // Create comprehensive final output for legal review with preserved document extraction
+      const finalLegalOutput = executionManager.createFinalOutput(pipelineResults, currentData, documentExtractionResult);
       setFinalOutput(finalLegalOutput);
       
       // Log final pipeline statistics
@@ -115,7 +123,9 @@ export const usePipelineExecutor = (nodes: AllNodes[], edges: Edge[]) => {
         totalModules: pipelineResults.length,
         finalDataType: typeof currentData,
         hasAnalysis: currentData?.output?.analysis ? currentData.output.analysis.length : 0,
-        hasParagraphs: currentData?.output?.paragraphs ? currentData.output.paragraphs.length : 0
+        hasParagraphs: currentData?.output?.paragraphs ? currentData.output.paragraphs.length : 0,
+        hasDocumentExtraction: !!documentExtractionResult,
+        documentExtractionOriginalContent: documentExtractionResult?.originalContent?.length || 0
       });
 
     } catch (error: any) {
