@@ -1,3 +1,4 @@
+
 /**
  * Markup Injection Utilities
  * 
@@ -7,25 +8,6 @@
 import { RedlineSuggestion } from "@/types/redlining";
 import { escapeHtml } from "./htmlUtils";
 import { getSeverityClass, getTypeClass, getTypeIcon } from "./styleUtils";
-
-/**
- * Temporary marker for paragraph breaks to preserve them during processing
- */
-const PARAGRAPH_MARKER = '___PARAGRAPH_BREAK___';
-
-/**
- * Preserves paragraph breaks by converting them to temporary markers
- */
-const preserveParagraphBreaks = (content: string): string => {
-  return content.replace(/\n\n/g, PARAGRAPH_MARKER);
-};
-
-/**
- * Restores paragraph breaks from temporary markers and converts to HTML
- */
-const restoreParagraphBreaks = (content: string): string => {
-  return content.replace(new RegExp(PARAGRAPH_MARKER, 'g'), '</p><p>');
-};
 
 /**
  * Creates a redline markup span for a suggestion with interactive elements
@@ -60,7 +42,7 @@ const validateSuggestion = (suggestion: RedlineSuggestion, contentLength: number
 };
 
 /**
- * Applies a single suggestion to content while preserving paragraph markers
+ * Applies a single suggestion to content
  */
 const applySuggestion = (
   content: string,
@@ -84,6 +66,28 @@ const applySuggestion = (
 };
 
 /**
+ * Converts content to HTML structure while preserving paragraph breaks
+ */
+const convertToHtmlWithParagraphs = (content: string): string => {
+  // Split on double line breaks to identify paragraphs
+  const paragraphs = content.split('\n\n');
+  
+  return paragraphs
+    .map(paragraph => {
+      const trimmedParagraph = paragraph.trim();
+      if (trimmedParagraph === '') {
+        return ''; // Skip empty paragraphs
+      }
+      
+      // Within each paragraph, convert single line breaks to <br> tags
+      const paragraphWithBreaks = trimmedParagraph.replace(/\n/g, '<br>');
+      return `<p>${paragraphWithBreaks}</p>`;
+    })
+    .filter(p => p !== '') // Remove empty paragraphs
+    .join('');
+};
+
+/**
  * Processes all suggestions and applies them to content while preserving paragraph structure
  */
 export const processSuggestions = (
@@ -93,68 +97,27 @@ export const processSuggestions = (
 ): string => {
   console.log(`Processing ${suggestions.length} suggestions for markup injection`);
   
-  // Step 1: Preserve paragraph breaks before processing
-  const contentWithMarkers = preserveParagraphBreaks(content);
-  console.log('Preserved paragraph breaks with markers');
-  
   // Filter and sort suggestions
   const validSuggestions = suggestions.filter(s => validateSuggestion(s, content.length));
   console.log(`Applying ${validSuggestions.length} valid suggestions`);
   
   const sortedSuggestions = [...validSuggestions].sort((a, b) => b.startPos - a.startPos);
   
-  let enhancedContent = contentWithMarkers;
+  let enhancedContent = content;
   
-  // Step 2: Apply suggestions while preserving markers
+  // Apply suggestions to the raw content first
   sortedSuggestions.forEach((suggestion, index) => {
     try {
-      // Adjust positions for the markers we added
-      const adjustedSuggestion = {
-        ...suggestion,
-        startPos: adjustPositionForMarkers(suggestion.startPos, content, contentWithMarkers),
-        endPos: adjustPositionForMarkers(suggestion.endPos, content, contentWithMarkers)
-      };
-      
-      enhancedContent = applySuggestion(enhancedContent, adjustedSuggestion, selectedId);
+      enhancedContent = applySuggestion(enhancedContent, suggestion, selectedId);
       console.log(`Applied suggestion ${index + 1}/${sortedSuggestions.length}`);
     } catch (error) {
       console.error(`Error applying suggestion ${suggestion.id}:`, error);
     }
   });
   
-  // Step 3: Convert to HTML structure while preserving redline markup
+  // Convert to HTML structure while preserving paragraph breaks
   const htmlContent = convertToHtmlWithParagraphs(enhancedContent);
   
   console.log('Completed suggestion processing with paragraph preservation');
-  return htmlContent;
-};
-
-/**
- * Adjusts character positions to account for paragraph markers
- */
-const adjustPositionForMarkers = (position: number, originalContent: string, markedContent: string): number => {
-  const beforeOriginal = originalContent.substring(0, position);
-  const paragraphBreaksCount = (beforeOriginal.match(/\n\n/g) || []).length;
-  
-  // Each \n\n (2 chars) becomes ___PARAGRAPH_BREAK___ (21 chars), so we add 19 chars per replacement
-  return position + (paragraphBreaksCount * (PARAGRAPH_MARKER.length - 2));
-};
-
-/**
- * Converts content with paragraph markers to proper HTML structure
- */
-const convertToHtmlWithParagraphs = (content: string): string => {
-  // First, wrap the entire content in a paragraph
-  let htmlContent = `<p>${content}</p>`;
-  
-  // Then restore paragraph breaks and convert to proper HTML structure
-  htmlContent = restoreParagraphBreaks(htmlContent);
-  
-  // Clean up any empty paragraphs
-  htmlContent = htmlContent.replace(/<p>\s*<\/p>/g, '');
-  
-  // Ensure we don't have nested paragraphs (shouldn't happen but safety check)
-  htmlContent = htmlContent.replace(/<p>\s*<p>/g, '<p>').replace(/<\/p>\s*<\/p>/g, '</p>');
-  
   return htmlContent;
 };

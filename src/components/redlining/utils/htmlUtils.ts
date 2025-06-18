@@ -29,10 +29,10 @@ export const hasRedlineMarkup = (content: string): boolean => {
 };
 
 /**
- * Converts plain text to HTML while preserving existing HTML markup
+ * Converts plain text to HTML while preserving paragraph structure
  */
 export const convertTextToHtml = (content: string): string => {
-  console.log('Converting text to HTML, preserving existing markup');
+  console.log('Converting text to HTML, preserving paragraph structure');
   
   // If content already contains redline markup, it should already be in HTML format
   if (hasRedlineMarkup(content)) {
@@ -46,17 +46,24 @@ export const convertTextToHtml = (content: string): string => {
     return content;
   }
   
-  // Plain text - convert line breaks to paragraphs
-  console.log('Converting plain text to HTML paragraphs');
-  return content
-    .split('\n')
-    .map(line => {
-      const trimmedLine = line.trim();
-      if (trimmedLine === '') {
-        return '<br>';
+  // Plain text - convert preserving paragraph structure
+  console.log('Converting plain text to HTML with proper paragraph handling');
+  
+  // First, split on double line breaks to identify paragraphs
+  const paragraphs = content.split('\n\n');
+  
+  return paragraphs
+    .map(paragraph => {
+      const trimmedParagraph = paragraph.trim();
+      if (trimmedParagraph === '') {
+        return ''; // Skip empty paragraphs
       }
-      return `<p>${trimmedLine}</p>`;
+      
+      // Within each paragraph, convert single line breaks to <br> tags
+      const paragraphWithBreaks = trimmedParagraph.replace(/\n/g, '<br>');
+      return `<p>${paragraphWithBreaks}</p>`;
     })
+    .filter(p => p !== '') // Remove empty paragraphs
     .join('');
 };
 
