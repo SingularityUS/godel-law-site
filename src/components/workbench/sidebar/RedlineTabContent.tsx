@@ -2,7 +2,7 @@
 /**
  * RedlineTabContent Component
  * 
- * Purpose: Content for the redline tab in the workspace sidebar
+ * Purpose: Content for the redline tab in the workspace sidebar with enhanced debugging
  * Extracted from WorkspaceSidebar for better organization
  */
 
@@ -71,23 +71,38 @@ const RedlineTabContent: React.FC<RedlineTabContentProps> = ({
     );
   }
 
-  // Default empty state
+  // Enhanced empty state with detailed debugging
   return (
     <div className="h-full flex items-center justify-center p-6">
-      <div className="text-center">
+      <div className="text-center max-w-md">
         <p className="text-gray-600 mb-2">No redline document available</p>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 mb-4">
           {isLegalPipeline 
-            ? "Unable to generate redline from current pipeline output"
+            ? "Analyzing pipeline output for redline generation..."
             : "Run a legal document analysis pipeline to generate redline suggestions"
           }
         </p>
+        
         {isLegalPipeline && (
-          <div className="mt-4 p-3 bg-yellow-50 rounded border text-xs text-left">
-            <p className="font-medium text-yellow-800 mb-1">Debug Info:</p>
-            <p className="text-yellow-700">Pipeline Type: {output?.summary?.pipelineType || 'Unknown'}</p>
-            <p className="text-yellow-700">Has Analysis: {!!output?.output?.analysis ? 'Yes' : 'No'}</p>
-            <p className="text-yellow-700">Analysis Items: {output?.output?.analysis?.length || 0}</p>
+          <div className="mt-4 p-4 bg-blue-50 rounded border text-left">
+            <p className="font-medium text-blue-800 mb-2">Pipeline Analysis:</p>
+            <div className="space-y-1 text-xs text-blue-700">
+              <div>Pipeline Type: {output?.summary?.pipelineType || 'Legal Document Analysis'}</div>
+              <div>Has Grammar Analysis: {!!output?.output?.analysis ? 'Yes' : 'No'}</div>
+              <div>Grammar Items: {output?.output?.analysis?.length || 0}</div>
+              <div>Has Citations: {!!output?.output?.citations ? 'Yes' : 'No'}</div>
+              <div>Citation Count: {output?.output?.citations?.length || 0}</div>
+              <div>Processing Stats: {output?.output?.processingStats ? 'Available' : 'None'}</div>
+              <div>Has Metadata: {!!output?.metadata ? 'Yes' : 'No'}</div>
+              <div>Has Original Content: {!!(output?.metadata?.originalContent || output?.originalContent) ? 'Yes' : 'No'}</div>
+            </div>
+            
+            {output?.metadata?.error && (
+              <div className="mt-3 p-2 bg-yellow-100 rounded">
+                <p className="text-xs font-medium text-yellow-800">Pipeline Error:</p>
+                <p className="text-xs text-yellow-700">{output.metadata.userFriendlyError || output.metadata.error}</p>
+              </div>
+            )}
           </div>
         )}
       </div>
