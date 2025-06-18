@@ -22,6 +22,7 @@ export const processParagraphBatches = async (
   let totalOutputGenerated = 0;
   
   console.log(`Starting paragraph batch processing of ${paragraphs.length} paragraphs`);
+  console.log(`Streaming callback available: ${!!window.streamingRedlineCallback}`);
   
   // Report initial progress correctly
   if (onProgress) {
@@ -104,11 +105,14 @@ export const processParagraphBatches = async (
       };
       
       try {
+        console.log(`🚀 STREAMING: Calling callback for batch ${batchNumber}/${totalBatches} with ${combinedBatchResult.output.analysis.length} analysis items`);
         window.streamingRedlineCallback(combinedBatchResult, batchNumber - 1, totalBatches);
-        console.log(`Streaming callback triggered for paragraph batch ${batchNumber}/${totalBatches}`);
+        console.log(`✅ STREAMING: Callback executed successfully for batch ${batchNumber}/${totalBatches}`);
       } catch (error) {
-        console.error('Error in streaming paragraph callback:', error);
+        console.error('❌ STREAMING: Error in streaming paragraph callback:', error);
       }
+    } else {
+      console.warn(`⚠️ STREAMING: No callback available for batch ${batchNumber}/${totalBatches} (callback exists: ${!!window.streamingRedlineCallback})`);
     }
     
     // Delay between batches

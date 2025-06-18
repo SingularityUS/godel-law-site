@@ -42,7 +42,7 @@ export const useStreamingRedlineGeneration = ({
 
   // Process incremental batch results for streaming display
   const processIncrementalBatch = useCallback((batchResult: any, batchIndex: number, totalBatches: number) => {
-    console.log(`Processing incremental batch ${batchIndex + 1}/${totalBatches}:`, batchResult);
+    console.log(`Streaming: Processing incremental batch ${batchIndex + 1}/${totalBatches}:`, batchResult);
     
     try {
       // Transform the batch result to redline format
@@ -61,25 +61,45 @@ export const useStreamingRedlineGeneration = ({
           partialDocument: partialRedlineData
         }));
 
-        console.log(`Streaming redline updated: ${batchIndex + 1}/${totalBatches} batches complete`);
+        console.log(`Streaming redline updated: ${batchIndex + 1}/${totalBatches} batches complete - Document displayed`);
       }
     } catch (error) {
       console.error('Error processing incremental batch for redline:', error);
     }
   }, [transformGrammarData, output.metadata]);
 
-  // Register the batch completion callback
+  // Register the streaming callback immediately when legal pipeline starts
   useEffect(() => {
-    if (onBatchComplete && isLegalPipeline) {
-      // Store the callback for use by batch processors
+    if (isLegalPipeline) {
+      console.log('Registering streaming redline callback for legal pipeline');
       window.streamingRedlineCallback = processIncrementalBatch;
+      
+      // Listen for early callback registration events
+      const handleStreamingCallbackReady = (event: CustomEvent) => {
+        console.log('Streaming callback ready event received - re-registering callback');
+        window.streamingRedlineCallback = processIncrementalBatch;
+      };
+
+      window.addEventListener('streamingCallbackReady', handleStreamingCallbackReady as EventListener);
+      
+      return () => {
+        window.removeEventListener('streamingCallbackReady', handleStreamingCallbackReady as EventListener);
+      };
     }
     
     return () => {
-      if (window.streamingRedlineCallback) {
+      if (window.streamingRedlineCallback === processIncrementalBatch) {
+        console.log('Cleaning up streaming redline callback');
         delete window.streamingRedlineCallback;
       }
     };
+  }, [processIncrementalBatch, isLegalPipeline]);
+
+  // Also register via onBatchComplete prop if provided (legacy support)
+  useEffect(() => {
+    if (onBatchComplete && isLegalPipeline) {
+      console.log('Streaming callback also registered via onBatchComplete prop');
+    }
   }, [processIncrementalBatch, onBatchComplete, isLegalPipeline]);
 
   // Generate final redline document when pipeline completes

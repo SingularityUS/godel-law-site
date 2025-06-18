@@ -36,6 +36,11 @@ const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
     isLegalPipeline
   } = useWorkspaceSidebarState(output);
 
+  // Batch completion handler for streaming results
+  const handleBatchComplete = React.useCallback((batchResult: any, batchIndex: number, totalBatches: number) => {
+    console.log(`WorkspaceSidebar: Batch ${batchIndex + 1}/${totalBatches} completed for streaming display`);
+  }, []);
+
   // Use streaming redline generation hook for real-time updates
   const {
     redlineDocument,
@@ -45,14 +50,14 @@ const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
     handleExportRedline
   } = useStreamingRedlineGeneration({
     output,
-    isLegalPipeline: isLegalPipeline || isPipelineExecuting // Assume legal pipeline during execution
+    isLegalPipeline: isLegalPipeline || isPipelineExecuting,
+    onBatchComplete: handleBatchComplete
   });
 
   // Register streaming callback early when pipeline starts executing
   React.useEffect(() => {
     if (isPipelineExecuting || isExecuting) {
-      console.log('Pipeline execution started - registering streaming callback early');
-      // The useStreamingRedlineGeneration hook will handle callback registration
+      console.log('WorkspaceSidebar: Pipeline execution started - ensuring streaming callback registration');
     }
   }, [isPipelineExecuting, isExecuting]);
 
@@ -73,6 +78,11 @@ const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
                 <p className="text-gray-600 font-medium">Pipeline Executing...</p>
                 <p className="text-sm text-gray-500 mt-2">Results will appear as batches complete</p>
+                <div className="mt-4 p-3 bg-blue-50 rounded border text-xs">
+                  <p className="text-blue-700">
+                    🔄 Streaming callback registered - waiting for results...
+                  </p>
+                </div>
               </div>
             </div>
           ) : (
