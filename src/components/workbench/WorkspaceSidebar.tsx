@@ -59,7 +59,7 @@ const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   });
 
   return (
-    <div className="flex flex-col border-l bg-white h-full max-h-screen overflow-hidden">
+    <div className="flex flex-col border-l bg-white h-full max-h-full overflow-hidden">
       <WorkspaceSidebarHeader 
         isOpen={isOpen}
         onClose={onClose}

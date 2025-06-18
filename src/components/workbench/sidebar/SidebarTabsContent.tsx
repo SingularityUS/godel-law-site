@@ -1,11 +1,12 @@
 
 import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Edit3, BarChart3 } from "lucide-react";
+import { FileText, Edit3, BarChart3, Code } from "lucide-react";
 import { RedlineDocument } from "@/types/redlining";
 import RedlineTabContent from "./RedlineTabContent";
 import DocumentPreviewTab from "./DocumentPreviewTab";
 import AnalysisContent from "../output/AnalysisContent";
+import RawDataTab from "../output/RawDataTab";
 
 interface SidebarTabsContentProps {
   activeTab: string;
@@ -37,7 +38,7 @@ const SidebarTabsContent: React.FC<SidebarTabsContentProps> = ({
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-        <TabsList className="grid w-full grid-cols-3 flex-shrink-0">
+        <TabsList className="grid w-full grid-cols-4 flex-shrink-0">
           <TabsTrigger value="document" className="flex items-center gap-1">
             <FileText size={14} />
             <span className="hidden sm:inline">Document</span>
@@ -49,6 +50,10 @@ const SidebarTabsContent: React.FC<SidebarTabsContentProps> = ({
           <TabsTrigger value="analysis" className="flex items-center gap-1">
             <BarChart3 size={14} />
             <span className="hidden sm:inline">Analysis</span>
+          </TabsTrigger>
+          <TabsTrigger value="raw" className="flex items-center gap-1">
+            <Code size={14} />
+            <span className="hidden sm:inline">Raw Data</span>
           </TabsTrigger>
         </TabsList>
 
@@ -73,6 +78,12 @@ const SidebarTabsContent: React.FC<SidebarTabsContentProps> = ({
           <TabsContent value="analysis" className="h-full m-0 overflow-hidden">
             <div className="h-full overflow-auto">
               <AnalysisContent analysisData={output?.output?.analysis || []} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="raw" className="h-full m-0 overflow-hidden">
+            <div className="h-full overflow-auto">
+              <RawDataTab output={output} />
             </div>
           </TabsContent>
         </div>
