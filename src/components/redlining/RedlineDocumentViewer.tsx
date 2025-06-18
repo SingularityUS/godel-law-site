@@ -7,6 +7,7 @@ import RedlineDocumentArea from "./components/RedlineDocumentArea";
 import RedlineSidebar from "./components/RedlineSidebar";
 import RedlineTooltipManager from "./components/RedlineTooltipManager";
 import { useRedlineDocument } from "@/hooks/redlining/useRedlineDocument";
+import { useEditMode } from "@/hooks/redlining/useEditMode";
 
 interface RedlineDocumentViewerProps {
   document: RedlineDocument;
@@ -25,16 +26,24 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
 }) => {
   const {
     redlineState,
+    document: currentDocument,
     handleSuggestionAction,
     navigateToSuggestion,
     applyFilters,
     filteredSuggestions,
-    getCurrentDocument
+    getCurrentDocument,
+    updateDocument
   } = useRedlineDocument(redlineDocument);
 
-  const [showSidebar, setShowSidebar] = useState(true);
+  const {
+    isEditMode,
+    hasUnsavedChanges,
+    toggleEditMode,
+    handleContentChange,
+    saveDocument
+  } = useEditMode(currentDocument, updateDocument);
 
-  const currentDoc = getCurrentDocument();
+  const [showSidebar, setShowSidebar] = useState(true);
 
   const handleSuggestionClick = (suggestionId: string) => {
     navigateToSuggestion(suggestionId);
@@ -44,38 +53,48 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
     setShowSidebar(true);
   };
 
+  const handleSave = () => {
+    saveDocument();
+    onSave(getCurrentDocument());
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-white flex flex-col">
       <Card className="h-full flex flex-col border-0 rounded-none">
         <CardHeader className="border-b bg-gray-50 flex-shrink-0">
           <div className="flex items-center justify-between">
             <CardTitle className="text-xl font-semibold">
-              Document Redlining - {currentDoc.metadata.fileName}
+              Document Redlining - {currentDocument.metadata.fileName}
             </CardTitle>
             <RedlineToolbar
-              document={currentDoc}
+              document={currentDocument}
               state={redlineState}
+              isEditMode={isEditMode}
+              hasUnsavedChanges={hasUnsavedChanges}
               onClose={onClose}
-              onSave={() => onSave(currentDoc)}
-              onExport={(format) => onExport(currentDoc, format)}
+              onSave={handleSave}
+              onExport={(format) => onExport(getCurrentDocument(), format)}
               onNavigate={navigateToSuggestion}
               onFilter={applyFilters}
               onToggleSidebar={() => setShowSidebar(!showSidebar)}
+              onToggleEditMode={toggleEditMode}
             />
           </div>
         </CardHeader>
         
         <CardContent className="flex-1 flex p-0 overflow-hidden">
           <RedlineDocumentArea
-            document={currentDoc}
+            document={currentDocument}
             originalDocument={originalDocument || { type: 'text/plain' }}
             suggestions={filteredSuggestions}
             selectedSuggestionId={redlineState.selectedSuggestionId}
-            showSidebar={showSidebar}
+            showSidebar={showSidebar && !isEditMode}
+            isEditMode={isEditMode}
             onSuggestionClick={handleSuggestionClick}
+            onContentChange={handleContentChange}
           />
           
-          {showSidebar && (
+          {showSidebar && !isEditMode && (
             <RedlineSidebar
               suggestions={filteredSuggestions}
               selectedSuggestionId={redlineState.selectedSuggestionId}
@@ -85,12 +104,14 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
         </CardContent>
       </Card>
 
-      <RedlineTooltipManager
-        suggestions={filteredSuggestions}
-        onSuggestionAction={handleSuggestionAction}
-        onNavigateToSuggestion={navigateToSuggestion}
-        onShowSidebar={handleShowSidebar}
-      />
+      {!isEditMode && (
+        <RedlineTooltipManager
+          suggestions={filteredSuggestions}
+          onSuggestionAction={handleSuggestionAction}
+          onNavigateToSuggestion={navigateToSuggestion}
+          onShowSidebar={handleShowSidebar}
+        />
+      )}
     </div>
   );
 };

@@ -1,4 +1,3 @@
-
 /**
  * useRedlineDocument Hook
  * 
@@ -19,6 +18,18 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
     showRejected: false,
     currentSuggestionIndex: 0
   });
+
+  /**
+   * Update the entire document
+   */
+  const updateDocument = useCallback((updatedDocument: RedlineDocument) => {
+    console.log('Updating document with new content');
+    setDocument(updatedDocument);
+    setRedlineState(prev => ({
+      ...prev,
+      document: updatedDocument
+    }));
+  }, []);
 
   /**
    * Handle suggestion actions (accept, reject, modify)
@@ -161,6 +172,7 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
     navigateToSuggestion,
     applyFilters,
     filteredSuggestions,
-    getCurrentDocument
+    getCurrentDocument,
+    updateDocument
   };
 };
