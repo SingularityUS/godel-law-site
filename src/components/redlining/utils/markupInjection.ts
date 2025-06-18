@@ -110,7 +110,26 @@ const applySuggestionToPlainText = (
 };
 
 /**
- * Converts plain text content to HTML with paragraph structure
+ * Detects if content is enhanced HTML (from mammoth.js or similar)
+ */
+const isEnhancedHtml = (content: string): boolean => {
+  // Check for specific patterns that indicate enhanced formatting
+  const enhancedPatterns = [
+    /<p[^>]*class="[^"]*document-title[^"]*"/,
+    /<p[^>]*class="[^"]*heading-\d[^"]*"/,
+    /<p[^>]*class="[^"]*text-center[^"]*"/,
+    /<p[^>]*class="[^"]*text-indent[^"]*"/,
+    /<p[^>]*style="[^"]*text-align[^"]*"/,
+    /<p[^>]*style="[^"]*margin-left[^"]*"/,
+    /<ol|<ul/,
+    /<strong>|<em>|<u>/
+  ];
+  
+  return enhancedPatterns.some(pattern => pattern.test(content));
+};
+
+/**
+ * Converts plain text content to HTML with paragraph structure (fallback only)
  */
 const convertPlainTextToHtml = (content: string): string => {
   console.log('Converting plain text to HTML with paragraph structure');
@@ -134,7 +153,7 @@ const convertPlainTextToHtml = (content: string): string => {
 };
 
 /**
- * Processes all suggestions and applies them to content with smart positioning
+ * Processes all suggestions and applies them to content while preserving formatting
  */
 export const processSuggestions = (
   content: string,
@@ -144,7 +163,13 @@ export const processSuggestions = (
   console.log(`Processing ${suggestions.length} suggestions for markup injection`);
   
   const isHtmlContent = hasHtmlMarkup(content);
-  console.log('Content type:', isHtmlContent ? 'HTML' : 'Plain Text');
+  const isEnhanced = isEnhancedHtml(content);
+  
+  console.log('Content analysis:', {
+    isHtml: isHtmlContent,
+    isEnhanced: isEnhanced,
+    length: content.length
+  });
   
   // Filter and validate suggestions based on content type
   let validSuggestions: RedlineSuggestion[];
@@ -178,11 +203,16 @@ export const processSuggestions = (
     }
   });
   
-  // Convert to HTML if needed (only for plain text)
+  // Only convert to HTML if we don't already have HTML content
+  // This preserves enhanced formatting from mammoth.js and similar tools
   if (!hasHtmlMarkup(enhancedContent)) {
+    console.log('Converting plain text to HTML');
     enhancedContent = convertPlainTextToHtml(enhancedContent);
+  } else if (isEnhanced) {
+    console.log('Preserving enhanced HTML formatting');
+    // Content is already enhanced HTML - no conversion needed
   }
   
-  console.log('Completed suggestion processing with smart positioning');
+  console.log('Completed suggestion processing while preserving formatting');
   return enhancedContent;
 };

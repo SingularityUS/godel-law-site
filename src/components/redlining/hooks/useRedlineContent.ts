@@ -36,45 +36,56 @@ export const useRedlineContent = ({
         console.log('Suggestions count:', suggestions.length);
         
         let baseContent = '';
+        let contentSource = 'unknown';
         
         // PRIORITY 1: Use enhanced formatted content from original document
         if (originalDocument?.preview) {
           console.log('Extracting enhanced formatted content from original document');
           try {
             baseContent = await extractDocumentContent(originalDocument);
+            contentSource = 'enhanced-original';
             console.log('Successfully extracted enhanced formatted content');
           } catch (error) {
             console.warn('Failed to extract enhanced content, falling back to stored content:', error);
             baseContent = document.currentContent || document.originalContent || '';
+            contentSource = 'fallback-stored';
           }
         }
         // FALLBACK 1: Use currentContent to preserve manual edits
         else if (document.currentContent && document.currentContent.length > 0) {
           console.log('Using document current content (preserves manual edits)');
           baseContent = document.currentContent;
+          contentSource = 'current-content';
         } 
         // FALLBACK 2: Use originalContent 
         else if (document.originalContent && document.originalContent.length > 0) {
           console.log('Using document original content');
           baseContent = document.originalContent;
+          contentSource = 'original-content';
         }
         // FALLBACK 3: Error state
         else {
           console.log('No meaningful content found for redlining');
           baseContent = 'No document content available for redlining.';
+          contentSource = 'error-fallback';
         }
         
         // Validate that we have meaningful content
         if (!baseContent || baseContent.length === 0) {
           console.warn('No meaningful content found for redlining');
           baseContent = 'No document content available for redlining.';
+          contentSource = 'empty-fallback';
         }
         
-        console.log('Base content type:', typeof baseContent);
-        console.log('Base content preview (first 200 chars):', JSON.stringify(baseContent.substring(0, 200)));
-        console.log('Base content has HTML tags:', /<[^>]+>/.test(baseContent));
+        console.log('Content analysis:', {
+          source: contentSource,
+          type: typeof baseContent,
+          length: baseContent.length,
+          hasHtmlTags: /<[^>]+>/.test(baseContent),
+          preview: baseContent.substring(0, 200)
+        });
         
-        // Apply redline markup to the enhanced formatted content
+        // Apply redline markup to the content while preserving formatting
         const enhancedContent = injectRedlineMarkup(baseContent, suggestions, selectedSuggestionId);
         setRichContent(enhancedContent);
         
