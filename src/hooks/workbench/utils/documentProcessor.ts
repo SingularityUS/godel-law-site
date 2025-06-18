@@ -40,7 +40,7 @@ export interface DocumentExtractionResult {
  */
 const validateAndFixEncoding = (text: string): string => {
   // Common character replacements for legal documents
-  const encodingFixes = [
+  const encodingFixes: Array<[RegExp, string]> = [
     // Section symbol
     [/�/g, '§'],
     // Smart quotes
@@ -110,18 +110,7 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
       
       // Use mammoth with explicit options for better character handling
       const result = await mammoth.extractRawText({ 
-        arrayBuffer,
-        // Options to preserve formatting and special characters
-        options: {
-          includeDefaultStyleMap: true,
-          convertImage: mammoth.images.imgElement(function(image) {
-            return image.read("base64").then(function(imageBuffer) {
-              return {
-                src: "data:" + image.contentType + ";base64," + imageBuffer
-              };
-            });
-          })
-        }
+        arrayBuffer
       });
       
       extractedText = result.value;
