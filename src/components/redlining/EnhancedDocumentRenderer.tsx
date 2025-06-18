@@ -73,7 +73,7 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
         
         if (suggestionId && originalText && suggestedText) {
           const rect = editableText.getBoundingClientRect();
-          const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+          const scrollTop = window.pageYOffset || window.document.documentElement.scrollTop;
           
           setInlineEditor({
             suggestionId,
@@ -121,8 +121,8 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
 
   React.useEffect(() => {
     if (inlineEditor) {
-      document.addEventListener('click', handleDocumentClick);
-      return () => document.removeEventListener('click', handleDocumentClick);
+      window.document.addEventListener('click', handleDocumentClick);
+      return () => window.document.removeEventListener('click', handleDocumentClick);
     }
   }, [inlineEditor]);
 
