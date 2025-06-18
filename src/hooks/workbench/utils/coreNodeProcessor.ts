@@ -36,16 +36,26 @@ export const createCoreProcessor = (callChatGPT: ReturnType<typeof useChatGPTApi
                              JSON.stringify(promptData);
       
       console.log(`Generic processing for ${moduleType}`);
-      const response = await callChatGPT(systemPrompt, cleanPromptData, "2000");
+      const data = await callChatGPT(systemPrompt, cleanPromptData, "gpt-4o-mini", 2000);
       
-      if (!response || !response.trim()) {
+      // Handle API error responses
+      if (data?.error) {
+        console.error('ChatGPT API error:', data.error);
+        throw new Error(`ChatGPT API error: ${data.error}`);
+      }
+      
+      // Extract the actual response text
+      const response = data?.response || data;
+      
+      if (!response || (typeof response === 'string' && !response.trim())) {
         throw new Error(`Empty response from ChatGPT for ${moduleType}`);
       }
       
       // Simple JSON parsing with fallback
       let parsedOutput;
       try {
-        parsedOutput = JSON.parse(response);
+        const responseText = typeof response === 'string' ? response : JSON.stringify(response);
+        parsedOutput = JSON.parse(responseText);
       } catch (parseError) {
         console.warn(`Failed to parse JSON response for ${moduleType}, using raw response`);
         parsedOutput = { content: response };

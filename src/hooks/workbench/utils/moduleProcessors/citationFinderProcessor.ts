@@ -94,20 +94,39 @@ export const createCitationFinderProcessor = (callChatGPT: ReturnType<typeof use
     console.log(`Analyzing ${textContent.length} characters for Bluebook citations`);
     
     try {
-      const response = await callChatGPT(systemPrompt, textContent, "2000");
+      const data = await callChatGPT(systemPrompt, textContent, "gpt-4o-mini", 2000);
       
-      if (!response || !response.trim()) {
+      // Handle API error responses
+      if (data?.error) {
+        console.error('ChatGPT API error:', data.error);
+        return {
+          success: false,
+          output: createEmptyCitationResult(),
+          error: `ChatGPT API error: ${data.error}`,
+          metadata: {
+            moduleType: 'citation-finder',
+            error: true,
+            timestamp: new Date().toISOString()
+          }
+        };
+      }
+      
+      // Extract the actual response text
+      const response = data?.response || data;
+      
+      if (!response || (typeof response === 'string' && !response.trim())) {
         console.warn('Empty response from ChatGPT for citation analysis');
         return createEmptyCitationResult();
       }
       
-      console.log('Raw ChatGPT response:', response.substring(0, 500));
+      console.log('Raw ChatGPT response:', typeof response === 'string' ? response.substring(0, 500) : JSON.stringify(response).substring(0, 500));
       
       // Parse the JSON response
       let parsedResponse;
       try {
         // Try to extract JSON from response
-        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        const responseText = typeof response === 'string' ? response : JSON.stringify(response);
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           parsedResponse = JSON.parse(jsonMatch[0]);
         } else {
