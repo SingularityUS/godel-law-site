@@ -1,4 +1,3 @@
-
 /**
  * Enhanced Document Renderer Component
  * 
@@ -31,19 +30,42 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
     const loadRichContent = async () => {
       setIsLoading(true);
       try {
+        console.log('Loading rich content for redlining');
+        console.log('Document original content length:', document.originalContent.length);
+        console.log('Suggestions count:', suggestions.length);
+        
+        let baseContent = '';
+        
+        // Try to get the best available content
         if (originalDocument?.preview) {
+          console.log('Using original document preview');
           const content = await extractDocumentContent(originalDocument);
-          const enhancedContent = injectRedlineMarkup(content, suggestions, selectedSuggestionId);
-          setRichContent(enhancedContent);
+          baseContent = content;
+        } else if (document.originalContent && document.originalContent.trim().length > 0) {
+          console.log('Using document original content');
+          baseContent = document.originalContent;
         } else {
-          // Fallback to current content with basic formatting
-          const enhancedContent = injectRedlineMarkup(document.currentContent, suggestions, selectedSuggestionId);
-          setRichContent(enhancedContent);
+          console.log('Using document current content as fallback');
+          baseContent = document.currentContent;
         }
+        
+        // Validate that we have meaningful content
+        if (!baseContent || baseContent.trim().length === 0) {
+          console.warn('No meaningful content found for redlining');
+          baseContent = 'No document content available for redlining.';
+        }
+        
+        console.log('Base content preview:', baseContent.substring(0, 200) + '...');
+        
+        // Apply redline markup to the full content
+        const enhancedContent = injectRedlineMarkup(baseContent, suggestions, selectedSuggestionId);
+        setRichContent(enhancedContent);
+        
       } catch (error) {
         console.error('Error loading rich content:', error);
-        // Fallback to basic content
-        const enhancedContent = injectRedlineMarkup(document.currentContent, suggestions, selectedSuggestionId);
+        // Use document content as absolute fallback
+        const fallbackContent = document.originalContent || document.currentContent || 'Error loading document content.';
+        const enhancedContent = injectRedlineMarkup(fallbackContent, suggestions, selectedSuggestionId);
         setRichContent(enhancedContent);
       } finally {
         setIsLoading(false);
@@ -54,40 +76,90 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
   }, [document, originalDocument, suggestions, selectedSuggestionId]);
 
   const injectRedlineMarkup = (content: string, suggestions: RedlineSuggestion[], selectedId: string | null): string => {
+    console.log(`Injecting redline markup into content (${content.length} chars) with ${suggestions.length} suggestions`);
+    
+    if (!content || content.trim().length === 0) {
+      return '<p>No content available</p>';
+    }
+    
     let enhancedContent = content;
     
     // Sort suggestions by position (reverse order to maintain positions)
-    const sortedSuggestions = [...suggestions].sort((a, b) => b.startPos - a.startPos);
+    const validSuggestions = suggestions.filter(s => 
+      s.status === 'pending' && 
+      s.startPos !== undefined && 
+      s.endPos !== undefined &&
+      s.startPos >= 0 && 
+      s.endPos <= content.length &&
+      s.startPos < s.endPos
+    );
     
-    sortedSuggestions.forEach(suggestion => {
-      if (suggestion.status === 'pending' && suggestion.startPos !== undefined && suggestion.endPos !== undefined) {
+    console.log(`Applying ${validSuggestions.length} valid suggestions`);
+    
+    const sortedSuggestions = [...validSuggestions].sort((a, b) => b.startPos - a.startPos);
+    
+    sortedSuggestions.forEach((suggestion, index) => {
+      try {
         const beforeText = enhancedContent.substring(0, suggestion.startPos);
         const originalText = enhancedContent.substring(suggestion.startPos, suggestion.endPos);
         const afterText = enhancedContent.substring(suggestion.endPos);
+        
+        // Validate that we're highlighting the expected text
+        const expectedText = suggestion.originalText;
+        if (expectedText && originalText.trim() !== expectedText.trim()) {
+          console.warn(`Text mismatch for suggestion ${suggestion.id}: expected "${expectedText}" but found "${originalText}"`);
+        }
         
         const isSelected = selectedId === suggestion.id;
         const severityClass = getSeverityClass(suggestion.severity);
         const typeClass = getTypeClass(suggestion.type);
         
-        const redlineMarkup = `
-          <span 
+        const redlineMarkup = `<span 
             class="redline-suggestion ${severityClass} ${typeClass} ${isSelected ? 'selected' : ''}" 
             data-suggestion-id="${suggestion.id}"
             data-type="${suggestion.type}"
             data-severity="${suggestion.severity}"
-            title="${suggestion.explanation}"
+            title="${escapeHtml(suggestion.explanation)}"
           >
-            <span class="original-text">${originalText}</span>
-            <span class="suggested-text">${suggestion.suggestedText}</span>
+            <span class="original-text">${escapeHtml(originalText)}</span>
+            <span class="suggested-text">${escapeHtml(suggestion.suggestedText)}</span>
             <span class="redline-indicator">${getTypeIcon(suggestion.type)}</span>
-          </span>
-        `;
+          </span>`;
         
         enhancedContent = beforeText + redlineMarkup + afterText;
+        
+        console.log(`Applied suggestion ${index + 1}/${sortedSuggestions.length}: "${originalText.substring(0, 30)}..."`);
+        
+      } catch (error) {
+        console.error(`Error applying suggestion ${suggestion.id}:`, error);
       }
     });
     
+    // Convert plain text formatting to HTML while preserving redlines
+    enhancedContent = preserveFormattingAsHtml(enhancedContent);
+    
+    console.log('Redline markup injection complete');
     return enhancedContent;
+  };
+
+  /**
+   * Converts plain text to HTML while preserving redline markup
+   */
+  const preserveFormattingAsHtml = (content: string): string => {
+    // Convert line breaks to HTML, but be careful not to break redline markup
+    return content
+      .split('\n')
+      .map(line => line.trim() === '' ? '<br>' : `<p>${line}</p>`)
+      .join('');
+  };
+
+  /**
+   * Escapes HTML characters to prevent XSS
+   */
+  const escapeHtml = (text: string): string => {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   };
 
   const getSeverityClass = (severity: string): string => {

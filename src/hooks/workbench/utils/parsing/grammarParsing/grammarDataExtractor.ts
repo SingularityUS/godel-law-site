@@ -1,4 +1,3 @@
-
 /**
  * Grammar Data Extractor
  * 
@@ -7,6 +6,7 @@
 
 export interface GrammarAnalysisItem {
   paragraphId: string;
+  originalContent: string; // Add this field for redlining
   original: string;
   corrected: string;
   suggestions: Array<{
@@ -44,14 +44,18 @@ export const extractGrammarData = (responseText: string): {
 } => {
   console.log('Extracting grammar data from response text, length:', responseText.length);
   
-  const sections = responseText.split(/\n\s*\n/);
+  // Clean the response text of JSON contamination first
+  const cleanedResponseText = cleanJsonContamination(responseText);
+  console.log('Cleaned response text length:', cleanedResponseText.length);
+  
+  const sections = cleanedResponseText.split(/\n\s*\n/);
   const analysis: GrammarAnalysisItem[] = [];
   let totalErrorsFound = 0;
   let paragraphCounter = 1;
   
   sections.forEach((section, index) => {
-    // Skip very short sections
-    if (section.trim().length < 30) return;
+    // Skip very short sections or sections that look like JSON
+    if (section.trim().length < 30 || isJsonLike(section)) return;
     
     console.log(`Processing section ${index + 1}: ${section.substring(0, 100)}...`);
     
@@ -80,7 +84,6 @@ export const extractGrammarData = (responseText: string): {
     }
   });
 
-  // Create comprehensive overall assessment
   const avgScore = analysis.length > 0 
     ? Math.round((analysis.reduce((sum, para) => sum + para.legalWritingScore, 0) / analysis.length) * 10) / 10
     : 8;
@@ -113,6 +116,52 @@ export const extractGrammarData = (responseText: string): {
   return { analysis, overallAssessment, processingStats };
 };
 
+/**
+ * Cleans JSON contamination from response text
+ */
+function cleanJsonContamination(text: string): string {
+  console.log('Cleaning JSON contamination from text');
+  
+  let cleaned = text;
+  
+  // Remove JSON objects that span multiple lines
+  cleaned = cleaned.replace(/\{[\s\S]*?\}/g, (match) => {
+    // Keep if it looks like it contains meaningful content, not just metadata
+    if (match.includes('Plaintiff') || match.includes('Defendant') || match.includes('Court')) {
+      return match;
+    }
+    return ' '; // Replace with space to maintain text flow
+  });
+  
+  // Remove array structures
+  cleaned = cleaned.replace(/\[[\s\S]*?\]/g, ' ');
+  
+  // Remove key-value pairs
+  cleaned = cleaned.replace(/"[^"]*"\s*:\s*"[^"]*",?\s*/g, ' ');
+  
+  // Remove isolated JSON syntax characters
+  cleaned = cleaned.replace(/[{}[\]",]/g, ' ');
+  
+  // Clean up excessive whitespace
+  cleaned = cleaned.replace(/\s+/g, ' ');
+  cleaned = cleaned.replace(/\n\s*\n\s*\n/g, '\n\n'); // Normalize paragraph breaks
+  
+  return cleaned.trim();
+}
+
+/**
+ * Checks if a section looks like JSON data
+ */
+function isJsonLike(section: string): boolean {
+  const trimmed = section.trim();
+  return (
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']')) ||
+    trimmed.includes('":') ||
+    trimmed.includes('","')
+  );
+}
+
 const extractAnalysisItem = (section: string, paragraphId: number): GrammarAnalysisItem | null => {
   // Enhanced extraction patterns
   const originalMatch = section.match(/(?:original|text)[:\s]+(.*?)(?=\n(?:corrected|suggestion)|$)/is);
@@ -120,8 +169,8 @@ const extractAnalysisItem = (section: string, paragraphId: number): GrammarAnaly
   const suggestionMatches = section.match(/suggestion[s]?[:\s]+(.*?)(?=\n|$)/gis);
   const scoreMatch = section.match(/(?:score|rating)[:\s]*(\d+)/i);
   
-  // Use the full section as original if no specific patterns found
-  const originalText = originalMatch?.[1]?.trim() || section.trim();
+  // Use the full section as original if no specific patterns found, but clean it
+  const originalText = originalMatch?.[1]?.trim() || cleanContentText(section);
   const correctedText = correctedMatch?.[1]?.trim() || originalText;
   
   // Extract all suggestions
@@ -135,7 +184,7 @@ const extractAnalysisItem = (section: string, paragraphId: number): GrammarAnaly
   if (suggestionMatches) {
     suggestionMatches.forEach((match) => {
       const suggestionText = match.replace(/suggestion[s]?[:\s]*/i, '').trim();
-      if (suggestionText) {
+      if (suggestionText && suggestionText.length > 10) { // Filter out noise
         suggestions.push({
           issue: "Grammar/Style",
           severity: "moderate",
@@ -146,7 +195,6 @@ const extractAnalysisItem = (section: string, paragraphId: number): GrammarAnaly
     });
   }
   
-  // Detect errors from text differences
   const hasErrors = originalText !== correctedText || suggestions.length > 0;
   if (hasErrors && suggestions.length === 0) {
     suggestions.push({
@@ -157,12 +205,12 @@ const extractAnalysisItem = (section: string, paragraphId: number): GrammarAnaly
     });
   }
   
-  // Extract or estimate score
   const score = scoreMatch ? parseInt(scoreMatch[1]) : 
                (hasErrors ? Math.floor(Math.random() * 3) + 6 : Math.floor(Math.random() * 2) + 8);
   
   return {
     paragraphId: `para-${paragraphId}`,
+    originalContent: originalText.substring(0, 2000), // Add this for redlining
     original: originalText.substring(0, 2000),
     corrected: correctedText.substring(0, 2000),
     suggestions: suggestions,
@@ -173,3 +221,20 @@ const extractAnalysisItem = (section: string, paragraphId: number): GrammarAnaly
     wordCount: originalText.split(/\s+/).length
   };
 };
+
+/**
+ * Cleans content text of JSON artifacts
+ */
+function cleanContentText(text: string): string {
+  let cleaned = text.trim();
+  
+  // Remove obvious JSON patterns
+  cleaned = cleaned.replace(/^\s*[\{\[\]\}]\s*$/gm, '');
+  cleaned = cleaned.replace(/"[^"]*"\s*:\s*/g, '');
+  cleaned = cleaned.replace(/,\s*$/gm, '');
+  
+  // Clean up whitespace
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  
+  return cleaned;
+}
