@@ -31,7 +31,24 @@ const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   const [isGeneratingRedline, setIsGeneratingRedline] = useState(false);
   const { transformGrammarData } = useRedlineDataTransform();
 
-  const isLegalPipeline = output?.summary?.pipelineType === "Legal Document Analysis";
+  // Enhanced pipeline type detection
+  const isLegalPipeline = React.useMemo(() => {
+    console.log('Checking pipeline type for output:', output);
+    
+    // Check multiple possible locations for pipeline type
+    const pipelineType = output?.summary?.pipelineType || 
+                        output?.metadata?.pipelineType ||
+                        output?.pipelineType;
+    
+    const hasAnalysisData = output?.output?.analysis || 
+                           output?.finalOutput?.output?.analysis ||
+                           output?.analysis;
+    
+    console.log('Pipeline type detected:', pipelineType);
+    console.log('Has analysis data:', !!hasAnalysisData);
+    
+    return pipelineType === "Legal Document Analysis" || !!hasAnalysisData;
+  }, [output]);
 
   // Generate redline document when output is available
   React.useEffect(() => {
@@ -39,12 +56,42 @@ const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
       setIsGeneratingRedline(true);
       try {
         console.log('Generating redline document from output:', output);
-        const convertedDocument = transformGrammarData(output);
-        if (convertedDocument) {
-          setRedlineDocument(convertedDocument);
+        console.log('Output structure:', {
+          hasOutput: !!output.output,
+          hasAnalysis: !!output.output?.analysis,
+          hasFinalOutput: !!output.finalOutput,
+          finalOutputStructure: output.finalOutput ? Object.keys(output.finalOutput) : [],
+          outputKeys: Object.keys(output)
+        });
+        
+        // Try multiple data sources for redline transformation
+        let transformResult = null;
+        
+        // First try: direct output
+        if (output.output?.analysis) {
+          transformResult = transformGrammarData(output);
+        }
+        
+        // Second try: finalOutput
+        if (!transformResult && output.finalOutput?.output?.analysis) {
+          transformResult = transformGrammarData(output.finalOutput);
+        }
+        
+        // Third try: nested finalOutput
+        if (!transformResult && output.finalOutput?.finalOutput?.output?.analysis) {
+          transformResult = transformGrammarData(output.finalOutput.finalOutput);
+        }
+        
+        if (transformResult) {
+          setRedlineDocument(transformResult);
           console.log('Redline document generated successfully');
         } else {
-          console.warn('Failed to generate redline document');
+          console.warn('Failed to generate redline document - no valid analysis data found');
+          console.log('Available data paths checked:', [
+            'output.output.analysis',
+            'output.finalOutput.output.analysis', 
+            'output.finalOutput.finalOutput.output.analysis'
+          ]);
         }
       } catch (error) {
         console.error('Error generating redline document:', error);
@@ -78,92 +125,109 @@ const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
 
   if (!output) return null;
 
-  const sidebarWidth = isOpen ? "w-[600px]" : "w-12";
+  // Handle collapsed state for resizable layout
+  if (!isOpen) {
+    return (
+      <div className="w-12 flex flex-col border-l bg-white h-full">
+        <div className="flex items-center justify-center p-4 border-b bg-gray-50">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onToggle}
+            className="flex items-center gap-2"
+          >
+            <ChevronLeft size={16} />
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={`${sidebarWidth} transition-all duration-300 ease-in-out flex flex-col border-l bg-white`}>
+    <div className="flex flex-col border-l bg-white h-full">
       {/* Sidebar Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-gray-50">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onToggle}
-          className="flex items-center gap-2"
-        >
-          {isOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-          {isOpen && <span>Pipeline Results</span>}
+      <div className="flex items-center justify-between p-4 border-b bg-gray-50 flex-shrink-0">
+        <h3 className="font-semibold text-gray-800">Pipeline Results</h3>
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          <X size={16} />
         </Button>
-        {isOpen && (
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X size={16} />
-          </Button>
-        )}
       </div>
 
       {/* Sidebar Content */}
-      {isOpen && (
-        <div className="flex-1 overflow-hidden">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-5 shrink-0">
-              <TabsTrigger value="redline">Redline</TabsTrigger>
-              <TabsTrigger value="summary">Summary</TabsTrigger>
-              <TabsTrigger value="analysis">Analysis</TabsTrigger>
-              <TabsTrigger value="grammar">Grammar</TabsTrigger>
-              <TabsTrigger value="raw">Raw Data</TabsTrigger>
-            </TabsList>
+      <div className="flex-1 overflow-hidden">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+          <TabsList className="grid w-full grid-cols-5 shrink-0 m-2">
+            <TabsTrigger value="redline">Redline</TabsTrigger>
+            <TabsTrigger value="summary">Summary</TabsTrigger>
+            <TabsTrigger value="analysis">Analysis</TabsTrigger>
+            <TabsTrigger value="grammar">Grammar</TabsTrigger>
+            <TabsTrigger value="raw">Raw Data</TabsTrigger>
+          </TabsList>
 
-            <div className="flex-1 overflow-hidden">
-              <TabsContent value="redline" className="h-full m-0">
-                {isGeneratingRedline ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                      <p className="text-gray-600">Generating redline document...</p>
-                    </div>
+          <div className="flex-1 overflow-hidden">
+            <TabsContent value="redline" className="h-full m-0">
+              {isGeneratingRedline ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Generating redline document...</p>
                   </div>
-                ) : redlineDocument ? (
-                  <div className="h-full">
-                    <RedlineDocumentViewer
-                      document={redlineDocument}
-                      originalDocument={{
-                        type: output.metadata?.fileType || 'text/plain',
-                        preview: output.metadata?.originalPreview,
-                        name: output.metadata?.fileName || 'Document'
-                      }}
-                      onClose={() => {}} // Don't close the whole sidebar
-                      onSave={handleSaveRedline}
-                      onExport={handleExportRedline}
-                    />
+                </div>
+              ) : redlineDocument ? (
+                <div className="h-full">
+                  <RedlineDocumentViewer
+                    document={redlineDocument}
+                    originalDocument={{
+                      type: output.metadata?.fileType || 'text/plain',
+                      preview: output.metadata?.originalPreview,
+                      name: output.metadata?.fileName || 'Document'
+                    }}
+                    onClose={() => {}} // Don't close the whole sidebar
+                    onSave={handleSaveRedline}
+                    onExport={handleExportRedline}
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full p-6">
+                  <div className="text-center">
+                    <p className="text-gray-600 mb-2">No redline document available</p>
+                    <p className="text-sm text-gray-500">
+                      {isLegalPipeline 
+                        ? "Unable to generate redline from current pipeline output"
+                        : "Run a legal document analysis pipeline to generate redline suggestions"
+                      }
+                    </p>
+                    {isLegalPipeline && (
+                      <div className="mt-4 p-3 bg-yellow-50 rounded border text-xs text-left">
+                        <p className="font-medium text-yellow-800 mb-1">Debug Info:</p>
+                        <p className="text-yellow-700">Pipeline Type: {output?.summary?.pipelineType || 'Unknown'}</p>
+                        <p className="text-yellow-700">Has Analysis: {!!output?.output?.analysis ? 'Yes' : 'No'}</p>
+                        <p className="text-yellow-700">Analysis Items: {output?.output?.analysis?.length || 0}</p>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="flex items-center justify-center h-full p-6">
-                    <div className="text-center">
-                      <p className="text-gray-600 mb-2">No redline document available</p>
-                      <p className="text-sm text-gray-500">Run a legal document analysis pipeline to generate redline suggestions</p>
-                    </div>
-                  </div>
-                )}
-              </TabsContent>
+                </div>
+              )}
+            </TabsContent>
 
-              <TabsContent value="summary" className="h-full m-0 overflow-auto">
-                <LegalSummaryTab output={output} />
-              </TabsContent>
+            <TabsContent value="summary" className="h-full m-0 overflow-auto">
+              <LegalSummaryTab output={output} />
+            </TabsContent>
 
-              <TabsContent value="analysis" className="h-full m-0 overflow-auto">
-                <LegalAnalysisTab output={output} />
-              </TabsContent>
+            <TabsContent value="analysis" className="h-full m-0 overflow-auto">
+              <LegalAnalysisTab output={output} />
+            </TabsContent>
 
-              <TabsContent value="grammar" className="h-full m-0 overflow-auto">
-                <GrammarAnalysisTab result={output} />
-              </TabsContent>
+            <TabsContent value="grammar" className="h-full m-0 overflow-auto">
+              <GrammarAnalysisTab result={output} />
+            </TabsContent>
 
-              <TabsContent value="raw" className="h-full m-0 overflow-auto">
-                <RawDataTab output={output} />
-              </TabsContent>
-            </div>
-          </Tabs>
-        </div>
-      )}
+            <TabsContent value="raw" className="h-full m-0 overflow-auto">
+              <RawDataTab output={output} />
+            </TabsContent>
+          </div>
+        </Tabs>
+      </div>
     </div>
   );
 };

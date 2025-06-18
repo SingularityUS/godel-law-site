@@ -23,43 +23,73 @@ export const convertGrammarAnalysisToRedline = (
     return createEmptyRedlineDocument(originalDocument);
   }
 
-  // Extract the clean original content
+  // Extract the clean original content with enhanced fallback
   const originalContent = extractOriginalContent(grammarResult, originalDocument);
   console.log('Extracted original content length:', originalContent.length);
   console.log('Original content preview:', originalContent.substring(0, 200) + '...');
 
-  // Extract suggestions from grammar analysis
+  // Extract suggestions from grammar analysis with enhanced path handling
   try {
+    let analysisData = null;
+    
+    // Multiple paths for analysis data
     if (grammarResult.output?.analysis && Array.isArray(grammarResult.output.analysis)) {
-      grammarResult.output.analysis.forEach((paragraph: any, paragraphIndex: number) => {
+      analysisData = grammarResult.output.analysis;
+    } else if (grammarResult.analysis && Array.isArray(grammarResult.analysis)) {
+      analysisData = grammarResult.analysis;
+    }
+
+    if (analysisData && Array.isArray(analysisData)) {
+      analysisData.forEach((paragraph: any, paragraphIndex: number) => {
+        console.log(`Processing paragraph ${paragraphIndex}:`, paragraph);
+        
+        // Handle different suggestion structures
+        let paragraphSuggestions = [];
+        
         if (paragraph.suggestions && Array.isArray(paragraph.suggestions)) {
-          paragraph.suggestions.forEach((suggestion: any, index: number) => {
-            // Create a unique ID for each suggestion
-            const suggestionId = `${paragraph.paragraphId || paragraphIndex}-${index}`;
-            
-            // Calculate positions within the original content
-            const positions = calculateSuggestionPositions(
-              suggestion,
-              paragraph,
-              originalContent,
-              paragraphIndex
-            );
-            
-            suggestions.push({
-              id: suggestionId,
-              type: suggestion.type || 'grammar',
-              severity: suggestion.severity || 'medium',
-              originalText: suggestion.originalText || suggestion.issue || '',
-              suggestedText: suggestion.suggestedText || suggestion.suggestion || '',
-              explanation: suggestion.explanation || suggestion.description || 'No explanation provided',
-              startPos: positions.start,
-              endPos: positions.end,
-              paragraphId: paragraph.paragraphId || `paragraph-${paragraphIndex}`,
-              status: 'pending',
-              confidence: suggestion.confidence || 0.8
-            });
-          });
+          paragraphSuggestions = paragraph.suggestions;
+        } else if (paragraph.issues && Array.isArray(paragraph.issues)) {
+          paragraphSuggestions = paragraph.issues;
+        } else if (paragraph.corrections && Array.isArray(paragraph.corrections)) {
+          paragraphSuggestions = paragraph.corrections;
         }
+
+        paragraphSuggestions.forEach((suggestion: any, index: number) => {
+          // Create a unique ID for each suggestion
+          const suggestionId = `${paragraph.paragraphId || paragraphIndex}-${index}`;
+          
+          // Calculate positions within the original content
+          const positions = calculateSuggestionPositions(
+            suggestion,
+            paragraph,
+            originalContent,
+            paragraphIndex
+          );
+          
+          // Enhanced suggestion object creation
+          suggestions.push({
+            id: suggestionId,
+            type: suggestion.type || suggestion.category || 'grammar',
+            severity: suggestion.severity || suggestion.priority || 'medium',
+            originalText: suggestion.originalText || 
+                         suggestion.issue || 
+                         suggestion.text || 
+                         suggestion.original || '',
+            suggestedText: suggestion.suggestedText || 
+                          suggestion.suggestion || 
+                          suggestion.correction || 
+                          suggestion.replacement || '',
+            explanation: suggestion.explanation || 
+                        suggestion.description || 
+                        suggestion.reason || 
+                        'No explanation provided',
+            startPos: positions.start,
+            endPos: positions.end,
+            paragraphId: paragraph.paragraphId || `paragraph-${paragraphIndex}`,
+            status: 'pending',
+            confidence: suggestion.confidence || suggestion.score || 0.8
+          });
+        });
       });
     }
   } catch (error) {
@@ -86,39 +116,31 @@ export const convertGrammarAnalysisToRedline = (
 };
 
 /**
- * Extracts the original document content from various sources
+ * Enhanced original content extraction with multiple fallback paths
  */
 function extractOriginalContent(grammarResult: any, originalDocument: { content: string }): string {
   console.log('Extracting original content from multiple sources');
   
-  // Priority 1: Original document content
-  if (originalDocument.content && originalDocument.content.trim().length > 0) {
-    console.log('Using original document content');
-    return originalDocument.content.trim();
-  }
-  
-  // Priority 2: Metadata original content
-  if (grammarResult.metadata?.originalContent) {
-    console.log('Using metadata original content');
-    return grammarResult.metadata.originalContent.trim();
-  }
-  
-  // Priority 3: Input content
-  if (grammarResult.input?.content) {
-    console.log('Using input content');
-    return grammarResult.input.content.trim();
-  }
-  
-  // Priority 4: Extract from analysis paragraphs
-  if (grammarResult.output?.analysis && Array.isArray(grammarResult.output.analysis)) {
-    console.log('Reconstructing content from analysis paragraphs');
-    const reconstructedContent = grammarResult.output.analysis
-      .map((para: any) => para.originalContent || para.original || '')
-      .filter((content: string) => content.trim().length > 0)
-      .join('\n\n');
+  const contentSources = [
+    // Priority 1: Original document content
+    originalDocument?.content,
     
-    if (reconstructedContent.trim().length > 0) {
-      return reconstructedContent.trim();
+    // Priority 2: Various metadata paths
+    grammarResult?.metadata?.originalContent,
+    grammarResult?.input?.content,
+    grammarResult?.originalContent,
+    
+    // Priority 3: Extract from analysis paragraphs
+    extractFromAnalysisParagraphs(grammarResult),
+    
+    // Priority 4: Any content field
+    grammarResult?.content
+  ];
+  
+  for (const source of contentSources) {
+    if (source && typeof source === 'string' && source.trim().length > 0) {
+      console.log(`Using content source with length: ${source.length}`);
+      return source.trim();
     }
   }
   
@@ -127,7 +149,37 @@ function extractOriginalContent(grammarResult: any, originalDocument: { content:
 }
 
 /**
- * Calculates accurate positions for suggestions within the original content
+ * Extract content from analysis paragraphs as fallback
+ */
+function extractFromAnalysisParagraphs(grammarResult: any): string {
+  try {
+    const analysisData = grammarResult?.output?.analysis || grammarResult?.analysis;
+    
+    if (analysisData && Array.isArray(analysisData)) {
+      const reconstructedContent = analysisData
+        .map((para: any) => {
+          return para.originalContent || 
+                 para.original || 
+                 para.text || 
+                 para.content || '';
+        })
+        .filter((content: string) => content.trim().length > 0)
+        .join('\n\n');
+      
+      if (reconstructedContent.trim().length > 0) {
+        console.log('Reconstructed content from analysis paragraphs');
+        return reconstructedContent.trim();
+      }
+    }
+  } catch (error) {
+    console.error('Error extracting from analysis paragraphs:', error);
+  }
+  
+  return '';
+}
+
+/**
+ * Enhanced position calculation with better text matching
  */
 function calculateSuggestionPositions(
   suggestion: any,
@@ -135,32 +187,36 @@ function calculateSuggestionPositions(
   originalContent: string,
   paragraphIndex: number
 ): { start: number; end: number } {
-  const originalText = suggestion.originalText || suggestion.issue || '';
+  const originalText = suggestion.originalText || 
+                      suggestion.issue || 
+                      suggestion.text || 
+                      suggestion.original || '';
   
   if (!originalText || originalText.trim().length === 0) {
     console.warn('No original text for suggestion, using default positions');
     return { start: 0, end: 0 };
   }
   
-  // Try to find the text in the original content
   const searchText = originalText.trim();
+  
+  // Try exact match first
   let startPos = originalContent.indexOf(searchText);
   
-  // If not found, try partial matches or case-insensitive search
+  // Try case-insensitive match
   if (startPos === -1) {
     startPos = originalContent.toLowerCase().indexOf(searchText.toLowerCase());
   }
   
+  // Try partial matching (first 20 characters)
+  if (startPos === -1 && searchText.length > 20) {
+    const partialText = searchText.substring(0, 20);
+    startPos = originalContent.indexOf(partialText);
+  }
+  
   // If still not found, estimate position based on paragraph
   if (startPos === -1) {
-    console.warn(`Could not find text "${searchText}" in original content`);
-    // Estimate position based on paragraph index
-    const paragraphs = originalContent.split('\n\n');
-    let estimatedStart = 0;
-    for (let i = 0; i < Math.min(paragraphIndex, paragraphs.length); i++) {
-      estimatedStart += paragraphs[i].length + 2; // +2 for the double newline
-    }
-    startPos = estimatedStart;
+    console.warn(`Could not find text "${searchText.substring(0, 50)}..." in original content`);
+    startPos = estimatePositionByParagraph(originalContent, paragraphIndex);
   }
   
   const endPos = startPos + searchText.length;
@@ -168,9 +224,23 @@ function calculateSuggestionPositions(
   console.log(`Positioned suggestion "${searchText.substring(0, 30)}..." at ${startPos}-${endPos}`);
   
   return {
-    start: startPos,
-    end: endPos
+    start: Math.max(0, startPos),
+    end: Math.min(originalContent.length, endPos)
   };
+}
+
+/**
+ * Estimate position based on paragraph index
+ */
+function estimatePositionByParagraph(content: string, paragraphIndex: number): number {
+  const paragraphs = content.split(/\n\s*\n/);
+  let estimatedStart = 0;
+  
+  for (let i = 0; i < Math.min(paragraphIndex, paragraphs.length); i++) {
+    estimatedStart += paragraphs[i].length + 2; // +2 for paragraph separation
+  }
+  
+  return Math.max(0, Math.min(content.length, estimatedStart));
 }
 
 function createEmptyRedlineDocument(originalDocument: { name: string; type: string; content: string } | null): RedlineDocument {
