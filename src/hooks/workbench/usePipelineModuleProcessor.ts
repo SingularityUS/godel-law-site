@@ -1,4 +1,5 @@
 
+
 /**
  * usePipelineModuleProcessor Hook
  * 
@@ -8,6 +9,7 @@
 import { useCallback } from "react";
 import { AllNodes } from "@/types/workbench";
 import { processGrammarAnalysis } from "./utils/moduleProcessors/grammarAnalysisProcessor";
+import { processParagraphSplitter } from "./utils/moduleProcessors/paragraphSplitterProcessor";
 import { processParagraphBatches } from "./utils/paragraphBatchProcessor";
 import { handleTextExtractor } from "./utils/textExtractorHandler";
 import { useChatGPTApi } from "./useChatGPTApi";
@@ -40,6 +42,33 @@ export const usePipelineModuleProcessor = (nodes: AllNodes[]) => {
       let result;
       
       switch (node.data?.moduleType) {
+        case 'paragraph-splitter': {
+          console.log(`Processing paragraph splitter for ${nodeId}`);
+          
+          // Update progress for splitting
+          updateProgress(nodeId, { 
+            completed: 0, 
+            total: 1, 
+            label: 'Splitting document into paragraphs...' 
+          });
+          
+          // Process paragraph splitting
+          result = await processParagraphSplitter(inputData);
+          
+          // Update completion progress
+          updateProgress(nodeId, { 
+            completed: 1, 
+            total: 1, 
+            label: `Split into ${result.output?.paragraphs?.length || 0} paragraphs` 
+          });
+          
+          console.log(`Paragraph splitting completed for ${nodeId}:`, {
+            paragraphsGenerated: result.output?.paragraphs?.length || 0,
+            processingTime: result.metadata?.processingTime
+          });
+          break;
+        }
+
         case 'grammar-checker': {
           // Enhanced batch processing with document extraction result
           const batchResults = await processParagraphBatches(
@@ -104,3 +133,4 @@ export const usePipelineModuleProcessor = (nodes: AllNodes[]) => {
     processModuleNode
   };
 };
+
