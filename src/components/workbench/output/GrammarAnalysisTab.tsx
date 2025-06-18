@@ -1,9 +1,10 @@
+
 import React, { useState, useCallback } from 'react';
 import { convertGrammarAnalysisToRedline } from "@/utils/redlining/grammarToRedline";
 import { RedlineDocument } from "@/types/redlining";
 import { RedlineDocumentViewer } from "@/components/redlining";
-import { toast } from "@/components/ui/use-toast"
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { toast } from "@/hooks/use-toast";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 interface GrammarAnalysisTabProps {
   result: any;
@@ -18,7 +19,11 @@ const GrammarAnalysisTab: React.FC<GrammarAnalysisTabProps> = ({ result }) => {
       console.log('Opening redlining mode with result:', result);
       
       if (!result?.output?.analysis) {
-        toast.error("No analysis data available for redlining");
+        toast({
+          title: "Error",
+          description: "No analysis data available for redlining",
+          variant: "destructive"
+        });
         return;
       }
 
@@ -37,19 +42,29 @@ const GrammarAnalysisTab: React.FC<GrammarAnalysisTabProps> = ({ result }) => {
       setIsRedlining(true);
     } catch (error) {
       console.error('Error opening redlining mode:', error);
-      toast.error("Failed to open redlining mode");
+      toast({
+        title: "Error",
+        description: "Failed to open redlining mode",
+        variant: "destructive"
+      });
     }
   }, [result]);
 
   const handleSaveRedline = useCallback((document: RedlineDocument) => {
     console.log('Saving redline document:', document);
-    toast.success("Redline document saved successfully");
+    toast({
+      title: "Success",
+      description: "Redline document saved successfully"
+    });
     setIsRedlining(false);
   }, []);
 
   const handleExportRedline = useCallback((document: RedlineDocument, format: string) => {
     console.log(`Exporting redline document in ${format} format:`, document);
-    toast.success(`Redline document exported in ${format} format`);
+    toast({
+      title: "Success",
+      description: `Redline document exported in ${format} format`
+    });
   }, []);
 
   const renderAnalysisContent = () => {

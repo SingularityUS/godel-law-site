@@ -52,7 +52,7 @@ const FinalOutputPanel: React.FC<FinalOutputPanelProps> = ({
           </TabsContent>
 
           <TabsContent value="grammar" className="h-full">
-            <GrammarAnalysisTab output={output} />
+            <GrammarAnalysisTab result={output} />
           </TabsContent>
 
           <TabsContent value="raw" className="h-full">
