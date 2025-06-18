@@ -1,4 +1,3 @@
-
 /**
  * WorkbenchFlow Component
  * 
@@ -31,10 +30,11 @@ interface WorkbenchFlowProps {
   editingPromptNodeId?: string;
   uploadedFiles?: any[];
   reactFlowWrapper: React.RefObject<HTMLDivElement>;
+  onOpenSidebar?: () => void;
 }
 
 const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow(
-  { onModuleEdit, editingPromptNodeId, uploadedFiles, reactFlowWrapper },
+  { onModuleEdit, editingPromptNodeId, uploadedFiles, reactFlowWrapper, onOpenSidebar },
   ref
 ) {
   // Initialize workbench event handling
@@ -164,6 +164,7 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
         isExecuting={isExecuting}
         onExecutePipeline={executeAllPipelines}
         onStopPipeline={resetExecution}
+        onOpenSidebar={onOpenSidebar}
       />
     </ReactFlow>
   );
