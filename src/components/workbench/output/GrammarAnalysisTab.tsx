@@ -12,6 +12,7 @@ import { Scale, Info, Edit } from "lucide-react";
 import RedlineDocumentViewer from "@/components/redlining/RedlineDocumentViewer";
 import { convertGrammarAnalysisToRedline } from "@/utils/redlining/grammarToRedline";
 import { RedlineDocument } from "@/types/redlining";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 interface GrammarAnalysisTabProps {
   output: any;
@@ -33,17 +34,28 @@ const GrammarAnalysisTab: React.FC<GrammarAnalysisTabProps> = ({ output }) => {
   }
 
   const handleOpenRedlining = () => {
-    // Get the original document from the pipeline
-    const docResult = output.results?.find((r: any) => r.moduleType === 'document-input');
-    const originalDocument = {
-      name: docResult?.result?.metadata?.fileName || 'Document',
-      type: docResult?.result?.metadata?.fileType || 'text/plain',
-      content: docResult?.result?.content || ''
-    };
+    console.log('Opening redlining mode...');
+    try {
+      // Get the original document from the pipeline
+      const docResult = output.results?.find((r: any) => r.moduleType === 'document-input');
+      const originalDocument = {
+        name: docResult?.result?.metadata?.fileName || 'Document',
+        type: docResult?.result?.metadata?.fileType || 'text/plain',
+        content: docResult?.result?.content || ''
+      };
 
-    const redlineDoc = convertGrammarAnalysisToRedline(grammarResult.result, originalDocument);
-    setRedlineDocument(redlineDoc);
-    setShowRedlining(true);
+      console.log('Original document:', originalDocument);
+      console.log('Grammar result for redline conversion:', grammarResult.result);
+
+      const redlineDoc = convertGrammarAnalysisToRedline(grammarResult.result, originalDocument);
+      console.log('Converted redline document:', redlineDoc);
+      
+      setRedlineDocument(redlineDoc);
+      setShowRedlining(true);
+    } catch (error) {
+      console.error('Error opening redlining mode:', error);
+      alert('Error opening redlining mode. Please check the console for details.');
+    }
   };
 
   const handleSaveDocument = (document: RedlineDocument) => {
@@ -58,12 +70,14 @@ const GrammarAnalysisTab: React.FC<GrammarAnalysisTabProps> = ({ output }) => {
 
   if (showRedlining && redlineDocument) {
     return (
-      <RedlineDocumentViewer
-        document={redlineDocument}
-        onClose={() => setShowRedlining(false)}
-        onSave={handleSaveDocument}
-        onExport={handleExportDocument}
-      />
+      <ErrorBoundary>
+        <RedlineDocumentViewer
+          document={redlineDocument}
+          onClose={() => setShowRedlining(false)}
+          onSave={handleSaveDocument}
+          onExport={handleExportDocument}
+        />
+      </ErrorBoundary>
     );
   }
 

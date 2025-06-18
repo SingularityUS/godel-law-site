@@ -28,71 +28,81 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
     action: 'accepted' | 'rejected' | 'modified',
     newText?: string
   ) => {
-    setDocument(prev => {
-      const suggestions = prev.suggestions.map(suggestion => {
-        if (suggestion.id === suggestionId) {
-          const updatedSuggestion = {
-            ...suggestion,
-            status: action,
-            ...(newText && action === 'modified' ? { suggestedText: newText } : {})
-          };
-          
-          return updatedSuggestion;
+    console.log(`Handling suggestion action: ${action} for suggestion ${suggestionId}`);
+    
+    try {
+      setDocument(prev => {
+        const suggestions = prev.suggestions.map(suggestion => {
+          if (suggestion.id === suggestionId) {
+            const updatedSuggestion = {
+              ...suggestion,
+              status: action,
+              ...(newText && action === 'modified' ? { suggestedText: newText } : {})
+            };
+            
+            return updatedSuggestion;
+          }
+          return suggestion;
+        });
+
+        // Apply the change to the document content if accepted
+        let currentContent = prev.currentContent;
+        if (action === 'accepted' || action === 'modified') {
+          const suggestion = suggestions.find(s => s.id === suggestionId);
+          if (suggestion && suggestion.startPos !== undefined && suggestion.endPos !== undefined) {
+            const textToUse = action === 'modified' && newText ? newText : suggestion.suggestedText;
+            currentContent = currentContent.substring(0, suggestion.startPos) +
+                            textToUse +
+                            currentContent.substring(suggestion.endPos);
+          }
         }
-        return suggestion;
+
+        return {
+          ...prev,
+          suggestions,
+          currentContent,
+          metadata: {
+            ...prev.metadata,
+            lastModified: new Date().toISOString(),
+            acceptedSuggestions: suggestions.filter(s => s.status === 'accepted').length,
+            rejectedSuggestions: suggestions.filter(s => s.status === 'rejected').length
+          }
+        };
       });
-
-      // Apply the change to the document content if accepted
-      let currentContent = prev.currentContent;
-      if (action === 'accepted' || action === 'modified') {
-        const suggestion = suggestions.find(s => s.id === suggestionId);
-        if (suggestion) {
-          const textToUse = action === 'modified' && newText ? newText : suggestion.suggestedText;
-          currentContent = currentContent.substring(0, suggestion.startPos) +
-                          textToUse +
-                          currentContent.substring(suggestion.endPos);
-        }
-      }
-
-      return {
-        ...prev,
-        suggestions,
-        currentContent,
-        metadata: {
-          ...prev.metadata,
-          lastModified: new Date().toISOString(),
-          acceptedSuggestions: suggestions.filter(s => s.status === 'accepted').length,
-          rejectedSuggestions: suggestions.filter(s => s.status === 'rejected').length
-        }
-      };
-    });
+    } catch (error) {
+      console.error('Error handling suggestion action:', error);
+    }
   }, []);
 
   /**
    * Navigate to a specific suggestion
    */
   const navigateToSuggestion = useCallback((suggestionId: string | 'next' | 'prev') => {
-    if (suggestionId === 'next' || suggestionId === 'prev') {
-      const pendingSuggestions = document.suggestions.filter(s => s.status === 'pending');
-      const currentIndex = redlineState.currentSuggestionIndex;
-      
-      let newIndex;
-      if (suggestionId === 'next') {
-        newIndex = Math.min(currentIndex + 1, pendingSuggestions.length - 1);
+    try {
+      if (suggestionId === 'next' || suggestionId === 'prev') {
+        const pendingSuggestions = document.suggestions.filter(s => s.status === 'pending');
+        const currentIndex = redlineState.currentSuggestionIndex;
+        
+        let newIndex;
+        if (suggestionId === 'next') {
+          newIndex = Math.min(currentIndex + 1, pendingSuggestions.length - 1);
+        } else {
+          newIndex = Math.max(currentIndex - 1, 0);
+        }
+        
+        setRedlineState(prev => ({
+          ...prev,
+          currentSuggestionIndex: newIndex,
+          selectedSuggestionId: pendingSuggestions[newIndex]?.id || null
+        }));
       } else {
-        newIndex = Math.max(currentIndex - 1, 0);
+        setRedlineState(prev => ({
+          ...prev,
+          selectedSuggestionId: suggestionId
+        }));
       }
-      
-      setRedlineState(prev => ({
-        ...prev,
-        currentSuggestionIndex: newIndex,
-        selectedSuggestionId: pendingSuggestions[newIndex]?.id || null
-      }));
-    } else {
-      setRedlineState(prev => ({
-        ...prev,
-        selectedSuggestionId: suggestionId
-      }));
+    } catch (error) {
+      console.error('Error navigating to suggestion:', error);
     }
   }, [document.suggestions, redlineState.currentSuggestionIndex]);
 
@@ -110,28 +120,33 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
    * Get filtered suggestions based on current state
    */
   const filteredSuggestions = useMemo(() => {
-    return document.suggestions.filter(suggestion => {
-      // Type filter
-      if (redlineState.filterType !== 'all' && suggestion.type !== redlineState.filterType) {
-        return false;
-      }
-      
-      // Severity filter
-      if (redlineState.filterSeverity !== 'all' && suggestion.severity !== redlineState.filterSeverity) {
-        return false;
-      }
-      
-      // Status filter
-      if (!redlineState.showAccepted && suggestion.status === 'accepted') {
-        return false;
-      }
-      
-      if (!redlineState.showRejected && suggestion.status === 'rejected') {
-        return false;
-      }
-      
-      return true;
-    });
+    try {
+      return document.suggestions.filter(suggestion => {
+        // Type filter
+        if (redlineState.filterType !== 'all' && suggestion.type !== redlineState.filterType) {
+          return false;
+        }
+        
+        // Severity filter
+        if (redlineState.filterSeverity !== 'all' && suggestion.severity !== redlineState.filterSeverity) {
+          return false;
+        }
+        
+        // Status filter
+        if (!redlineState.showAccepted && suggestion.status === 'accepted') {
+          return false;
+        }
+        
+        if (!redlineState.showRejected && suggestion.status === 'rejected') {
+          return false;
+        }
+        
+        return true;
+      });
+    } catch (error) {
+      console.error('Error filtering suggestions:', error);
+      return [];
+    }
   }, [document.suggestions, redlineState]);
 
   /**

@@ -139,19 +139,20 @@ const RedlineToolbar: React.FC<RedlineToolbarProps> = ({
           Save
         </Button>
         
-        <Select onValueChange={onExport}>
-          <SelectTrigger asChild>
-            <Button size="sm" variant="outline">
+        {/* Fixed Export Dropdown */}
+        <div className="relative">
+          <Select onValueChange={onExport}>
+            <SelectTrigger className="w-28">
               <Download size={16} className="mr-1" />
-              Export
-            </Button>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="docx">Export as DOCX</SelectItem>
-            <SelectItem value="pdf">Export as PDF</SelectItem>
-            <SelectItem value="txt">Export as TXT</SelectItem>
-          </SelectContent>
-        </Select>
+              <SelectValue placeholder="Export" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="docx">DOCX</SelectItem>
+              <SelectItem value="pdf">PDF</SelectItem>
+              <SelectItem value="txt">TXT</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         
         <Button size="sm" variant="outline" onClick={onClose}>
           <X size={16} />
