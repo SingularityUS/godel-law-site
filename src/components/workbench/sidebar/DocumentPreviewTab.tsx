@@ -84,93 +84,130 @@ const DocumentPreviewTab: React.FC<DocumentPreviewTabProps> = ({ document }) => 
         </div>
       </div>
       
-      <style jsx>{`
+      <style>{`
         .document-content .text-center {
-          text-align: center;
+          text-align: center !important;
         }
         
         .document-content .text-right {
-          text-align: right;
+          text-align: right !important;
         }
         
         .document-content .text-justify {
-          text-align: justify;
+          text-align: justify !important;
         }
         
         .document-content .text-indent {
-          text-indent: 0.5in;
+          text-indent: 0.5in !important;
         }
         
         .document-content .margin-left {
-          margin-left: 0.5in;
+          margin-left: 0.5in !important;
         }
         
         .document-content .document-title {
-          font-size: 16pt;
-          font-weight: bold;
-          text-align: center;
-          margin: 12pt 0;
+          font-size: 16pt !important;
+          font-weight: bold !important;
+          text-align: center !important;
+          margin: 12pt 0 !important;
+          line-height: 1.2 !important;
         }
         
         .document-content .heading-1 {
-          font-size: 14pt;
-          font-weight: bold;
-          margin: 12pt 0 6pt 0;
+          font-size: 14pt !important;
+          font-weight: bold !important;
+          margin: 12pt 0 6pt 0 !important;
+          line-height: 1.2 !important;
         }
         
         .document-content .heading-2 {
-          font-size: 13pt;
-          font-weight: bold;
-          margin: 10pt 0 6pt 0;
+          font-size: 13pt !important;
+          font-weight: bold !important;
+          margin: 10pt 0 6pt 0 !important;
+          line-height: 1.2 !important;
         }
         
         .document-content .heading-3 {
-          font-size: 12pt;
-          font-weight: bold;
-          margin: 8pt 0 4pt 0;
+          font-size: 12pt !important;
+          font-weight: bold !important;
+          margin: 8pt 0 4pt 0 !important;
+          line-height: 1.2 !important;
         }
         
-        .document-content ul {
-          margin: 6pt 0;
-          padding-left: 24pt;
+        .document-content ul, .document-content ol {
+          margin: 6pt 0 !important;
+          padding-left: 24pt !important;
         }
         
         .document-content li {
-          margin: 3pt 0;
-          line-height: 1.15;
+          margin: 3pt 0 !important;
+          line-height: 1.15 !important;
         }
         
         .document-content u {
-          text-decoration: underline;
+          text-decoration: underline !important;
         }
         
         .document-content s {
-          text-decoration: line-through;
+          text-decoration: line-through !important;
         }
         
         .document-content strong {
-          font-weight: bold;
+          font-weight: bold !important;
         }
         
         .document-content em {
-          font-style: italic;
+          font-style: italic !important;
         }
         
         .document-content p {
-          margin: 6pt 0;
-          line-height: 1.15;
+          margin: 6pt 0 !important;
+          line-height: 1.15 !important;
         }
         
         .document-content .list-paragraph {
-          margin-left: 0.5in;
+          margin-left: 0.5in !important;
+        }
+        
+        .document-content .tab-1 {
+          margin-left: 0.5in !important;
+        }
+        
+        .document-content .tab-2 {
+          margin-left: 1in !important;
+        }
+        
+        .document-content .tab-3 {
+          margin-left: 1.5in !important;
+        }
+        
+        .document-content .tab-4 {
+          margin-left: 2in !important;
         }
         
         .formatted-document {
-          line-height: 1.15;
+          line-height: 1.15 !important;
         }
         
         .formatted-document p {
-          margin: 6pt 0;
+          margin: 6pt 0 !important;
+        }
+        
+        .formatted-document ul {
+          list-style-type: disc !important;
+          margin: 6pt 0 !important;
+          padding-left: 24pt !important;
+        }
+        
+        .formatted-document ol {
+          list-style-type: decimal !important;
+          margin: 6pt 0 !important;
+          padding-left: 24pt !important;
+        }
+        
+        .formatted-document li {
+          margin: 3pt 0 !important;
+          line-height: 1.15 !important;
         }
       `}</style>
     </div>
