@@ -3,7 +3,8 @@ import { useCallback, useState, useRef } from "react";
 import ModuleSettingsDrawer from "@/components/ModuleSettingsDrawer";
 import DocumentLibrary from "@/components/DocumentLibrary";
 import AppHeader from "@/components/layout/AppHeader";
-import MainWorkspace from "@/components/layout/MainWorkspace";
+import DocumentAnalyzerTab from "@/components/tabs/DocumentAnalyzerTab";
+import DocumentBuilderTab from "@/components/tabs/DocumentBuilderTab";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { MODULE_DEFINITIONS, ModuleKind } from "@/data/modules";
 import { useDocuments } from "@/hooks/useDocuments";
@@ -15,6 +16,7 @@ const getModuleDef = (type: ModuleKind) =>
 export type UploadedFile = File & { preview?: string; extractedText?: string };
 
 const IndexContent = () => {
+  const [activeTab, setActiveTab] = useState<string>('document-analyzer');
   const [editingNodeId, setEditingNodeId] = useState<string | undefined>();
   const [editingNode, setEditingNode] = useState<any>();
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -38,8 +40,8 @@ const IndexContent = () => {
     };
   }, []);
 
-  const handlePaletteDragStart = (mod: any, event: React.DragEvent) => {
-    event.dataTransfer.setData("application/json", JSON.stringify(mod));
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
   };
 
   const handleFilesAccepted = (files: UploadedFile[]) => {
@@ -84,6 +86,35 @@ const IndexContent = () => {
     drawerPromptOverride = editingNode.data.promptOverride ?? "";
   }
 
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'document-analyzer':
+        return (
+          <DocumentAnalyzerTab
+            onModuleEdit={handleModuleEdit}
+            editingPromptNodeId={editingNodeId}
+            uploadedFiles={uploadedFiles}
+            workbenchRef={workbenchRef}
+            finalOutput={finalOutput}
+            onCloseFinalOutput={handleCloseFinalOutput}
+          />
+        );
+      case 'document-builder':
+        return <DocumentBuilderTab />;
+      default:
+        return (
+          <DocumentAnalyzerTab
+            onModuleEdit={handleModuleEdit}
+            editingPromptNodeId={editingNodeId}
+            uploadedFiles={uploadedFiles}
+            workbenchRef={workbenchRef}
+            finalOutput={finalOutput}
+            onCloseFinalOutput={handleCloseFinalOutput}
+          />
+        );
+    }
+  };
+
   return (
     <div className="flex flex-col w-full min-h-screen bg-white" style={{ fontFamily: 'Courier New, monospace' }}>
       <AppHeader 
@@ -91,17 +122,12 @@ const IndexContent = () => {
         onUploadComplete={handleUploadComplete}
         onLibraryOpen={() => setIsLibraryOpen(true)}
         onDocumentAdded={handleDocumentAdded}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
       />
 
       <div className="flex-1 overflow-hidden">
-        <MainWorkspace 
-          onModuleEdit={handleModuleEdit}
-          editingPromptNodeId={editingNodeId}
-          uploadedFiles={uploadedFiles}
-          workbenchRef={workbenchRef}
-          finalOutput={finalOutput}
-          onCloseFinalOutput={handleCloseFinalOutput}
-        />
+        {renderTabContent()}
       </div>
 
       <DocumentLibrary

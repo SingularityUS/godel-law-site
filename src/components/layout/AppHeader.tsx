@@ -12,13 +12,17 @@ interface AppHeaderProps {
   onUploadComplete: () => void;
   onLibraryOpen: () => void;
   onDocumentAdded?: () => void;
+  activeTab: string;
+  onTabChange: (tab: string) => void;
 }
 
 const AppHeader: React.FC<AppHeaderProps> = ({
   onFilesAccepted,
   onUploadComplete,
   onLibraryOpen,
-  onDocumentAdded
+  onDocumentAdded,
+  activeTab,
+  onTabChange
 }) => {
   return (
     <header className="border-b-2 border-black bg-white">
@@ -40,7 +44,30 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         </div>
       </div>
 
-      <div className="flex justify-end items-center py-1 px-8 bg-white">
+      <div className="flex justify-between items-center py-2 px-8 bg-white border-t border-gray-200">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => onTabChange('document-analyzer')}
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+              activeTab === 'document-analyzer'
+                ? 'bg-blue-100 text-blue-700 border-b-2 border-blue-700'
+                : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+            }`}
+          >
+            Document Analyzer
+          </button>
+          <button
+            onClick={() => onTabChange('document-builder')}
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+              activeTab === 'document-builder'
+                ? 'bg-blue-100 text-blue-700 border-b-2 border-blue-700'
+                : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+            }`}
+          >
+            Document Builder
+          </button>
+        </div>
+        
         <ChatGPTStatus />
       </div>
     </header>
