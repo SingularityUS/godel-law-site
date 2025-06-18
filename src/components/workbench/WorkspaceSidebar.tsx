@@ -57,9 +57,6 @@ const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
     isLegalPipeline
   });
 
-  // Show sidebar if processing or has output
-  if (!isProcessing && !output) return null;
-
   return (
     <div className="flex flex-col border-l bg-white h-full">
       <WorkspaceSidebarHeader 
@@ -82,6 +79,15 @@ const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
             onSaveRedline={handleSaveRedline}
             onExportRedline={handleExportRedline}
           />
+        </div>
+      )}
+
+      {!isOpen && (
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="text-center text-gray-500">
+            <p className="text-sm mb-2">Pipeline Results</p>
+            <p className="text-xs">Click to expand sidebar</p>
+          </div>
         </div>
       )}
     </div>

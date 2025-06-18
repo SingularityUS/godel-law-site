@@ -74,12 +74,10 @@ const DocumentAnalyzerTab: React.FC<DocumentAnalyzerTabProps> = ({
     }
   };
 
-  const showSidebar = isOutputOpen || isProcessing;
-
   return (
     <div className="flex-1 overflow-hidden">
       <ResizablePanelGroup direction="horizontal" className="h-full">
-        <ResizablePanel defaultSize={50} minSize={30}>
+        <ResizablePanel defaultSize={70} minSize={40}>
           <AIWorkbench 
             onModuleEdit={onModuleEdit || (() => {})}
             editingPromptNodeId={editingPromptNodeId}
@@ -89,21 +87,17 @@ const DocumentAnalyzerTab: React.FC<DocumentAnalyzerTabProps> = ({
           />
         </ResizablePanel>
         
-        {showSidebar && (
-          <>
-            <ResizableHandle />
-            <ResizablePanel defaultSize={50} minSize={25}>
-              <WorkspaceSidebar 
-                output={output}
-                isOpen={isOutputOpen}
-                isProcessing={isProcessing}
-                processingDocument={processingDocument}
-                onClose={handleClose}
-                onToggle={toggleOutput}
-              />
-            </ResizablePanel>
-          </>
-        )}
+        <ResizableHandle />
+        <ResizablePanel defaultSize={30} minSize={25}>
+          <WorkspaceSidebar 
+            output={output}
+            isOpen={isOutputOpen}
+            isProcessing={isProcessing}
+            processingDocument={processingDocument}
+            onClose={handleClose}
+            onToggle={toggleOutput}
+          />
+        </ResizablePanel>
       </ResizablePanelGroup>
     </div>
   );
