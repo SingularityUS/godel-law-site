@@ -176,7 +176,8 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
       cleaningResult: {
         originalContent: '',
         processableContent: '',
-        cleaningApplied: ['error']
+        cleaningApplied: ['error'],
+        whitespaceMap: []
       },
       metadata: {
         fileName,

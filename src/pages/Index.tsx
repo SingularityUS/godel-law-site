@@ -95,7 +95,6 @@ const IndexContent = () => {
 
       <div className="flex-1 overflow-hidden">
         <MainWorkspace 
-          onPaletteDragStart={handlePaletteDragStart}
           onModuleEdit={handleModuleEdit}
           editingPromptNodeId={editingNodeId}
           uploadedFiles={uploadedFiles}

@@ -68,7 +68,7 @@ const EditableDocumentRenderer: React.FC<EditableDocumentRendererProps> = ({
     const textNodes: Text[] = [];
     
     // Collect all text nodes
-    const walker = document.createTreeWalker(
+    const walker = window.document.createTreeWalker(
       editorRef.current,
       NodeFilter.SHOW_TEXT,
       null
@@ -106,7 +106,7 @@ const EditableDocumentRenderer: React.FC<EditableDocumentRendererProps> = ({
     if (startNode) {
       try {
         const selection = window.getSelection();
-        const range = document.createRange();
+        const range = window.document.createRange();
         
         range.setStart(startNode, Math.min(startOffset, startNode.textContent?.length || 0));
         range.setEnd(endNode || startNode, Math.min(endOffset, (endNode || startNode).textContent?.length || 0));

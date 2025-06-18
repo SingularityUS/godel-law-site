@@ -2,12 +2,15 @@
 /**
  * useOutputPanel Hook
  * 
- * Purpose: Shared logic for output panel operations
+ * Purpose: Shared logic for output panel operations and state management
  */
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
-export const useOutputPanel = (output: any) => {
+export const useOutputPanel = () => {
+  const [output, setOutput] = useState<any>(null);
+  const [isOutputOpen, setIsOutputOpen] = useState(false);
+
   const formatOutput = useCallback((data: any): string => {
     if (typeof data === 'string') {
       return data;
@@ -37,21 +40,44 @@ export const useOutputPanel = (output: any) => {
   }, []);
 
   const handleCopy = useCallback(() => {
-    copyToClipboard(formatOutput(output));
+    if (output) {
+      copyToClipboard(formatOutput(output));
+    }
   }, [copyToClipboard, formatOutput, output]);
 
   const handleDownload = useCallback(() => {
-    downloadAsFile(
-      formatOutput(output), 
-      `legal-analysis-${new Date().toISOString().slice(0, 19)}.json`
-    );
+    if (output) {
+      downloadAsFile(
+        formatOutput(output), 
+        `legal-analysis-${new Date().toISOString().slice(0, 19)}.json`
+      );
+    }
   }, [downloadAsFile, formatOutput, output]);
 
+  const closeOutput = useCallback(() => {
+    setIsOutputOpen(false);
+  }, []);
+
+  const toggleOutput = useCallback(() => {
+    setIsOutputOpen(prev => !prev);
+  }, []);
+
+  const openOutput = useCallback((newOutput: any) => {
+    setOutput(newOutput);
+    setIsOutputOpen(true);
+  }, []);
+
   return {
+    output,
+    isOutputOpen,
     formatOutput,
     copyToClipboard,
     downloadAsFile,
     handleCopy,
-    handleDownload
+    handleDownload,
+    closeOutput,
+    toggleOutput,
+    openOutput,
+    setOutput
   };
 };
