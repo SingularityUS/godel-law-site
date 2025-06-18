@@ -1,20 +1,11 @@
 
-/**
- * SidebarTabsContent Component
- * 
- * Purpose: Main tabs content for the workspace sidebar
- * Extracted from WorkspaceSidebar for better organization
- */
-
 import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FileText, Edit3, BarChart3 } from "lucide-react";
 import { RedlineDocument } from "@/types/redlining";
-import DocumentPreviewTab from "./DocumentPreviewTab";
 import RedlineTabContent from "./RedlineTabContent";
-import LegalSummaryTab from "../output/LegalSummaryTab";
-import LegalAnalysisTab from "../output/LegalAnalysisTab";
-import GrammarAnalysisTab from "../output/GrammarAnalysisTab";
-import RawDataTab from "../output/RawDataTab";
+import DocumentPreviewTab from "./DocumentPreviewTab";
+import AnalysisContent from "../output/AnalysisContent";
 
 interface SidebarTabsContentProps {
   activeTab: string;
@@ -44,51 +35,49 @@ const SidebarTabsContent: React.FC<SidebarTabsContentProps> = ({
   onExportRedline
 }) => {
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-      <TabsList className="grid w-full grid-cols-6 shrink-0 m-2">
-        <TabsTrigger value="document">Document</TabsTrigger>
-        <TabsTrigger value="redline">Redline</TabsTrigger>
-        <TabsTrigger value="summary">Summary</TabsTrigger>
-        <TabsTrigger value="analysis">Analysis</TabsTrigger>
-        <TabsTrigger value="grammar">Grammar</TabsTrigger>
-        <TabsTrigger value="raw">Raw Data</TabsTrigger>
-      </TabsList>
+    <div className="h-full flex flex-col overflow-hidden">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+        <TabsList className="grid w-full grid-cols-3 flex-shrink-0">
+          <TabsTrigger value="document" className="flex items-center gap-1">
+            <FileText size={14} />
+            <span className="hidden sm:inline">Document</span>
+          </TabsTrigger>
+          <TabsTrigger value="redline" className="flex items-center gap-1">
+            <Edit3 size={14} />
+            <span className="hidden sm:inline">Redline</span>
+          </TabsTrigger>
+          <TabsTrigger value="analysis" className="flex items-center gap-1">
+            <BarChart3 size={14} />
+            <span className="hidden sm:inline">Analysis</span>
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="flex-1 overflow-hidden">
-        <TabsContent value="document" className="h-full m-0">
-          <DocumentPreviewTab document={previewDocument} />
-        </TabsContent>
+        <div className="flex-1 overflow-hidden min-h-0">
+          <TabsContent value="document" className="h-full m-0 overflow-hidden">
+            <DocumentPreviewTab document={previewDocument} />
+          </TabsContent>
 
-        <TabsContent value="redline" className="h-full m-0">
-          <RedlineTabContent
-            isProcessing={isProcessing}
-            processingDocument={processingDocument}
-            isGeneratingRedline={isGeneratingRedline}
-            redlineDocument={redlineDocument}
-            isLegalPipeline={isLegalPipeline}
-            output={output}
-            onSaveRedline={onSaveRedline}
-            onExportRedline={onExportRedline}
-          />
-        </TabsContent>
+          <TabsContent value="redline" className="h-full m-0 overflow-hidden">
+            <RedlineTabContent
+              isProcessing={isProcessing}
+              processingDocument={processingDocument}
+              isGeneratingRedline={isGeneratingRedline}
+              redlineDocument={redlineDocument}
+              isLegalPipeline={isLegalPipeline}
+              output={output}
+              onSaveRedline={onSaveRedline}
+              onExportRedline={onExportRedline}
+            />
+          </TabsContent>
 
-        <TabsContent value="summary" className="h-full m-0 overflow-auto">
-          <LegalSummaryTab output={output} />
-        </TabsContent>
-
-        <TabsContent value="analysis" className="h-full m-0 overflow-auto">
-          <LegalAnalysisTab output={output} />
-        </TabsContent>
-
-        <TabsContent value="grammar" className="h-full m-0 overflow-auto">
-          <GrammarAnalysisTab result={output} />
-        </TabsContent>
-
-        <TabsContent value="raw" className="h-full m-0 overflow-auto">
-          <RawDataTab output={output} />
-        </TabsContent>
-      </div>
-    </Tabs>
+          <TabsContent value="analysis" className="h-full m-0 overflow-hidden">
+            <div className="h-full overflow-auto">
+              <AnalysisContent output={output} />
+            </div>
+          </TabsContent>
+        </div>
+      </Tabs>
+    </div>
   );
 };
 

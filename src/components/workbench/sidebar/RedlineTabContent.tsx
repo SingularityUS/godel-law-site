@@ -35,14 +35,16 @@ const RedlineTabContent: React.FC<RedlineTabContentProps> = ({
   // Show processing document view while pipeline is executing
   if (isProcessing && processingDocument) {
     return (
-      <ProcessingDocumentView document={processingDocument} />
+      <div className="h-full overflow-hidden">
+        <ProcessingDocumentView document={processingDocument} />
+      </div>
     );
   }
 
   // Show redline generation spinner
   if (isGeneratingRedline) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="h-full flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Generating redline document...</p>
@@ -54,22 +56,24 @@ const RedlineTabContent: React.FC<RedlineTabContentProps> = ({
   // Show redline document when ready
   if (redlineDocument) {
     return (
-      <EmbeddedRedlineViewer
-        document={redlineDocument}
-        originalDocument={{
-          type: output.metadata?.fileType || 'text/plain',
-          preview: output.metadata?.originalPreview,
-          name: output.metadata?.fileName || 'Document'
-        }}
-        onSave={onSaveRedline}
-        onExport={onExportRedline}
-      />
+      <div className="h-full overflow-hidden">
+        <EmbeddedRedlineViewer
+          document={redlineDocument}
+          originalDocument={{
+            type: output.metadata?.fileType || 'text/plain',
+            preview: output.metadata?.originalPreview,
+            name: output.metadata?.fileName || 'Document'
+          }}
+          onSave={onSaveRedline}
+          onExport={onExportRedline}
+        />
+      </div>
     );
   }
 
   // Default empty state
   return (
-    <div className="flex items-center justify-center h-full p-6">
+    <div className="h-full flex items-center justify-center p-6">
       <div className="text-center">
         <p className="text-gray-600 mb-2">No redline document available</p>
         <p className="text-sm text-gray-500">
