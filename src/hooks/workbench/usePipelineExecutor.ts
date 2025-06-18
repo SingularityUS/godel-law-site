@@ -2,13 +2,15 @@
 /**
  * usePipelineExecutor Hook
  * 
- * Purpose: Core pipeline execution logic with document processing
+ * Purpose: Core pipeline execution logic with enhanced data preservation and endpoint detection
  */
 
 import { useCallback } from "react";
 import { Node, Edge } from "@xyflow/react";
 import { AllNodes, DocumentInputNode } from "@/types/workbench";
 import { createExecutionManager } from "./utils/executionManager";
+import { createEndpointDetector } from "./utils/endpointDetector";
+import { PipelineChangeDetector } from "./utils/pipelineChangeDetector";
 import { usePipelineState } from "./usePipelineState";
 import { usePipelineProgress } from "./usePipelineProgress";
 import { usePipelineDocumentProcessor } from "./usePipelineDocumentProcessor";
@@ -39,9 +41,10 @@ export const usePipelineExecutor = (nodes: AllNodes[], edges: Edge[]) => {
 
   // Create utility functions
   const executionManager = createExecutionManager(nodes, edges);
+  const endpointDetector = createEndpointDetector(nodes, edges);
 
   /**
-   * Execute pipeline starting from a document input node
+   * Execute pipeline starting from a document input node with enhanced data preservation
    */
   const executePipeline = useCallback(async (startNodeId: string) => {
     if (isExecuting) return;
@@ -52,13 +55,22 @@ export const usePipelineExecutor = (nodes: AllNodes[], edges: Edge[]) => {
     
     try {
       const executionOrder = executionManager.getExecutionOrder(startNodeId);
-      console.log('Legal document processing pipeline execution order:', executionOrder);
+      console.log('Enhanced pipeline execution order:', executionOrder);
+
+      // Detect pipeline endpoints for redline generation
+      const endpoints = endpointDetector.getPipelineEndpoints();
+      console.log('Pipeline endpoints detected:', endpoints);
+
+      // Check if pipeline has changed
+      const pipelineChanged = PipelineChangeDetector.hasPipelineChanged(nodes, edges);
+      console.log('Pipeline changed since last execution:', pipelineChanged);
 
       // Initialize execution state
       initializeState(executionOrder);
 
       let currentData: any = null;
       const pipelineResults: any[] = [];
+      const allModuleData = new Map<string, any>(); // Preserve all module outputs
 
       // Process each node in order
       for (const nodeId of executionOrder) {
@@ -80,10 +92,19 @@ export const usePipelineExecutor = (nodes: AllNodes[], edges: Edge[]) => {
             );
           }
 
+          // Store this module's data separately (don't overwrite)
+          allModuleData.set(nodeId, {
+            nodeId,
+            moduleType: node?.data?.moduleType,
+            result: currentData,
+            isEndpoint: endpointDetector.isEndpointNode(nodeId)
+          });
+
           pipelineResults.push({
             nodeId,
             moduleType: node?.data?.moduleType,
-            result: currentData
+            result: currentData,
+            isEndpoint: endpointDetector.isEndpointNode(nodeId)
           });
 
           // Update status to completed with data and statistics
@@ -105,21 +126,28 @@ export const usePipelineExecutor = (nodes: AllNodes[], edges: Edge[]) => {
         }
       }
 
-      // Create comprehensive final output for legal review
-      const finalLegalOutput = executionManager.createFinalOutput(pipelineResults, currentData);
-      setFinalOutput(finalLegalOutput);
+      // Create enhanced final output with endpoint data preserved
+      const enhancedFinalOutput = executionManager.createEnhancedFinalOutput(
+        pipelineResults, 
+        currentData, 
+        endpoints,
+        allModuleData
+      );
       
-      // Log final pipeline statistics
-      console.log('Legal document processing pipeline completed successfully');
+      setFinalOutput(enhancedFinalOutput);
+      
+      // Log comprehensive pipeline statistics
+      console.log('Enhanced pipeline execution completed successfully');
       console.log(`Final output contains:`, {
         totalModules: pipelineResults.length,
-        finalDataType: typeof currentData,
-        hasAnalysis: currentData?.output?.analysis ? currentData.output.analysis.length : 0,
-        hasParagraphs: currentData?.output?.paragraphs ? currentData.output.paragraphs.length : 0
+        endpointModules: endpoints.length,
+        endpointTypes: endpoints.map(e => e.moduleType),
+        pipelineChanged,
+        preservedModuleCount: allModuleData.size
       });
 
     } catch (error: any) {
-      console.error('Legal document processing pipeline failed:', error);
+      console.error('Enhanced pipeline execution failed:', error);
     } finally {
       setIsExecuting(false);
       resetAllProgress();
@@ -127,9 +155,11 @@ export const usePipelineExecutor = (nodes: AllNodes[], edges: Edge[]) => {
   }, [
     isExecuting, 
     executionManager, 
+    endpointDetector,
     processDocumentNode,
     processModuleNode,
     nodes, 
+    edges,
     setIsExecuting, 
     setFinalOutput, 
     resetAllProgress, 
@@ -149,6 +179,7 @@ export const usePipelineExecutor = (nodes: AllNodes[], edges: Edge[]) => {
     resetState: () => {
       resetState();
       resetAllProgress();
+      PipelineChangeDetector.resetSignature();
     }
   };
 };

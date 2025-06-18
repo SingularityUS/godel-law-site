@@ -2,12 +2,13 @@
 /**
  * Execution Manager Utility
  * 
- * Purpose: Manages execution order and state tracking for pipeline execution
+ * Purpose: Enhanced execution order and state tracking with endpoint support
  */
 
 import { Edge } from "@xyflow/react";
 import { AllNodes, DocumentInputNode } from "@/types/workbench";
 import { ExecutionState, PipelineResult, FinalLegalOutput } from "../types/pipelineTypes";
+import { PipelineEndpoint } from "./endpointDetector";
 
 export const createExecutionManager = (nodes: AllNodes[], edges: Edge[]) => {
   const getDocumentInputNodes = (): DocumentInputNode[] => {
@@ -53,6 +54,36 @@ export const createExecutionManager = (nodes: AllNodes[], edges: Edge[]) => {
     };
   };
 
+  /**
+   * Create enhanced final output with endpoint data preserved
+   */
+  const createEnhancedFinalOutput = (
+    pipelineResults: PipelineResult[], 
+    currentData: any,
+    endpoints: PipelineEndpoint[],
+    allModuleData: Map<string, any>
+  ): FinalLegalOutput => {
+    // Filter results to get only endpoint module data
+    const endpointResults = pipelineResults.filter(result => 
+      endpoints.some(endpoint => endpoint.nodeId === result.nodeId)
+    );
+
+    return {
+      summary: {
+        documentsProcessed: 1,
+        modulesExecuted: pipelineResults.length - 1,
+        processingCompleted: new Date().toISOString(),
+        pipelineType: "Legal Document Analysis",
+        endpointCount: endpoints.length
+      },
+      results: pipelineResults,
+      endpointResults, // New: preserved endpoint data for redline generation
+      endpoints, // New: endpoint metadata
+      finalOutput: currentData,
+      pipelineResults // Maintain compatibility while adding enhanced data
+    };
+  };
+
   const initializeExecutionState = (executionOrder: string[]): ExecutionState => {
     const newExecutionState: ExecutionState = {};
     executionOrder.forEach(nodeId => {
@@ -65,6 +96,7 @@ export const createExecutionManager = (nodes: AllNodes[], edges: Edge[]) => {
     getDocumentInputNodes,
     getExecutionOrder,
     createFinalOutput,
+    createEnhancedFinalOutput,
     initializeExecutionState
   };
 };
