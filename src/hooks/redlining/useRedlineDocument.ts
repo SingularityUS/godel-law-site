@@ -20,6 +20,17 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
   });
 
   /**
+   * Auto-save document with debouncing
+   */
+  const autoSave = useCallback((updatedDocument: RedlineDocument) => {
+    // Simulate auto-save delay
+    setTimeout(() => {
+      console.log('Document auto-saved');
+      // In a real app, this would call an API to save the document
+    }, 500);
+  }, []);
+
+  /**
    * Update the entire document
    */
   const updateDocument = useCallback((updatedDocument: RedlineDocument) => {
@@ -29,10 +40,13 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
       ...prev,
       document: updatedDocument
     }));
-  }, []);
+    
+    // Trigger auto-save
+    autoSave(updatedDocument);
+  }, [autoSave]);
 
   /**
-   * Handle suggestion actions (accept, reject, modify)
+   * Handle suggestion actions (accept, reject, modify) with auto-save
    */
   const handleSuggestionAction = useCallback((
     suggestionId: string,
@@ -56,7 +70,7 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
           return suggestion;
         });
 
-        // Apply the change to the document content if accepted
+        // Apply the change to the document content if accepted or modified
         let currentContent = prev.currentContent;
         if (action === 'accepted' || action === 'modified') {
           const suggestion = suggestions.find(s => s.id === suggestionId);
@@ -68,7 +82,7 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
           }
         }
 
-        return {
+        const updatedDocument = {
           ...prev,
           suggestions,
           currentContent,
@@ -79,11 +93,30 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
             rejectedSuggestions: suggestions.filter(s => s.status === 'rejected').length
           }
         };
+
+        // Trigger auto-save
+        autoSave(updatedDocument);
+        
+        return updatedDocument;
       });
     } catch (error) {
       console.error('Error handling suggestion action:', error);
     }
-  }, []);
+  }, [autoSave]);
+
+  /**
+   * Quick accept suggestion (for checkmark button)
+   */
+  const acceptSuggestion = useCallback((suggestionId: string) => {
+    handleSuggestionAction(suggestionId, 'accepted');
+  }, [handleSuggestionAction]);
+
+  /**
+   * Modify suggestion with custom text (for inline editing)
+   */
+  const modifySuggestion = useCallback((suggestionId: string, newText: string) => {
+    handleSuggestionAction(suggestionId, 'modified', newText);
+  }, [handleSuggestionAction]);
 
   /**
    * Navigate to a specific suggestion
@@ -169,6 +202,8 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
     redlineState,
     document,
     handleSuggestionAction,
+    acceptSuggestion,
+    modifySuggestion,
     navigateToSuggestion,
     applyFilters,
     filteredSuggestions,

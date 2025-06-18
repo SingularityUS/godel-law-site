@@ -5,10 +5,11 @@
  * Purpose: Renders documents with original formatting and inline redline suggestions
  */
 
-import React from "react";
+import React, { useState } from "react";
 import { RedlineDocument, RedlineSuggestion } from "@/types/redlining";
 import { useRedlineContent } from "./hooks/useRedlineContent";
 import RedlineStyles from "./components/RedlineStyles";
+import InlineSuggestionEditor from "./components/InlineSuggestionEditor";
 
 interface EnhancedDocumentRendererProps {
   document: RedlineDocument;
@@ -16,6 +17,15 @@ interface EnhancedDocumentRendererProps {
   suggestions: RedlineSuggestion[];
   selectedSuggestionId: string | null;
   onSuggestionClick: (suggestionId: string) => void;
+  onSuggestionAccept?: (suggestionId: string) => void;
+  onSuggestionModify?: (suggestionId: string, newText: string) => void;
+}
+
+interface InlineEditorState {
+  suggestionId: string;
+  originalText: string;
+  suggestedText: string;
+  position: { top: number; left: number; width: number };
 }
 
 const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
@@ -23,7 +33,9 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
   originalDocument,
   suggestions,
   selectedSuggestionId,
-  onSuggestionClick
+  onSuggestionClick,
+  onSuggestionAccept,
+  onSuggestionModify
 }) => {
   const { richContent, isLoading } = useRedlineContent({
     document,
@@ -32,10 +44,54 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
     selectedSuggestionId
   });
 
+  const [inlineEditor, setInlineEditor] = useState<InlineEditorState | null>(null);
+
   const handleContentClick = (event: React.MouseEvent) => {
     const target = event.target as HTMLElement;
-    const suggestionElement = target.closest('.redline-suggestion');
     
+    // Handle accept button clicks
+    const acceptBtn = target.closest('.redline-accept-btn');
+    if (acceptBtn) {
+      event.stopPropagation();
+      const suggestionId = acceptBtn.getAttribute('data-suggestion-id');
+      if (suggestionId && onSuggestionAccept) {
+        onSuggestionAccept(suggestionId);
+      }
+      return;
+    }
+
+    // Handle suggestion text clicks for inline editing
+    const editableText = target.closest('[data-editable="true"]');
+    if (editableText) {
+      event.stopPropagation();
+      const suggestionElement = editableText.closest('.redline-suggestion');
+      
+      if (suggestionElement) {
+        const suggestionId = suggestionElement.getAttribute('data-suggestion-id');
+        const originalText = suggestionElement.getAttribute('data-original-text');
+        const suggestedText = suggestionElement.getAttribute('data-suggested-text');
+        
+        if (suggestionId && originalText && suggestedText) {
+          const rect = editableText.getBoundingClientRect();
+          const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+          
+          setInlineEditor({
+            suggestionId,
+            originalText,
+            suggestedText,
+            position: {
+              top: rect.top + scrollTop,
+              left: rect.left,
+              width: rect.width
+            }
+          });
+        }
+      }
+      return;
+    }
+
+    // Handle regular suggestion clicks
+    const suggestionElement = target.closest('.redline-suggestion');
     if (suggestionElement) {
       const suggestionId = suggestionElement.getAttribute('data-suggestion-id');
       if (suggestionId) {
@@ -43,6 +99,32 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
       }
     }
   };
+
+  const handleInlineEditorSave = (newText: string) => {
+    if (inlineEditor && onSuggestionModify) {
+      onSuggestionModify(inlineEditor.suggestionId, newText);
+    }
+    setInlineEditor(null);
+  };
+
+  const handleInlineEditorCancel = () => {
+    setInlineEditor(null);
+  };
+
+  // Close inline editor when clicking outside
+  const handleDocumentClick = (event: MouseEvent) => {
+    const target = event.target as HTMLElement;
+    if (!target.closest('.inline-suggestion-editor') && !target.closest('[data-editable="true"]')) {
+      setInlineEditor(null);
+    }
+  };
+
+  React.useEffect(() => {
+    if (inlineEditor) {
+      document.addEventListener('click', handleDocumentClick);
+      return () => document.removeEventListener('click', handleDocumentClick);
+    }
+  }, [inlineEditor]);
 
   if (isLoading) {
     return (
@@ -56,7 +138,7 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
   }
 
   return (
-    <div className="bg-gray-100 w-full h-full overflow-y-auto">
+    <div className="bg-gray-100 w-full h-full overflow-y-auto relative">
       <RedlineStyles />
       <div className="max-w-4xl mx-auto py-8 px-4">
         <div className="bg-white shadow-lg p-16 relative">
@@ -73,6 +155,18 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
           />
         </div>
       </div>
+      
+      {inlineEditor && (
+        <div className="inline-suggestion-editor">
+          <InlineSuggestionEditor
+            originalText={inlineEditor.originalText}
+            suggestedText={inlineEditor.suggestedText}
+            onSave={handleInlineEditorSave}
+            onCancel={handleInlineEditorCancel}
+            position={inlineEditor.position}
+          />
+        </div>
+      )}
     </div>
   );
 };

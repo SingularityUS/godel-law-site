@@ -19,6 +19,8 @@ interface RedlineDocumentAreaProps {
   isEditMode: boolean;
   onSuggestionClick: (suggestionId: string) => void;
   onContentChange: (newContent: string) => void;
+  onSuggestionAccept?: (suggestionId: string) => void;
+  onSuggestionModify?: (suggestionId: string, newText: string) => void;
 }
 
 const RedlineDocumentArea: React.FC<RedlineDocumentAreaProps> = ({
@@ -29,7 +31,9 @@ const RedlineDocumentArea: React.FC<RedlineDocumentAreaProps> = ({
   showSidebar,
   isEditMode,
   onSuggestionClick,
-  onContentChange
+  onContentChange,
+  onSuggestionAccept,
+  onSuggestionModify
 }) => {
   return (
     <div className={`flex-1 ${showSidebar ? 'mr-80' : ''} transition-all duration-200 overflow-hidden`}>
@@ -46,6 +50,8 @@ const RedlineDocumentArea: React.FC<RedlineDocumentAreaProps> = ({
             suggestions={suggestions}
             selectedSuggestionId={selectedSuggestionId}
             onSuggestionClick={onSuggestionClick}
+            onSuggestionAccept={onSuggestionAccept}
+            onSuggestionModify={onSuggestionModify}
           />
         )}
       </div>

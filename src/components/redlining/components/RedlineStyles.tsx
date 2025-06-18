@@ -39,6 +39,41 @@ const RedlineStyles: React.FC = () => {
       color: #166534;
       font-weight: 500;
       margin-left: 4px;
+      cursor: text;
+      padding: 1px 2px;
+      border-radius: 2px;
+    }
+    
+    .suggested-text:hover {
+      background-color: #bbf7d0;
+      outline: 1px solid #16a34a;
+    }
+    
+    .redline-accept-btn {
+      display: inline-block;
+      margin-left: 4px;
+      background-color: #16a34a;
+      color: white;
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      text-align: center;
+      line-height: 14px;
+      font-size: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      opacity: 0;
+      transform: scale(0.8);
+    }
+    
+    .redline-suggestion:hover .redline-accept-btn {
+      opacity: 1;
+      transform: scale(1);
+    }
+    
+    .redline-accept-btn:hover {
+      background-color: #15803d;
+      transform: scale(1.1);
     }
     
     .redline-indicator {

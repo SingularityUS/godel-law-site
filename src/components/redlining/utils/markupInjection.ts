@@ -1,4 +1,3 @@
-
 /**
  * Markup Injection Utilities
  * 
@@ -29,7 +28,7 @@ const restoreParagraphBreaks = (content: string): string => {
 };
 
 /**
- * Creates a redline markup span for a suggestion
+ * Creates a redline markup span for a suggestion with interactive elements
  */
 const createRedlineMarkup = (
   suggestion: RedlineSuggestion,
@@ -39,7 +38,11 @@ const createRedlineMarkup = (
   const severityClass = getSeverityClass(suggestion.severity);
   const typeClass = getTypeClass(suggestion.type);
   
-  return `<span class="redline-suggestion ${severityClass} ${typeClass} ${isSelected ? 'selected' : ''}" data-suggestion-id="${suggestion.id}" data-type="${suggestion.type}" data-severity="${suggestion.severity}" title="${escapeHtml(suggestion.explanation)}"><span class="original-text">${escapeHtml(originalText)}</span><span class="suggested-text">${escapeHtml(suggestion.suggestedText)}</span><span class="redline-indicator">${getTypeIcon(suggestion.type)}</span></span>`;
+  // Add checkmark button for pending suggestions
+  const checkmarkButton = suggestion.status === 'pending' ? 
+    `<span class="redline-accept-btn" data-suggestion-id="${suggestion.id}" title="Accept suggestion">✓</span>` : '';
+  
+  return `<span class="redline-suggestion ${severityClass} ${typeClass} ${isSelected ? 'selected' : ''}" data-suggestion-id="${suggestion.id}" data-type="${suggestion.type}" data-severity="${suggestion.severity}" data-original-text="${escapeHtml(originalText)}" data-suggested-text="${escapeHtml(suggestion.suggestedText)}" title="${escapeHtml(suggestion.explanation)}"><span class="original-text">${escapeHtml(originalText)}</span><span class="suggested-text" data-editable="true">${escapeHtml(suggestion.suggestedText)}</span>${checkmarkButton}<span class="redline-indicator">${getTypeIcon(suggestion.type)}</span></span>`;
 };
 
 /**

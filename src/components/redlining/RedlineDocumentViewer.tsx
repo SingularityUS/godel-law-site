@@ -28,6 +28,8 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
     redlineState,
     document: currentDocument,
     handleSuggestionAction,
+    acceptSuggestion,
+    modifySuggestion,
     navigateToSuggestion,
     applyFilters,
     filteredSuggestions,
@@ -92,6 +94,8 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
             isEditMode={isEditMode}
             onSuggestionClick={handleSuggestionClick}
             onContentChange={handleContentChange}
+            onSuggestionAccept={acceptSuggestion}
+            onSuggestionModify={modifySuggestion}
           />
           
           {showSidebar && !isEditMode && (
