@@ -20,7 +20,6 @@ interface WorkbenchControlsProps {
   isExecuting: boolean;
   onExecutePipeline: () => void;
   onStopPipeline: () => void;
-  onOpenSidebar?: () => void;
 }
 
 const WorkbenchControls: React.FC<WorkbenchControlsProps> = ({ 
@@ -29,8 +28,7 @@ const WorkbenchControls: React.FC<WorkbenchControlsProps> = ({
   edges, 
   isExecuting, 
   onExecutePipeline, 
-  onStopPipeline,
-  onOpenSidebar
+  onStopPipeline
 }) => {
   return (
     <>
@@ -42,7 +40,6 @@ const WorkbenchControls: React.FC<WorkbenchControlsProps> = ({
           isExecuting={isExecuting}
           onExecute={onExecutePipeline}
           onStop={onStopPipeline}
-          onOpenSidebar={onOpenSidebar}
         />
       </div>
 

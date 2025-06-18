@@ -19,7 +19,6 @@ interface PipelineExecutionButtonProps {
   isExecuting: boolean;
   onExecute: () => void;
   onStop: () => void;
-  onOpenSidebar?: () => void;
 }
 
 const PipelineExecutionButton: React.FC<PipelineExecutionButtonProps> = ({
@@ -27,8 +26,7 @@ const PipelineExecutionButton: React.FC<PipelineExecutionButtonProps> = ({
   edges,
   isExecuting,
   onExecute,
-  onStop,
-  onOpenSidebar
+  onStop
 }) => {
   // Validate pipeline to check if execution is possible
   const validatePipeline = () => {
@@ -61,8 +59,7 @@ const PipelineExecutionButton: React.FC<PipelineExecutionButtonProps> = ({
   useExecutionKeyboard({ 
     isValid, 
     isExecuting, 
-    onExecute: handleExecute,
-    onOpenSidebar 
+    onExecute: handleExecute
   });
 
   return (
