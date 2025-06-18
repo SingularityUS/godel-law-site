@@ -45,7 +45,7 @@ const DocumentContent: React.FC<DocumentContentProps> = ({
         <div className="max-w-4xl mx-auto py-8 px-4">
           <div className="bg-white shadow-lg p-16 relative min-h-[800px]">
             <div 
-              className="prose prose-sm max-w-none"
+              className="prose prose-sm max-w-none document-content"
               style={{
                 fontFamily: 'Calibri, "Segoe UI", Tahoma, Geneva, Verdana, sans-serif',
                 fontSize: '11pt',
@@ -54,23 +54,116 @@ const DocumentContent: React.FC<DocumentContentProps> = ({
               }}
             >
               {documentType === "text/plain" ? (
-                <pre 
+                <div 
                   style={{ 
                     whiteSpace: 'pre-wrap', 
                     fontFamily: 'inherit',
                     margin: 0,
-                    fontSize: 'inherit'
+                    fontSize: 'inherit',
+                    tabSize: 4
                   }}
-                >
-                  {content}
-                </pre>
+                  dangerouslySetInnerHTML={{ __html: content }}
+                />
               ) : (
-                <div dangerouslySetInnerHTML={{ __html: content }} />
+                <div 
+                  className="formatted-document"
+                  dangerouslySetInnerHTML={{ __html: content }} 
+                />
               )}
             </div>
           </div>
         </div>
       </div>
+      
+      <style jsx>{`
+        .document-content .text-center {
+          text-align: center;
+        }
+        
+        .document-content .text-right {
+          text-align: right;
+        }
+        
+        .document-content .text-justify {
+          text-align: justify;
+        }
+        
+        .document-content .text-indent {
+          text-indent: 0.5in;
+        }
+        
+        .document-content .margin-left {
+          margin-left: 0.5in;
+        }
+        
+        .document-content .document-title {
+          font-size: 16pt;
+          font-weight: bold;
+          text-align: center;
+          margin: 12pt 0;
+        }
+        
+        .document-content .heading-1 {
+          font-size: 14pt;
+          font-weight: bold;
+          margin: 12pt 0 6pt 0;
+        }
+        
+        .document-content .heading-2 {
+          font-size: 13pt;
+          font-weight: bold;
+          margin: 10pt 0 6pt 0;
+        }
+        
+        .document-content .heading-3 {
+          font-size: 12pt;
+          font-weight: bold;
+          margin: 8pt 0 4pt 0;
+        }
+        
+        .document-content ul {
+          margin: 6pt 0;
+          padding-left: 24pt;
+        }
+        
+        .document-content li {
+          margin: 3pt 0;
+          line-height: 1.15;
+        }
+        
+        .document-content u {
+          text-decoration: underline;
+        }
+        
+        .document-content s {
+          text-decoration: line-through;
+        }
+        
+        .document-content strong {
+          font-weight: bold;
+        }
+        
+        .document-content em {
+          font-style: italic;
+        }
+        
+        .document-content p {
+          margin: 6pt 0;
+          line-height: 1.15;
+        }
+        
+        .document-content .list-paragraph {
+          margin-left: 0.5in;
+        }
+        
+        .formatted-document {
+          line-height: 1.15;
+        }
+        
+        .formatted-document p {
+          margin: 6pt 0;
+        }
+      `}</style>
     </ScrollArea>
   );
 };
