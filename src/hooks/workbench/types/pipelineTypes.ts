@@ -1,16 +1,15 @@
 
 /**
- * Pipeline Execution Types
+ * Pipeline Types
  * 
- * Purpose: Type definitions for pipeline execution system
+ * Purpose: Enhanced type definitions for pipeline execution and results
  */
 
 export interface ExecutionState {
   [nodeId: string]: {
-    status: 'idle' | 'queued' | 'processing' | 'completed' | 'error';
+    status: 'queued' | 'processing' | 'completed' | 'error';
     data?: any;
     error?: string;
-    progress?: string;
     processingTime?: number;
   };
 }
@@ -19,15 +18,22 @@ export interface PipelineResult {
   nodeId: string;
   moduleType: string;
   result: any;
+  isEndpoint?: boolean;
+}
+
+export interface PipelineSummary {
+  documentsProcessed: number;
+  modulesExecuted: number;
+  processingCompleted: string;
+  pipelineType: string;
+  endpointCount?: number;
 }
 
 export interface FinalLegalOutput {
-  summary: {
-    documentsProcessed: number;
-    modulesExecuted: number;
-    processingCompleted: string;
-    pipelineType: string;
-  };
+  summary: PipelineSummary;
   results: PipelineResult[];
+  endpointResults?: PipelineResult[];
+  endpoints?: any[];
   finalOutput: any;
+  pipelineResults?: PipelineResult[];
 }

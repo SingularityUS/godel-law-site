@@ -31,6 +31,7 @@ export interface RedlineDocument {
     totalSuggestions: number;
     acceptedSuggestions: number;
     rejectedSuggestions: number;
+    sourceModules?: string[];
   };
   positionMap?: any;
 }

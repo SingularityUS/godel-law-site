@@ -1,3 +1,4 @@
+
 /**
  * useRedlineGeneration Hook
  * 
@@ -56,7 +57,7 @@ export const useRedlineGeneration = ({
           );
         }
         // Final fallback to direct output analysis
-        else if (this.hasAnalyzableData(output)) {
+        else if (hasAnalyzableData(output)) {
           console.log('Using direct output analysis (legacy fallback)');
           redlineDoc = RedlineAggregator.createComprehensiveRedline(
             [{
@@ -77,7 +78,7 @@ export const useRedlineGeneration = ({
           });
         } else {
           console.warn('Failed to generate redline document from any available data');
-          this.logAvailableDataSources(output);
+          logAvailableDataSources(output);
         }
       } catch (error) {
         console.error('Error in enhanced redline generation:', error);
