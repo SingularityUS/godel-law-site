@@ -34,7 +34,8 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
     applyFilters,
     filteredSuggestions,
     getCurrentDocument,
-    updateDocument
+    updateDocument,
+    handleManualEdit
   } = useRedlineDocument(redlineDocument);
 
   const {
@@ -96,6 +97,7 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
             onContentChange={handleContentChange}
             onSuggestionAccept={acceptSuggestion}
             onSuggestionModify={modifySuggestion}
+            onManualEdit={handleManualEdit}
           />
           
           {showSidebar && !isEditMode && (

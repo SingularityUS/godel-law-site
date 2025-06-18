@@ -6,6 +6,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { RedlineDocument, RedlineState, RedlineSuggestion } from "@/types/redlining";
+import { TextRange, replaceTextInRange, adjustSuggestionPositions } from "@/components/redlining/utils/textSelection";
 
 export const useRedlineDocument = (initialDocument: RedlineDocument) => {
   const [document, setDocument] = useState<RedlineDocument>(initialDocument);
@@ -43,6 +44,42 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
     
     // Trigger auto-save
     autoSave(updatedDocument);
+  }, [autoSave]);
+
+  /**
+   * Handle manual text edits
+   */
+  const handleManualEdit = useCallback((textRange: TextRange, newText: string) => {
+    console.log(`Handling manual edit: replacing "${textRange.selectedText}" with "${newText}"`);
+    
+    try {
+      setDocument(prev => {
+        // Replace the text in the content
+        const newContent = replaceTextInRange(prev.currentContent, textRange, newText);
+        
+        // Adjust suggestion positions
+        const adjustedSuggestions = adjustSuggestionPositions(prev.suggestions, textRange, newText)
+          .filter(s => s.status !== 'invalidated'); // Remove invalidated suggestions
+        
+        const updatedDocument = {
+          ...prev,
+          currentContent: newContent,
+          originalContent: newContent, // Update original content too for consistency
+          suggestions: adjustedSuggestions,
+          metadata: {
+            ...prev.metadata,
+            lastModified: new Date().toISOString()
+          }
+        };
+
+        // Trigger auto-save
+        autoSave(updatedDocument);
+        
+        return updatedDocument;
+      });
+    } catch (error) {
+      console.error('Error handling manual edit:', error);
+    }
   }, [autoSave]);
 
   /**
@@ -208,6 +245,7 @@ export const useRedlineDocument = (initialDocument: RedlineDocument) => {
     applyFilters,
     filteredSuggestions,
     getCurrentDocument,
-    updateDocument
+    updateDocument,
+    handleManualEdit
   };
 };

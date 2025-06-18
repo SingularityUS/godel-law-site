@@ -9,6 +9,7 @@ import React from "react";
 import { RedlineDocument, RedlineSuggestion } from "@/types/redlining";
 import EnhancedDocumentRenderer from "../EnhancedDocumentRenderer";
 import EditableDocumentRenderer from "../EditableDocumentRenderer";
+import { TextRange } from "../utils/textSelection";
 
 interface RedlineDocumentAreaProps {
   document: RedlineDocument;
@@ -21,6 +22,7 @@ interface RedlineDocumentAreaProps {
   onContentChange: (newContent: string) => void;
   onSuggestionAccept?: (suggestionId: string) => void;
   onSuggestionModify?: (suggestionId: string, newText: string) => void;
+  onManualEdit?: (range: TextRange, newText: string) => void;
 }
 
 const RedlineDocumentArea: React.FC<RedlineDocumentAreaProps> = ({
@@ -33,7 +35,8 @@ const RedlineDocumentArea: React.FC<RedlineDocumentAreaProps> = ({
   onSuggestionClick,
   onContentChange,
   onSuggestionAccept,
-  onSuggestionModify
+  onSuggestionModify,
+  onManualEdit
 }) => {
   return (
     <div className={`flex-1 ${showSidebar ? 'mr-80' : ''} transition-all duration-200 overflow-hidden`}>
@@ -52,6 +55,7 @@ const RedlineDocumentArea: React.FC<RedlineDocumentAreaProps> = ({
             onSuggestionClick={onSuggestionClick}
             onSuggestionAccept={onSuggestionAccept}
             onSuggestionModify={onSuggestionModify}
+            onManualEdit={onManualEdit}
           />
         )}
       </div>

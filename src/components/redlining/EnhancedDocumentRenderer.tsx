@@ -9,7 +9,8 @@ import React, { useState } from "react";
 import { RedlineDocument, RedlineSuggestion } from "@/types/redlining";
 import { useRedlineContent } from "./hooks/useRedlineContent";
 import RedlineStyles from "./components/RedlineStyles";
-import InlineSuggestionEditor from "./components/InlineSuggestionEditor";
+import GenericInlineEditor from "./components/GenericInlineEditor";
+import { getTextRangeFromClick, TextRange } from "./utils/textSelection";
 
 interface EnhancedDocumentRendererProps {
   document: RedlineDocument;
@@ -19,13 +20,16 @@ interface EnhancedDocumentRendererProps {
   onSuggestionClick: (suggestionId: string) => void;
   onSuggestionAccept?: (suggestionId: string) => void;
   onSuggestionModify?: (suggestionId: string, newText: string) => void;
+  onManualEdit?: (range: TextRange, newText: string) => void;
 }
 
 interface InlineEditorState {
-  suggestionId: string;
+  suggestionId?: string;
   originalText: string;
-  suggestedText: string;
+  suggestedText?: string;
   position: { top: number; left: number; width: number };
+  mode: 'suggestion' | 'manual';
+  textRange?: TextRange;
 }
 
 const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
@@ -35,7 +39,8 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
   selectedSuggestionId,
   onSuggestionClick,
   onSuggestionAccept,
-  onSuggestionModify
+  onSuggestionModify,
+  onManualEdit
 }) => {
   const { richContent, isLoading } = useRedlineContent({
     document,
@@ -83,7 +88,8 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
               top: rect.top + scrollTop,
               left: rect.left,
               width: rect.width
-            }
+            },
+            mode: 'suggestion'
           });
         }
       }
@@ -97,13 +103,45 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
       if (suggestionId) {
         onSuggestionClick(suggestionId);
       }
+      return;
+    }
+
+    // Handle manual text editing (clicks on regular text)
+    if (onManualEdit && target.closest('.prose')) {
+      event.stopPropagation();
+      const proseContainer = target.closest('.prose') as HTMLElement;
+      
+      if (proseContainer) {
+        const textRange = getTextRangeFromClick(target, proseContainer);
+        
+        if (textRange && textRange.selectedText.trim().length > 0) {
+          const rect = target.getBoundingClientRect();
+          const scrollTop = window.pageYOffset || window.document.documentElement.scrollTop;
+          
+          setInlineEditor({
+            originalText: textRange.selectedText,
+            position: {
+              top: rect.top + scrollTop,
+              left: rect.left,
+              width: Math.max(rect.width, 100)
+            },
+            mode: 'manual',
+            textRange
+          });
+        }
+      }
     }
   };
 
   const handleInlineEditorSave = (newText: string) => {
-    if (inlineEditor && onSuggestionModify) {
+    if (!inlineEditor) return;
+    
+    if (inlineEditor.mode === 'suggestion' && inlineEditor.suggestionId && onSuggestionModify) {
       onSuggestionModify(inlineEditor.suggestionId, newText);
+    } else if (inlineEditor.mode === 'manual' && inlineEditor.textRange && onManualEdit) {
+      onManualEdit(inlineEditor.textRange, newText);
     }
+    
     setInlineEditor(null);
   };
 
@@ -114,7 +152,7 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
   // Close inline editor when clicking outside
   const handleDocumentClick = (event: MouseEvent) => {
     const target = event.target as HTMLElement;
-    if (!target.closest('.inline-suggestion-editor') && !target.closest('[data-editable="true"]')) {
+    if (!target.closest('.inline-editor') && !target.closest('[data-editable="true"]') && !target.closest('.prose')) {
       setInlineEditor(null);
     }
   };
@@ -143,7 +181,7 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
       <div className="max-w-4xl mx-auto py-8 px-4">
         <div className="bg-white shadow-lg p-16 relative">
           <div 
-            className="prose prose-sm max-w-none"
+            className="prose prose-sm max-w-none cursor-text"
             style={{
               fontFamily: 'Calibri, "Segoe UI", Tahoma, Geneva, Verdana, sans-serif',
               fontSize: '11pt',
@@ -157,13 +195,14 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
       </div>
       
       {inlineEditor && (
-        <div className="inline-suggestion-editor">
-          <InlineSuggestionEditor
+        <div className="inline-editor">
+          <GenericInlineEditor
             originalText={inlineEditor.originalText}
             suggestedText={inlineEditor.suggestedText}
             onSave={handleInlineEditorSave}
             onCancel={handleInlineEditorCancel}
             position={inlineEditor.position}
+            mode={inlineEditor.mode}
           />
         </div>
       )}
