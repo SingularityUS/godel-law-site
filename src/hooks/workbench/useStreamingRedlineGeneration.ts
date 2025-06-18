@@ -1,4 +1,3 @@
-
 /**
  * useStreamingRedlineGeneration Hook
  * 
@@ -40,18 +39,30 @@ export const useStreamingRedlineGeneration = ({
 
   const { transformGrammarData } = useRedlineDataTransform();
 
-  // Process incremental batch results for streaming display
+  // Process incremental batch results for streaming display with enhanced document access
   const processIncrementalBatch = useCallback((batchResult: any, batchIndex: number, totalBatches: number) => {
-    console.log(`Streaming: Processing incremental batch ${batchIndex + 1}/${totalBatches}:`, batchResult);
+    console.log(`Streaming: Processing incremental batch ${batchIndex + 1}/${totalBatches} with document context:`, {
+      hasAnalysis: !!batchResult.output?.analysis,
+      analysisCount: batchResult.output?.analysis?.length || 0,
+      hasDocumentExtraction: !!batchResult.documentExtractionResult,
+      documentFileName: batchResult.documentExtractionResult?.fileName,
+      documentContentLength: batchResult.documentExtractionResult?.originalContent?.length || 0
+    });
     
     try {
-      // Transform the batch result to redline format
-      const partialRedlineData = transformGrammarData({
+      // Enhanced batch result for redline transformation with complete document context
+      const enhancedBatchResult = {
         output: {
           analysis: batchResult.output?.analysis || []
         },
-        metadata: output.metadata
-      });
+        // CRITICAL: Include document extraction result from streaming batch
+        documentExtractionResult: batchResult.documentExtractionResult,
+        // Fallback to main output metadata if streaming doesn't have document context
+        metadata: batchResult.metadata || output.metadata
+      };
+
+      // Transform the enhanced batch result to redline format
+      const partialRedlineData = transformGrammarData(enhancedBatchResult);
 
       if (partialRedlineData) {
         setStreamingState(prev => ({
@@ -61,7 +72,9 @@ export const useStreamingRedlineGeneration = ({
           partialDocument: partialRedlineData
         }));
 
-        console.log(`Streaming redline updated: ${batchIndex + 1}/${totalBatches} batches complete - Document displayed`);
+        console.log(`Streaming redline updated successfully: ${batchIndex + 1}/${totalBatches} batches complete - Document displayed with original content`);
+      } else {
+        console.warn(`Failed to transform batch ${batchIndex + 1}/${totalBatches} to redline format`);
       }
     } catch (error) {
       console.error('Error processing incremental batch for redline:', error);

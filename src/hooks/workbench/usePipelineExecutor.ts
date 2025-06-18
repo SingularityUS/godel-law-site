@@ -41,7 +41,7 @@ export const usePipelineExecutor = (nodes: AllNodes[], edges: Edge[]) => {
   const executionManager = createExecutionManager(nodes, edges);
 
   /**
-   * Execute pipeline starting from a document input node
+   * Execute pipeline starting from a document input node with enhanced document context flow
    */
   const executePipeline = useCallback(async (startNodeId: string) => {
     if (isExecuting) return;
@@ -72,19 +72,21 @@ export const usePipelineExecutor = (nodes: AllNodes[], edges: Edge[]) => {
           if (node?.data?.moduleType === 'document-input') {
             currentData = await processDocumentNode(node as DocumentInputNode);
             documentExtractionResult = currentData; // Preserve the initial document extraction
-            console.log('Document extraction result preserved:', {
+            console.log('Document extraction result preserved for streaming:', {
               hasOriginalContent: !!documentExtractionResult?.originalContent,
               hasProcessableContent: !!documentExtractionResult?.processableContent,
               fileName: documentExtractionResult?.fileName,
               contentLength: documentExtractionResult?.originalContent?.length || 0
             });
           } else {
+            // ENHANCED: Pass document extraction result to module processing
             currentData = await processModuleNode(
               nodeId, 
               currentData, 
               updateProgress, 
               updateNodeStatus, 
-              clearProgress
+              clearProgress,
+              documentExtractionResult // PASS: Document extraction result for streaming context
             );
           }
 
@@ -118,7 +120,7 @@ export const usePipelineExecutor = (nodes: AllNodes[], edges: Edge[]) => {
       setFinalOutput(finalLegalOutput);
       
       // Log final pipeline statistics
-      console.log('Legal document processing pipeline completed successfully');
+      console.log('Legal document processing pipeline completed successfully with document context preserved');
       console.log(`Final output contains:`, {
         totalModules: pipelineResults.length,
         finalDataType: typeof currentData,
