@@ -114,6 +114,7 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
         // Handle document nodes for preview
         const docNode = node as any;
         if (docNode.data?.file) {
+          // Trigger modal preview (existing behavior)
           const previewEvent = new CustomEvent('openDocumentPreview', {
             detail: {
               name: docNode.data.documentName,
@@ -124,6 +125,16 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
             }
           });
           window.dispatchEvent(previewEvent);
+
+          // Also trigger sidebar preview
+          const sidebarPreviewEvent = new CustomEvent('showDocumentInSidebar', {
+            detail: {
+              name: docNode.data.documentName,
+              type: docNode.data.file.type,
+              preview: docNode.data.file.preview
+            }
+          });
+          window.dispatchEvent(sidebarPreviewEvent);
         }
       }
     },

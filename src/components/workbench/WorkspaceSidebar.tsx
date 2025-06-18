@@ -43,6 +43,7 @@ const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   const {
     activeTab,
     setActiveTab,
+    previewDocument,
     isLegalPipeline
   } = useWorkspaceSidebarState(output);
 
@@ -76,6 +77,7 @@ const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
             redlineDocument={redlineDocument}
             isLegalPipeline={isLegalPipeline}
             output={output}
+            previewDocument={previewDocument}
             onSaveRedline={handleSaveRedline}
             onExportRedline={handleExportRedline}
           />

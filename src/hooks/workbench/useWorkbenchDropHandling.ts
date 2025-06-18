@@ -52,6 +52,16 @@ export const useWorkbenchDropHandling = ({
         const fileData = JSON.parse(docData);
         console.log('Parsed file data:', fileData);
         
+        // Trigger sidebar document preview
+        const previewEvent = new CustomEvent('showDocumentInSidebar', {
+          detail: {
+            name: fileData.name,
+            type: fileData.type,
+            preview: fileData.preview
+          }
+        });
+        window.dispatchEvent(previewEvent);
+        
         // Check if dropping on an existing document node for replacement
         const targetNode = getNodeAtPosition(event.clientX, event.clientY);
         

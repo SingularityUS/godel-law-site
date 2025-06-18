@@ -9,6 +9,7 @@
 import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RedlineDocument } from "@/types/redlining";
+import DocumentPreviewTab from "./DocumentPreviewTab";
 import RedlineTabContent from "./RedlineTabContent";
 import LegalSummaryTab from "../output/LegalSummaryTab";
 import LegalAnalysisTab from "../output/LegalAnalysisTab";
@@ -24,6 +25,7 @@ interface SidebarTabsContentProps {
   redlineDocument: RedlineDocument | null;
   isLegalPipeline: boolean;
   output: any;
+  previewDocument: { name: string; type: string; preview?: string } | null;
   onSaveRedline: (document: RedlineDocument) => void;
   onExportRedline: (document: RedlineDocument, format: string) => void;
 }
@@ -37,12 +39,14 @@ const SidebarTabsContent: React.FC<SidebarTabsContentProps> = ({
   redlineDocument,
   isLegalPipeline,
   output,
+  previewDocument,
   onSaveRedline,
   onExportRedline
 }) => {
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-      <TabsList className="grid w-full grid-cols-5 shrink-0 m-2">
+      <TabsList className="grid w-full grid-cols-6 shrink-0 m-2">
+        <TabsTrigger value="document">Document</TabsTrigger>
         <TabsTrigger value="redline">Redline</TabsTrigger>
         <TabsTrigger value="summary">Summary</TabsTrigger>
         <TabsTrigger value="analysis">Analysis</TabsTrigger>
@@ -51,6 +55,10 @@ const SidebarTabsContent: React.FC<SidebarTabsContentProps> = ({
       </TabsList>
 
       <div className="flex-1 overflow-hidden">
+        <TabsContent value="document" className="h-full m-0">
+          <DocumentPreviewTab document={previewDocument} />
+        </TabsContent>
+
         <TabsContent value="redline" className="h-full m-0">
           <RedlineTabContent
             isProcessing={isProcessing}

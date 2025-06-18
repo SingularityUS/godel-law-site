@@ -6,11 +6,12 @@
  * Extracted from WorkspaceSidebar for better organization
  */
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 
 export const useWorkspaceSidebarState = (output: any) => {
-  const [activeTab, setActiveTab] = useState("redline");
+  const [activeTab, setActiveTab] = useState("document");
   const [isGeneratingRedline, setIsGeneratingRedline] = useState(false);
+  const [previewDocument, setPreviewDocument] = useState<{ name: string; type: string; preview?: string } | null>(null);
 
   /**
    * Enhanced pipeline type detection with multiple fallback checks
@@ -40,11 +41,37 @@ export const useWorkspaceSidebarState = (output: any) => {
     setIsGeneratingRedline(generating);
   }, []);
 
+  /**
+   * Set document for preview and switch to document tab
+   */
+  const setDocumentPreview = useCallback((document: { name: string; type: string; preview?: string } | null) => {
+    setPreviewDocument(document);
+    if (document) {
+      setActiveTab("document");
+    }
+  }, []);
+
+  // Listen for document preview events
+  useEffect(() => {
+    const handleDocumentPreview = (event: CustomEvent) => {
+      console.log('Document preview event received:', event.detail);
+      setDocumentPreview(event.detail);
+    };
+
+    window.addEventListener('showDocumentInSidebar', handleDocumentPreview as EventListener);
+    
+    return () => {
+      window.removeEventListener('showDocumentInSidebar', handleDocumentPreview as EventListener);
+    };
+  }, [setDocumentPreview]);
+
   return {
     activeTab,
     setActiveTab,
     isGeneratingRedline,
     toggleGeneratingRedline,
+    previewDocument,
+    setDocumentPreview,
     isLegalPipeline
   };
 };
