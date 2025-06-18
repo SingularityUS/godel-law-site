@@ -1,11 +1,10 @@
-
 import React, { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { X, ChevronRight, ChevronLeft } from "lucide-react";
 import { RedlineDocument } from "@/types/redlining";
-import { RedlineDocumentViewer } from "@/components/redlining";
+import EmbeddedRedlineViewer from "@/components/redlining/EmbeddedRedlineViewer";
 import { useRedlineDataTransform } from "@/hooks/redlining/useRedlineDataTransform";
 import { toast } from "@/hooks/use-toast";
 import LegalSummaryTab from "./output/LegalSummaryTab";
@@ -174,19 +173,16 @@ const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                   </div>
                 </div>
               ) : redlineDocument ? (
-                <div className="h-full">
-                  <RedlineDocumentViewer
-                    document={redlineDocument}
-                    originalDocument={{
-                      type: output.metadata?.fileType || 'text/plain',
-                      preview: output.metadata?.originalPreview,
-                      name: output.metadata?.fileName || 'Document'
-                    }}
-                    onClose={() => {}} // Don't close the whole sidebar
-                    onSave={handleSaveRedline}
-                    onExport={handleExportRedline}
-                  />
-                </div>
+                <EmbeddedRedlineViewer
+                  document={redlineDocument}
+                  originalDocument={{
+                    type: output.metadata?.fileType || 'text/plain',
+                    preview: output.metadata?.originalPreview,
+                    name: output.metadata?.fileName || 'Document'
+                  }}
+                  onSave={handleSaveRedline}
+                  onExport={handleExportRedline}
+                />
               ) : (
                 <div className="flex items-center justify-center h-full p-6">
                   <div className="text-center">
