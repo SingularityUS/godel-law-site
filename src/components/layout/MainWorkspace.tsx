@@ -4,6 +4,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import AIWorkbench from "@/components/AIWorkbench";
 import WorkspaceSidebar from "@/components/workbench/WorkspaceSidebar";
 import { useOutputPanel } from "@/hooks/workbench/useOutputPanel";
+import { useDocumentContext } from "@/hooks/workbench/useDocumentContext";
 
 interface MainWorkspaceProps {
   onPaletteDragStart?: (mod: any, event: React.DragEvent) => void;
@@ -24,7 +25,18 @@ const MainWorkspace: React.FC<MainWorkspaceProps> = ({
   finalOutput,
   onCloseFinalOutput
 }) => {
-  const { output, isOutputOpen, closeOutput, toggleOutput, openOutput } = useOutputPanel();
+  const { 
+    output, 
+    isOutputOpen, 
+    isProcessing, 
+    processingDocument,
+    closeOutput, 
+    toggleOutput, 
+    openOutput,
+    startProcessing
+  } = useOutputPanel();
+  
+  const { extractDocumentFromNodes } = useDocumentContext();
 
   // Use finalOutput when available
   React.useEffect(() => {
@@ -33,12 +45,33 @@ const MainWorkspace: React.FC<MainWorkspaceProps> = ({
     }
   }, [finalOutput, openOutput]);
 
+  // Listen for pipeline execution start to open sidebar immediately
+  React.useEffect(() => {
+    const handlePipelineStart = () => {
+      if (workbenchRef.current?.getNodes) {
+        const nodes = workbenchRef.current.getNodes();
+        const document = extractDocumentFromNodes(nodes);
+        if (document) {
+          startProcessing(document);
+        }
+      }
+    };
+
+    window.addEventListener('pipelineExecutionStart', handlePipelineStart);
+    
+    return () => {
+      window.removeEventListener('pipelineExecutionStart', handlePipelineStart);
+    };
+  }, [extractDocumentFromNodes, startProcessing]);
+
   const handleClose = () => {
     closeOutput();
     if (onCloseFinalOutput) {
       onCloseFinalOutput();
     }
   };
+
+  const showSidebar = isOutputOpen || isProcessing;
 
   return (
     <div className="flex-1 overflow-hidden">
@@ -49,16 +82,27 @@ const MainWorkspace: React.FC<MainWorkspaceProps> = ({
             editingPromptNodeId={editingPromptNodeId}
             uploadedFiles={uploadedFiles}
             ref={workbenchRef}
+            onOpenSidebar={() => {
+              if (workbenchRef.current?.getNodes) {
+                const nodes = workbenchRef.current.getNodes();
+                const document = extractDocumentFromNodes(nodes);
+                if (document) {
+                  startProcessing(document);
+                }
+              }
+            }}
           />
         </ResizablePanel>
         
-        {isOutputOpen && (
+        {showSidebar && (
           <>
             <ResizableHandle />
             <ResizablePanel defaultSize={50} minSize={25}>
               <WorkspaceSidebar 
                 output={output}
                 isOpen={isOutputOpen}
+                isProcessing={isProcessing}
+                processingDocument={processingDocument}
                 onClose={handleClose}
                 onToggle={toggleOutput}
               />

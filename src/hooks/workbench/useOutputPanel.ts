@@ -10,6 +10,8 @@ import { useCallback, useState } from "react";
 export const useOutputPanel = () => {
   const [output, setOutput] = useState<any>(null);
   const [isOutputOpen, setIsOutputOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingDocument, setProcessingDocument] = useState<any>(null);
 
   const formatOutput = useCallback((data: any): string => {
     if (typeof data === 'string') {
@@ -56,6 +58,8 @@ export const useOutputPanel = () => {
 
   const closeOutput = useCallback(() => {
     setIsOutputOpen(false);
+    setIsProcessing(false);
+    setProcessingDocument(null);
   }, []);
 
   const toggleOutput = useCallback(() => {
@@ -64,12 +68,23 @@ export const useOutputPanel = () => {
 
   const openOutput = useCallback((newOutput: any) => {
     setOutput(newOutput);
+    setIsProcessing(false);
+    setProcessingDocument(null);
+    setIsOutputOpen(true);
+  }, []);
+
+  const startProcessing = useCallback((document: any) => {
+    setProcessingDocument(document);
+    setIsProcessing(true);
+    setOutput(null);
     setIsOutputOpen(true);
   }, []);
 
   return {
     output,
     isOutputOpen,
+    isProcessing,
+    processingDocument,
     formatOutput,
     copyToClipboard,
     downloadAsFile,
@@ -78,6 +93,7 @@ export const useOutputPanel = () => {
     closeOutput,
     toggleOutput,
     openOutput,
+    startProcessing,
     setOutput
   };
 };

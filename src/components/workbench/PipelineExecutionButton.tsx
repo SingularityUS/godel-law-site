@@ -19,6 +19,7 @@ interface PipelineExecutionButtonProps {
   isExecuting: boolean;
   onExecute: () => void;
   onStop: () => void;
+  onOpenSidebar?: () => void;
 }
 
 const PipelineExecutionButton: React.FC<PipelineExecutionButtonProps> = ({
@@ -26,7 +27,8 @@ const PipelineExecutionButton: React.FC<PipelineExecutionButtonProps> = ({
   edges,
   isExecuting,
   onExecute,
-  onStop
+  onStop,
+  onOpenSidebar
 }) => {
   // Validate pipeline to check if execution is possible
   const validatePipeline = () => {
@@ -46,8 +48,22 @@ const PipelineExecutionButton: React.FC<PipelineExecutionButtonProps> = ({
 
   const isValid = validatePipeline();
 
+  const handleExecute = () => {
+    // Emit pipeline start event for immediate sidebar opening
+    const event = new CustomEvent('pipelineExecutionStart');
+    window.dispatchEvent(event);
+    
+    // Execute the pipeline
+    onExecute();
+  };
+
   // Add keyboard event handler for Ctrl+Enter
-  useExecutionKeyboard({ isValid, isExecuting, onExecute });
+  useExecutionKeyboard({ 
+    isValid, 
+    isExecuting, 
+    onExecute: handleExecute,
+    onOpenSidebar 
+  });
 
   return (
     <div className="flex items-center gap-3">
@@ -55,7 +71,7 @@ const PipelineExecutionButton: React.FC<PipelineExecutionButtonProps> = ({
       <ExecutionControls
         isExecuting={isExecuting}
         isValid={isValid}
-        onExecute={onExecute}
+        onExecute={handleExecute}
         onStop={onStop}
       />
     </div>

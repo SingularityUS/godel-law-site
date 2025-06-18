@@ -18,6 +18,8 @@ import RawDataTab from "../output/RawDataTab";
 interface SidebarTabsContentProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  isProcessing?: boolean;
+  processingDocument?: any;
   isGeneratingRedline: boolean;
   redlineDocument: RedlineDocument | null;
   isLegalPipeline: boolean;
@@ -29,6 +31,8 @@ interface SidebarTabsContentProps {
 const SidebarTabsContent: React.FC<SidebarTabsContentProps> = ({
   activeTab,
   setActiveTab,
+  isProcessing,
+  processingDocument,
   isGeneratingRedline,
   redlineDocument,
   isLegalPipeline,
@@ -49,6 +53,8 @@ const SidebarTabsContent: React.FC<SidebarTabsContentProps> = ({
       <div className="flex-1 overflow-hidden">
         <TabsContent value="redline" className="h-full m-0">
           <RedlineTabContent
+            isProcessing={isProcessing}
+            processingDocument={processingDocument}
             isGeneratingRedline={isGeneratingRedline}
             redlineDocument={redlineDocument}
             isLegalPipeline={isLegalPipeline}

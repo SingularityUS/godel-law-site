@@ -27,13 +27,17 @@ interface WorkspaceSidebarProps {
   isOpen: boolean;
   onClose: () => void;
   onToggle: () => void;
+  isProcessing?: boolean;
+  processingDocument?: any;
 }
 
 const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   output,
   isOpen,
   onClose,
-  onToggle
+  onToggle,
+  isProcessing,
+  processingDocument
 }) => {
   // Use focused state management hook
   const {
@@ -53,7 +57,8 @@ const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
     isLegalPipeline
   });
 
-  if (!output) return null;
+  // Show sidebar if processing or has output
+  if (!isProcessing && !output) return null;
 
   return (
     <div className="flex flex-col border-l bg-white h-full">
@@ -68,6 +73,8 @@ const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           <SidebarTabsContent
             activeTab={activeTab}
             setActiveTab={setActiveTab}
+            isProcessing={isProcessing}
+            processingDocument={processingDocument}
             isGeneratingRedline={isGeneratingRedline}
             redlineDocument={redlineDocument}
             isLegalPipeline={isLegalPipeline}

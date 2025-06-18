@@ -11,14 +11,25 @@ interface UseExecutionKeyboardProps {
   isValid: boolean;
   isExecuting: boolean;
   onExecute: () => void;
+  onOpenSidebar?: () => void;
 }
 
-export const useExecutionKeyboard = ({ isValid, isExecuting, onExecute }: UseExecutionKeyboardProps) => {
+export const useExecutionKeyboard = ({ 
+  isValid, 
+  isExecuting, 
+  onExecute, 
+  onOpenSidebar 
+}: UseExecutionKeyboardProps) => {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
         event.preventDefault();
         if (isValid && !isExecuting) {
+          // Open sidebar immediately
+          if (onOpenSidebar) {
+            onOpenSidebar();
+          }
+          // Then start execution
           onExecute();
         }
       }
@@ -28,5 +39,5 @@ export const useExecutionKeyboard = ({ isValid, isExecuting, onExecute }: UseExe
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isValid, isExecuting, onExecute]);
+  }, [isValid, isExecuting, onExecute, onOpenSidebar]);
 };

@@ -9,8 +9,11 @@
 import React from "react";
 import { RedlineDocument } from "@/types/redlining";
 import EmbeddedRedlineViewer from "@/components/redlining/EmbeddedRedlineViewer";
+import ProcessingDocumentView from "./ProcessingDocumentView";
 
 interface RedlineTabContentProps {
+  isProcessing?: boolean;
+  processingDocument?: any;
   isGeneratingRedline: boolean;
   redlineDocument: RedlineDocument | null;
   isLegalPipeline: boolean;
@@ -20,6 +23,8 @@ interface RedlineTabContentProps {
 }
 
 const RedlineTabContent: React.FC<RedlineTabContentProps> = ({
+  isProcessing,
+  processingDocument,
   isGeneratingRedline,
   redlineDocument,
   isLegalPipeline,
@@ -27,6 +32,14 @@ const RedlineTabContent: React.FC<RedlineTabContentProps> = ({
   onSaveRedline,
   onExportRedline
 }) => {
+  // Show processing document view while pipeline is executing
+  if (isProcessing && processingDocument) {
+    return (
+      <ProcessingDocumentView document={processingDocument} />
+    );
+  }
+
+  // Show redline generation spinner
   if (isGeneratingRedline) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -38,6 +51,7 @@ const RedlineTabContent: React.FC<RedlineTabContentProps> = ({
     );
   }
 
+  // Show redline document when ready
   if (redlineDocument) {
     return (
       <EmbeddedRedlineViewer
@@ -53,6 +67,7 @@ const RedlineTabContent: React.FC<RedlineTabContentProps> = ({
     );
   }
 
+  // Default empty state
   return (
     <div className="flex items-center justify-center h-full p-6">
       <div className="text-center">
