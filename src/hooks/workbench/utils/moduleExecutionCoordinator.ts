@@ -38,17 +38,12 @@ export const createModuleExecutionCoordinator = (callChatGPT: ReturnType<typeof 
       });
     }
     
-    // Prepare clean input data for the module - UPDATED to preserve structure when needed
+    // Prepare clean input data for the module
     const cleanInputData = prepareModuleInput(inputData, moduleType);
     console.log('Prepared input type:', typeof cleanInputData);
 
-    // Check if we need batch processing - UPDATED logic
-    const needsBatchProcessing = shouldUseBatchProcessing(cleanInputData) || shouldProcessParagraphsIndividually(cleanInputData, moduleType);
-    const hasStructuredParagraphs = cleanInputData?.output?.paragraphs || cleanInputData?.paragraphs;
-    
-    console.log(`Module ${moduleType} - Batch processing needed: ${needsBatchProcessing}, Has structured paragraphs: ${!!hasStructuredParagraphs}`);
-    
-    if (needsBatchProcessing && hasStructuredParagraphs) {
+    // Check if we need batch processing
+    if (shouldUseBatchProcessing(cleanInputData) || shouldProcessParagraphsIndividually(cleanInputData, moduleType)) {
       return await handleBatchProcessing(
         node, cleanInputData, moduleType, systemPrompt, 
         coreProcessor, onProgress, startTime, inputData
@@ -76,21 +71,12 @@ async function handleBatchProcessing(
   
   // Define processing function for individual chunks with position awareness
   const processChunk = async (chunkContent: string, chunkInfo?: DocumentChunk) => {
-    // For structured modules like grammar-checker, pass the raw chunk content
-    let promptData;
+    const cleanChunkContent = extractCleanContent(chunkContent, moduleType);
     
-    if (moduleType === 'grammar-checker' && typeof chunkContent === 'object') {
-      // Pass structured paragraph data directly for grammar checking
-      promptData = chunkContent;
-    } else {
-      // For other modules, extract clean content
-      const cleanChunkContent = typeof chunkContent === 'string' ? chunkContent : extractCleanContent(chunkContent, moduleType);
-      promptData = cleanChunkContent;
-      
-      if (chunkInfo) {
-        promptData = `[Chunk ${chunkInfo.chunkIndex + 1} of ${chunkInfo.totalChunks}]\n\n${cleanChunkContent}`;
-        console.log(`Processing chunk ${chunkInfo.chunkIndex + 1}/${chunkInfo.totalChunks} for ${moduleType}`);
-      }
+    let promptData = cleanChunkContent;
+    if (chunkInfo) {
+      promptData = `[Chunk ${chunkInfo.chunkIndex + 1} of ${chunkInfo.totalChunks}]\n\n${cleanChunkContent}`;
+      console.log(`Processing chunk ${chunkInfo.chunkIndex + 1}/${chunkInfo.totalChunks} for ${moduleType}`);
     }
     
     const result = await coreProcessor(node, promptData, systemPrompt, moduleType);
@@ -161,15 +147,7 @@ async function handleSingleDocumentProcessing(
 ) {
   console.log(`Processing single document for ${moduleType} with position tracking`);
   
-  // For single document processing, use the data as-is for structured modules
-  let promptData;
-  if (moduleType === 'citation-finder' || moduleType === 'grammar-checker') {
-    // Pass the data directly, let the processor handle format detection
-    promptData = cleanInputData;
-  } else {
-    // For other modules, extract clean content
-    promptData = extractCleanContent(cleanInputData, moduleType);
-  }
+  const cleanContent = extractCleanContent(cleanInputData, moduleType);
   
   // Report progress for single document processing
   if (onProgress) {
@@ -182,7 +160,7 @@ async function handleSingleDocumentProcessing(
     onProgress(progress);
   }
   
-  const result = await coreProcessor(node, promptData, systemPrompt, moduleType);
+  const result = await coreProcessor(node, cleanContent, systemPrompt, moduleType);
 
   // Report completion
   if (onProgress) {
@@ -191,8 +169,8 @@ async function handleSingleDocumentProcessing(
       total: 1,
       moduleType,
       inputType: 'documents',
-      outputGenerated: Array.isArray(result.output?.paragraphs) ? result.output.paragraphs.length : 
-                      Array.isArray(result.output?.analysis) ? result.output.analysis.length : 1
+      outputGenerated: Array.isArray(result.output.paragraphs) ? result.output.paragraphs.length : 
+                      Array.isArray(result.output.analysis) ? result.output.analysis.length : 1
     };
     onProgress(progress);
   }

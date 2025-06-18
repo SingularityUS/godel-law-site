@@ -2,8 +2,14 @@
 /**
  * Module Processors Index
  * 
- * Purpose: Central export point for all specialized module processors
+ * Purpose: Centralized exports for all module processors
  */
 
-export { createCitationFinderProcessor } from './citationFinderProcessor';
-export type { CitationMatch, CitationFinderOutput } from './citationFinderProcessor';
+export { processParagraphSplitter } from './paragraphSplitterProcessor';
+export { processGrammarAnalysis } from './grammarAnalysisProcessor';
+
+// Export grammar analysis utilities for potential reuse
+export { createEmptyAnalysisResult } from './grammarAnalysis/emptyResultCreator';
+export { processInputData } from './grammarAnalysis/inputDataProcessor';
+export { formatSingleParagraphOutput, formatBatchOutput } from './grammarAnalysis/outputFormatter';
+export type { AnalysisResult, ProcessingOptions, GrammarAnalysisInputData } from './grammarAnalysis/types';
