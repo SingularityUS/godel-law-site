@@ -12,6 +12,8 @@ export const useRedlineDataTransform = () => {
         hasAnalysis: !!result?.output?.analysis,
         hasFinalOutput: !!result?.finalOutput,
         analysisLength: result?.output?.analysis?.length || 0,
+        hasMetadata: !!result?.metadata,
+        hasOriginalDocument: !!result?.metadata?.originalDocument,
         resultKeys: Object.keys(result || {})
       });
       
@@ -55,7 +57,7 @@ export const useRedlineDataTransform = () => {
       console.log(`Found analysis data with ${analysisData.length} items`);
 
       // Extract original document metadata with enhanced formatting preservation
-      const originalDocument = extractOriginalDocumentInfoWithFormatting(result);
+      const originalDocument = extractOriginalDocumentInfoWithFormattingFromPipeline(result);
       console.log('Extracted original document info with formatting preservation:', originalDocument);
 
       return convertGrammarAnalysisToRedline(sourceResult, originalDocument);
@@ -90,7 +92,97 @@ export const useRedlineDataTransform = () => {
 };
 
 /**
- * Enhanced original document info extraction with formatting preservation
+ * Enhanced original document info extraction with formatting preservation from pipeline metadata
+ */
+function extractOriginalDocumentInfoWithFormattingFromPipeline(result: any) {
+  console.log('Extracting original document info from pipeline with all metadata paths');
+  
+  // Try multiple metadata paths from the pipeline
+  const metadataPaths = [
+    result?.metadata?.originalDocument,
+    result?.finalOutput?.metadata?.originalDocument,
+    result?.input?.metadata?.originalDocument,
+    result?.metadata,
+    result?.finalOutput?.metadata,
+    result?.input?.metadata
+  ];
+  
+  let originalDocumentInfo = null;
+  
+  // Find the first valid metadata with document info
+  for (const metadata of metadataPaths) {
+    if (metadata && (metadata.fileName || metadata.originalContent)) {
+      originalDocumentInfo = metadata;
+      console.log('Found original document metadata in pipeline:', {
+        hasFileName: !!metadata.fileName,
+        hasOriginalContent: !!metadata.originalContent,
+        contentLength: metadata.originalContent?.length || 0
+      });
+      break;
+    }
+  }
+  
+  // If no metadata found, try direct content extraction
+  if (!originalDocumentInfo) {
+    console.log('No pipeline metadata found, trying direct content extraction');
+    originalDocumentInfo = extractOriginalDocumentInfoWithFormatting(result);
+  }
+  
+  // CRITICAL: Prioritize sources that preserve original formatting
+  let originalContent = '';
+  
+  const contentPaths = [
+    // Priority 1: Pipeline metadata original content
+    originalDocumentInfo?.originalContent,
+    
+    // Priority 2: Other metadata sources
+    result?.metadata?.originalContent,
+    result?.input?.originalContent,
+    result?.originalContent,
+    
+    // Priority 3: Less processed content sources
+    result?.input?.content,
+    originalDocumentInfo?.content,
+    
+    // Priority 4: Content from initial processing (might be cleaned)
+    result?.content
+  ];
+  
+  for (const path of contentPaths) {
+    if (path && typeof path === 'string' && path.length > 0) {
+      originalContent = path; // DO NOT TRIM - preserve exact formatting
+      console.log('Selected content source with formatting preservation:', {
+        source: 'pipeline content path',
+        length: originalContent.length,
+        hasLineBreaks: originalContent.includes('\n'),
+        hasDoubleLineBreaks: originalContent.includes('\n\n'),
+        hasLeadingWhitespace: /^\s/.test(originalContent),
+        hasTrailingWhitespace: /\s$/.test(originalContent)
+      });
+      break;
+    }
+  }
+  
+  if (!originalContent) {
+    console.error('Could not extract original content from pipeline - this will cause redline display issues');
+    originalContent = 'Original document content could not be retrieved from pipeline';
+  }
+
+  return {
+    name: originalDocumentInfo?.fileName || 
+          result?.fileName || 
+          'Document',
+    type: originalDocumentInfo?.fileType || 
+          result?.fileType || 
+          'text/plain',
+    content: originalContent, // Preserved with all original formatting
+    preview: originalDocumentInfo?.originalPreview || 
+             result?.originalPreview
+  };
+}
+
+/**
+ * Fallback original document info extraction (legacy support)
  */
 function extractOriginalDocumentInfoWithFormatting(result: any) {
   // Try multiple paths for document metadata
@@ -121,7 +213,7 @@ function extractOriginalDocumentInfoWithFormatting(result: any) {
     if (path && typeof path === 'string' && path.length > 0) {
       originalContent = path; // DO NOT TRIM - preserve exact formatting
       console.log('Selected content source with formatting preservation:', {
-        source: 'content path',
+        source: 'fallback content path',
         length: originalContent.length,
         hasLineBreaks: originalContent.includes('\n'),
         hasDoubleLineBreaks: originalContent.includes('\n\n'),

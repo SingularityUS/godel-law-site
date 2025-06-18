@@ -30,6 +30,10 @@ export const createModuleExecutionCoordinator = (callChatGPT: ReturnType<typeof 
     console.log(`=== MODULE EXECUTION COORDINATOR: ${moduleType} ===`);
     console.log('Input data structure:', typeof inputData, inputData ? Object.keys(inputData) : 'null');
     
+    // Extract and preserve original document metadata
+    const originalDocumentMetadata = extractOriginalDocumentMetadata(inputData);
+    console.log('Extracted original document metadata:', originalDocumentMetadata);
+    
     // Log if we have position tracking data
     if (inputData && inputData.positionMap) {
       console.log('Position tracking available:', {
@@ -46,16 +50,37 @@ export const createModuleExecutionCoordinator = (callChatGPT: ReturnType<typeof 
     if (shouldUseBatchProcessing(cleanInputData) || shouldProcessParagraphsIndividually(cleanInputData, moduleType)) {
       return await handleBatchProcessing(
         node, cleanInputData, moduleType, systemPrompt, 
-        coreProcessor, onProgress, startTime, inputData
+        coreProcessor, onProgress, startTime, inputData, originalDocumentMetadata
       );
     } else {
       return await handleSingleDocumentProcessing(
         node, cleanInputData, moduleType, systemPrompt, 
-        coreProcessor, onProgress, startTime, inputData
+        coreProcessor, onProgress, startTime, inputData, originalDocumentMetadata
       );
     }
   };
 };
+
+/**
+ * Extract original document metadata from input data
+ */
+function extractOriginalDocumentMetadata(inputData: any) {
+  if (!inputData) return null;
+  
+  // Try multiple paths to find original document info
+  const metadata = inputData.metadata || {};
+  
+  return {
+    fileName: metadata.fileName || inputData.fileName || 'Document',
+    fileType: metadata.fileType || inputData.fileType || 'text/plain',
+    originalContent: inputData.originalContent || 
+                    metadata.originalContent || 
+                    inputData.content || 
+                    inputData.processableContent || '',
+    processableContent: inputData.processableContent || inputData.content || '',
+    originalPreview: metadata.originalPreview || inputData.originalPreview
+  };
+}
 
 async function handleBatchProcessing(
   node: HelperNode,
@@ -65,7 +90,8 @@ async function handleBatchProcessing(
   coreProcessor: any,
   onProgress?: (progress: ModuleProgress) => void,
   startTime?: number,
-  originalInputData?: any
+  originalInputData?: any,
+  originalDocumentMetadata?: any
 ) {
   console.log(`Using batch processing for module ${moduleType} with position preservation`);
   
@@ -90,7 +116,9 @@ async function handleBatchProcessing(
           index: chunkInfo.chunkIndex,
           total: chunkInfo.totalChunks
         } : undefined,
-        preservesPositions: true
+        preservesPositions: true,
+        // Preserve original document metadata
+        originalDocument: originalDocumentMetadata
       }
     };
   };
@@ -130,7 +158,9 @@ async function handleBatchProcessing(
       batchProcessed: true,
       totalProcessingTime: processingTime,
       preservesPositions: true,
-      originalPositionMap: originalInputData?.positionMap
+      originalPositionMap: originalInputData?.positionMap,
+      // Preserve original document metadata in final result
+      originalDocument: originalDocumentMetadata
     }
   };
 }
@@ -143,7 +173,8 @@ async function handleSingleDocumentProcessing(
   coreProcessor: any,
   onProgress?: (progress: ModuleProgress) => void,
   startTime?: number,
-  originalInputData?: any
+  originalInputData?: any,
+  originalDocumentMetadata?: any
 ) {
   console.log(`Processing single document for ${moduleType} with position tracking`);
   
@@ -184,7 +215,9 @@ async function handleSingleDocumentProcessing(
       processingTime,
       timestamp: new Date().toISOString(),
       preservesPositions: true,
-      originalPositionMap: originalInputData?.positionMap
+      originalPositionMap: originalInputData?.positionMap,
+      // Preserve original document metadata in final result
+      originalDocument: originalDocumentMetadata
     }
   };
 }
