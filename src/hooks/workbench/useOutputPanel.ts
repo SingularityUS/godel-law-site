@@ -9,7 +9,7 @@ import { useCallback, useState } from "react";
 
 export const useOutputPanel = () => {
   const [output, setOutput] = useState<any>(null);
-  const [isOutputOpen, setIsOutputOpen] = useState(false);
+  const [isOutputOpen, setIsOutputOpen] = useState(true); // Changed from false to true
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingDocument, setProcessingDocument] = useState<any>(null);
 
