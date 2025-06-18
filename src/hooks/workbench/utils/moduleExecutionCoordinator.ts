@@ -1,4 +1,3 @@
-
 /**
  * Module Execution Coordinator
  * 
@@ -42,9 +41,19 @@ export const createModuleExecutionCoordinator = (callChatGPT: ReturnType<typeof 
     if (moduleType === 'citation-finder') {
       console.log('Processing citation finder with structured data');
       
+      // Create a simple progress callback for citation finder
+      const citationProgress = onProgress ? (completed: number, total: number) => {
+        onProgress({
+          completed,
+          total,
+          moduleType,
+          inputType: 'paragraphs'
+        });
+      } : undefined;
+      
       // Use the specialized citation finder processor directly
       const { processCitationFinder } = await import('./moduleProcessors/citationFinderProcessor');
-      return await processCitationFinder(inputData, callChatGPT, onProgress);
+      return await processCitationFinder(inputData, callChatGPT, citationProgress);
     }
     
     // Prepare clean input data for other modules
