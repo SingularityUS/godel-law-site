@@ -1,3 +1,4 @@
+
 /**
  * useOutputPanel Hook
  * 
@@ -58,6 +59,7 @@ export const useOutputPanel = () => {
   const closeOutput = useCallback(() => {
     setIsOutputOpen(false);
     setIsPipelineExecuting(false);
+    setOutput(null); // Clear output when closing
   }, []);
 
   const toggleOutput = useCallback(() => {
@@ -70,15 +72,17 @@ export const useOutputPanel = () => {
     setIsPipelineExecuting(false);
   }, []);
 
-  // New method to open sidebar immediately when pipeline starts
+  // Enhanced method to open sidebar immediately when pipeline starts
   const openForPipelineExecution = useCallback(() => {
+    console.log('useOutputPanel: Opening sidebar for pipeline execution');
     setIsPipelineExecuting(true);
     setIsOutputOpen(true);
     setOutput(null); // Clear previous output
   }, []);
 
-  // New method to handle pipeline completion
+  // Enhanced method to handle pipeline completion
   const handlePipelineCompletion = useCallback((finalOutput: any) => {
+    console.log('useOutputPanel: Handling pipeline completion with output:', finalOutput);
     setOutput(finalOutput);
     setIsPipelineExecuting(false);
     // Keep sidebar open

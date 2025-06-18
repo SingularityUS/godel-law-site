@@ -38,7 +38,30 @@ const StreamingRedlineTabContent: React.FC<StreamingRedlineTabContentProps> = ({
   isPipelineExecuting = false,
   isExecuting = false
 }) => {
-  // Show pipeline executing state
+  // Listen for early streaming callback registration
+  React.useEffect(() => {
+    const handleRegisterStreamingCallback = (event: CustomEvent) => {
+      console.log('StreamingRedlineTabContent: Registering streaming callback early', event.detail);
+      
+      // Emit callback registration event that streaming hook can listen to
+      const callbackEvent = new CustomEvent('streamingCallbackReady', {
+        detail: {
+          component: 'StreamingRedlineTabContent',
+          timestamp: new Date().toISOString(),
+          source: event.detail.source
+        }
+      });
+      window.dispatchEvent(callbackEvent);
+    };
+
+    window.addEventListener('registerStreamingCallback', handleRegisterStreamingCallback as EventListener);
+    
+    return () => {
+      window.removeEventListener('registerStreamingCallback', handleRegisterStreamingCallback as EventListener);
+    };
+  }, []);
+
+  // Show pipeline executing state with enhanced messaging
   if ((isPipelineExecuting || isExecuting) && !streamingProgress?.hasPartialResults && !redlineDocument) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -51,6 +74,9 @@ const StreamingRedlineTabContent: React.FC<StreamingRedlineTabContentProps> = ({
           <div className="mt-4 p-3 bg-blue-50 rounded border text-xs">
             <p className="text-blue-700">
               ✨ Streaming results enabled - you'll see updates in real-time!
+            </p>
+            <p className="text-blue-600 mt-1">
+              Pipeline started at {new Date().toLocaleTimeString()}
             </p>
           </div>
         </div>

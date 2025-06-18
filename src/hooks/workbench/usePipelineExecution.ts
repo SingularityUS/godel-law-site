@@ -32,10 +32,23 @@ export const usePipelineExecution = (
   const executionManager = createExecutionManager(nodes, edges);
 
   /**
-   * Enhanced pipeline execution with start/complete events
+   * Enhanced pipeline execution with immediate start events
    */
   const executePipeline = useCallback(async (startNodeId: string) => {
-    // Emit pipeline start event immediately
+    console.log('Pipeline execution starting - emitting start event');
+    
+    // Emit pipeline start event IMMEDIATELY
+    const startEvent = new CustomEvent('pipelineStarted', {
+      detail: {
+        startNodeId,
+        timestamp: new Date().toISOString(),
+        nodes: nodes.length,
+        edges: edges.length
+      }
+    });
+    window.dispatchEvent(startEvent);
+    
+    // Also call the callback if provided
     if (onPipelineStart) {
       onPipelineStart();
     }
@@ -44,12 +57,22 @@ export const usePipelineExecution = (
     const result = await baseExecutePipeline(startNodeId);
 
     // Emit completion event with final output
+    console.log('Pipeline execution completed - emitting completion event');
+    const completionEvent = new CustomEvent('pipelineCompleted', {
+      detail: {
+        finalOutput,
+        timestamp: new Date().toISOString(),
+        success: !!finalOutput
+      }
+    });
+    window.dispatchEvent(completionEvent);
+
     if (onPipelineComplete && finalOutput) {
       onPipelineComplete(finalOutput);
     }
 
     return result;
-  }, [baseExecutePipeline, onPipelineStart, onPipelineComplete, finalOutput]);
+  }, [baseExecutePipeline, onPipelineStart, onPipelineComplete, finalOutput, nodes, edges]);
 
   /**
    * Execute all pipelines (from all document input nodes)
