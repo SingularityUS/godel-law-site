@@ -8,17 +8,12 @@
 import { HelperNode } from "@/types/workbench";
 import { ModuleKind } from "@/data/modules";
 import { useChatGPTApi } from "../useChatGPTApi";
-import { parseResponseWithFallback } from "./parsing";
 import { 
-  createGrammarAnalysisProcessor, 
-  createParagraphSplitterProcessor,
   createCitationFinderProcessor
 } from "./moduleProcessors";
 
 export const createCoreProcessor = (callChatGPT: ReturnType<typeof useChatGPTApi>['callChatGPT']) => {
   // Initialize specialized processors
-  const grammarProcessor = createGrammarAnalysisProcessor(callChatGPT);
-  const paragraphProcessor = createParagraphSplitterProcessor(callChatGPT);
   const citationProcessor = createCitationFinderProcessor(callChatGPT);
 
   return async (
@@ -31,14 +26,6 @@ export const createCoreProcessor = (callChatGPT: ReturnType<typeof useChatGPTApi
     
     try {
       // Use specialized processors for specific modules
-      if (moduleType === 'grammar-checker') {
-        return await grammarProcessor(node, promptData, systemPrompt, moduleType);
-      }
-      
-      if (moduleType === 'paragraph-splitter') {
-        return await paragraphProcessor(node, promptData, systemPrompt, moduleType);
-      }
-      
       if (moduleType === 'citation-finder') {
         return await citationProcessor(node, promptData, systemPrompt, moduleType);
       }
@@ -49,13 +36,20 @@ export const createCoreProcessor = (callChatGPT: ReturnType<typeof useChatGPTApi
                              JSON.stringify(promptData);
       
       console.log(`Generic processing for ${moduleType}`);
-      const response = await callChatGPT(systemPrompt, cleanPromptData, 2000);
+      const response = await callChatGPT(systemPrompt, cleanPromptData, "2000");
       
       if (!response || !response.trim()) {
         throw new Error(`Empty response from ChatGPT for ${moduleType}`);
       }
       
-      const parsedOutput = parseResponseWithFallback(response, moduleType);
+      // Simple JSON parsing with fallback
+      let parsedOutput;
+      try {
+        parsedOutput = JSON.parse(response);
+      } catch (parseError) {
+        console.warn(`Failed to parse JSON response for ${moduleType}, using raw response`);
+        parsedOutput = { content: response };
+      }
       
       return {
         success: true,

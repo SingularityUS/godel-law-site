@@ -94,7 +94,7 @@ export const createCitationFinderProcessor = (callChatGPT: ReturnType<typeof use
     console.log(`Analyzing ${textContent.length} characters for Bluebook citations`);
     
     try {
-      const response = await callChatGPT(systemPrompt, textContent, 2000);
+      const response = await callChatGPT(systemPrompt, textContent, "2000");
       
       if (!response || !response.trim()) {
         console.warn('Empty response from ChatGPT for citation analysis');
