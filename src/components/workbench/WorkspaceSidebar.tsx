@@ -1,23 +1,23 @@
 
 import React from "react";
 import { useWorkspaceSidebarState } from "@/hooks/workbench/useWorkspaceSidebarState";
-import { useRedlineGeneration } from "@/hooks/workbench/useRedlineGeneration";
+import { useStreamingRedlineGeneration } from "@/hooks/workbench/useStreamingRedlineGeneration";
 import WorkspaceSidebarHeader from "./sidebar/WorkspaceSidebarHeader";
 import SidebarTabsContent from "./sidebar/SidebarTabsContent";
 
 /**
  * WorkspaceSidebar Component
  * 
- * Purpose: Integrated sidebar for pipeline results and redlining
- * Refactored to use smaller, focused components and hooks
+ * Purpose: Integrated sidebar for pipeline results and redlining with streaming support
+ * Now supports real-time redline updates as processing batches complete
  * 
  * Key Responsibilities:
  * - Orchestrates sidebar layout and behavior
  * - Integrates with pipeline output data
- * - Provides redline document generation and editing
+ * - Provides streaming redline document generation and editing
  * 
  * Architecture:
- * - Uses focused state management and generation hooks
+ * - Uses streaming-capable redline generation hook
  * - Delegates UI rendering to specialized components
  * - Maintains clean separation of concerns
  */
@@ -42,13 +42,14 @@ const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
     isLegalPipeline
   } = useWorkspaceSidebarState(output);
 
-  // Use redline generation hook
+  // Use streaming redline generation hook for real-time updates
   const {
     redlineDocument,
     isGeneratingRedline,
+    streamingProgress,
     handleSaveRedline,
     handleExportRedline
-  } = useRedlineGeneration({
+  } = useStreamingRedlineGeneration({
     output,
     isLegalPipeline
   });
@@ -72,6 +73,7 @@ const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
             redlineDocument={redlineDocument}
             isLegalPipeline={isLegalPipeline}
             output={output}
+            streamingProgress={streamingProgress}
             onSaveRedline={handleSaveRedline}
             onExportRedline={handleExportRedline}
           />

@@ -2,13 +2,13 @@
 /**
  * Paragraph Batch Processor
  * 
- * Purpose: Handles processing of paragraphs in batches for individual analysis - FIXED progress tracking
+ * Purpose: Handles processing of paragraphs in batches for individual analysis with streaming results
  */
 
 import { BatchProcessingOptions, PARAGRAPH_BATCH_OPTIONS } from "./batchConfig";
 
 /**
- * Process paragraphs in batches for individual analysis - FIXED to show correct progress
+ * Process paragraphs in batches for individual analysis with streaming support
  */
 export const processParagraphBatches = async (
   paragraphs: any[],
@@ -23,7 +23,7 @@ export const processParagraphBatches = async (
   
   console.log(`Starting paragraph batch processing of ${paragraphs.length} paragraphs`);
   
-  // FIXED: Report initial progress correctly
+  // Report initial progress correctly
   if (onProgress) {
     onProgress(0, paragraphs.length, 0);
   }
@@ -82,10 +82,33 @@ export const processParagraphBatches = async (
     results.push(...batchResults);
     completedCount += batch.length;
     
-    // FIXED: Update progress with correct counts
+    // Update progress with correct counts
     console.log(`Progress update: ${completedCount}/${paragraphs.length} paragraphs completed`);
     if (onProgress) {
       onProgress(completedCount, paragraphs.length, totalOutputGenerated);
+    }
+    
+    // STREAMING: Emit incremental results for immediate redline processing
+    if (window.streamingRedlineCallback && batchResults.length > 0) {
+      // Combine batch results for streaming
+      const combinedBatchResult = {
+        output: {
+          analysis: batchResults.flatMap(result => result.output?.analysis || [])
+        },
+        metadata: {
+          batchNumber,
+          totalBatches,
+          paragraphsInBatch: batch.length,
+          completedParagraphs: completedCount
+        }
+      };
+      
+      try {
+        window.streamingRedlineCallback(combinedBatchResult, batchNumber - 1, totalBatches);
+        console.log(`Streaming callback triggered for paragraph batch ${batchNumber}/${totalBatches}`);
+      } catch (error) {
+        console.error('Error in streaming paragraph callback:', error);
+      }
     }
     
     // Delay between batches
