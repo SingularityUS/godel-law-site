@@ -2,7 +2,7 @@
 /**
  * RedlineStyles Component
  * 
- * Purpose: Provides CSS styles for redline suggestions
+ * Purpose: Provides CSS styles for redline suggestions with direct editing support
  */
 
 import React from 'react';
@@ -16,6 +16,10 @@ const RedlineStyles: React.FC = () => {
       border-radius: 2px;
       padding: 1px 2px;
       display: inline;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
     }
     
     .redline-suggestion:hover {
@@ -39,9 +43,11 @@ const RedlineStyles: React.FC = () => {
       color: #166534;
       font-weight: 500;
       margin-left: 4px;
-      cursor: text;
       padding: 1px 2px;
       border-radius: 2px;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
     }
     
     .suggested-text:hover {
@@ -64,6 +70,8 @@ const RedlineStyles: React.FC = () => {
       transition: all 0.2s ease;
       opacity: 0;
       transform: scale(0.8);
+      user-select: none;
+      -webkit-user-select: none;
     }
     
     .redline-suggestion:hover .redline-accept-btn {
@@ -81,6 +89,8 @@ const RedlineStyles: React.FC = () => {
       margin-left: 2px;
       font-size: 10px;
       opacity: 0.7;
+      user-select: none;
+      -webkit-user-select: none;
     }
     
     /* Severity styles */
@@ -104,6 +114,26 @@ const RedlineStyles: React.FC = () => {
     .type-style { border-color: #8b5cf6; }
     .type-legal { border-color: #f97316; }
     .type-clarity { border-color: #06b6d4; }
+    
+    /* Direct editing styles */
+    [contenteditable] {
+      cursor: text;
+    }
+    
+    [contenteditable]:focus {
+      outline: none;
+    }
+    
+    /* Prevent editing of redline elements */
+    .redline-suggestion * {
+      pointer-events: auto;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    
+    .redline-accept-btn {
+      pointer-events: auto;
+    }
   `;
 
   return <style dangerouslySetInnerHTML={{ __html: redlineStyles }} />;

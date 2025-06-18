@@ -1,4 +1,3 @@
-
 /**
  * RedlineDocumentArea Component
  * 
@@ -56,6 +55,7 @@ const RedlineDocumentArea: React.FC<RedlineDocumentAreaProps> = ({
             onSuggestionAccept={onSuggestionAccept}
             onSuggestionModify={onSuggestionModify}
             onManualEdit={onManualEdit}
+            onContentChange={onContentChange}
           />
         )}
       </div>
