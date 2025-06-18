@@ -1,4 +1,3 @@
-
 import { useCallback, useState, useRef } from "react";
 import ModuleSettingsDrawer from "@/components/ModuleSettingsDrawer";
 import DocumentLibrary from "@/components/DocumentLibrary";
@@ -126,7 +125,7 @@ const IndexContent = () => {
         onTabChange={handleTabChange}
       />
 
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 h-full overflow-hidden">
         {renderTabContent()}
       </div>
 
