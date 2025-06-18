@@ -36,7 +36,7 @@ interface WorkbenchFlowProps {
 const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow(
   { onModuleEdit, editingPromptNodeId, uploadedFiles, reactFlowWrapper },
   ref
-) => {
+) {
   // Initialize workbench event handling
   const {
     nodes,
