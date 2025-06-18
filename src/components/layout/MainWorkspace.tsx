@@ -13,9 +13,6 @@ interface MainWorkspaceProps {
   workbenchRef?: React.RefObject<any>;
   finalOutput?: any;
   onCloseFinalOutput?: () => void;
-  isExecuting?: boolean;
-  onPipelineStart?: () => void;
-  onPipelineComplete?: (output: any) => void;
 }
 
 const MainWorkspace: React.FC<MainWorkspaceProps> = ({
@@ -25,75 +22,16 @@ const MainWorkspace: React.FC<MainWorkspaceProps> = ({
   uploadedFiles,
   workbenchRef,
   finalOutput,
-  onCloseFinalOutput,
-  isExecuting,
-  onPipelineStart,
-  onPipelineComplete
+  onCloseFinalOutput
 }) => {
-  const { 
-    output, 
-    isOutputOpen, 
-    isPipelineExecuting,
-    closeOutput, 
-    toggleOutput, 
-    openOutput,
-    openForPipelineExecution,
-    handlePipelineCompletion
-  } = useOutputPanel();
+  const { output, isOutputOpen, closeOutput, toggleOutput, openOutput } = useOutputPanel();
 
-  // Listen for pipeline start events to immediately open sidebar
-  React.useEffect(() => {
-    const handlePipelineStarted = (event: CustomEvent) => {
-      console.log('MainWorkspace: Pipeline started event received', event.detail);
-      openForPipelineExecution();
-      
-      // Register streaming callback early
-      const registerStreamingCallback = () => {
-        console.log('Registering streaming callback for early results');
-        const streamingEvent = new CustomEvent('registerStreamingCallback', {
-          detail: { 
-            timestamp: new Date().toISOString(),
-            source: 'pipeline-start'
-          }
-        });
-        window.dispatchEvent(streamingEvent);
-      };
-      
-      // Register callback with slight delay to ensure components are ready
-      setTimeout(registerStreamingCallback, 100);
-    };
-
-    const handlePipelineCompleted = (event: CustomEvent) => {
-      console.log('MainWorkspace: Pipeline completed event received', event.detail);
-      if (event.detail.finalOutput) {
-        handlePipelineCompletion(event.detail.finalOutput);
-      }
-    };
-
-    // Add event listeners
-    window.addEventListener('pipelineStarted', handlePipelineStarted as EventListener);
-    window.addEventListener('pipelineCompleted', handlePipelineCompleted as EventListener);
-
-    // Cleanup listeners
-    return () => {
-      window.removeEventListener('pipelineStarted', handlePipelineStarted as EventListener);
-      window.removeEventListener('pipelineCompleted', handlePipelineCompleted as EventListener);
-    };
-  }, [openForPipelineExecution, handlePipelineCompletion]);
-
-  // Handle pipeline start - open sidebar immediately (fallback)
-  React.useEffect(() => {
-    if (isExecuting && onPipelineStart) {
-      openForPipelineExecution();
-    }
-  }, [isExecuting, onPipelineStart, openForPipelineExecution]);
-
-  // Use finalOutput when available (fallback)
+  // Use finalOutput when available
   React.useEffect(() => {
     if (finalOutput) {
-      handlePipelineCompletion(finalOutput);
+      openOutput(finalOutput);
     }
-  }, [finalOutput, handlePipelineCompletion]);
+  }, [finalOutput, openOutput]);
 
   const handleClose = () => {
     closeOutput();
@@ -119,12 +57,10 @@ const MainWorkspace: React.FC<MainWorkspaceProps> = ({
             <ResizableHandle />
             <ResizablePanel defaultSize={50} minSize={25}>
               <WorkspaceSidebar 
-                output={output || {}} // Provide empty object during execution
+                output={output}
                 isOpen={isOutputOpen}
                 onClose={handleClose}
                 onToggle={toggleOutput}
-                isPipelineExecuting={isPipelineExecuting}
-                isExecuting={isExecuting}
               />
             </ResizablePanel>
           </>

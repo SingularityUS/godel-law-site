@@ -2,14 +2,14 @@
 /**
  * Chunk Batch Processor
  * 
- * Purpose: Handles processing of document chunks in batches with streaming results
+ * Purpose: Handles processing of document chunks in batches
  */
 
 import { DocumentChunk, reassembleChunks } from "./documentChunker";
 import { BatchProcessingOptions, DEFAULT_BATCH_OPTIONS } from "./batchConfig";
 
 /**
- * Process chunks in batches with enhanced progress tracking and streaming results
+ * Process chunks in batches with enhanced progress tracking
  */
 export const processBatches = async (
   chunks: DocumentChunk[],
@@ -96,30 +96,6 @@ export const processBatches = async (
     // Update progress with enhanced information
     if (onProgress) {
       onProgress(completedCount, chunks.length, totalOutputGenerated);
-    }
-    
-    // STREAMING: Emit incremental results for immediate redline processing
-    if (window.streamingRedlineCallback && batchResults.length > 0) {
-      // Combine batch results for streaming
-      const combinedBatchResult = {
-        output: {
-          analysis: batchResults.flatMap(result => result.output?.analysis || []),
-          paragraphs: batchResults.flatMap(result => result.output?.paragraphs || [])
-        },
-        metadata: {
-          batchNumber,
-          totalBatches,
-          chunksInBatch: batch.length,
-          completedChunks: completedCount
-        }
-      };
-      
-      try {
-        window.streamingRedlineCallback(combinedBatchResult, batchNumber - 1, totalBatches);
-        console.log(`Streaming callback triggered for batch ${batchNumber}/${totalBatches}`);
-      } catch (error) {
-        console.error('Error in streaming callback:', error);
-      }
     }
     
     // Delay between batches (except for the last one)

@@ -2,21 +2,19 @@
 /**
  * Paragraph Batch Processor
  * 
- * Purpose: Handles processing of paragraphs in batches for individual analysis with streaming results
+ * Purpose: Handles processing of paragraphs in batches for individual analysis - FIXED progress tracking
  */
 
 import { BatchProcessingOptions, PARAGRAPH_BATCH_OPTIONS } from "./batchConfig";
 
 /**
- * Process paragraphs in batches for individual analysis with streaming support
- * Enhanced to include original document extraction result in streaming batches
+ * Process paragraphs in batches for individual analysis - FIXED to show correct progress
  */
 export const processParagraphBatches = async (
   paragraphs: any[],
   processingFunction: (paragraph: any, index: number) => Promise<any>,
   options: Partial<BatchProcessingOptions> = {},
-  onProgress?: (completed: number, total: number, outputGenerated?: number) => void,
-  documentExtractionResult?: any // NEW: Include document extraction result for streaming
+  onProgress?: (completed: number, total: number, outputGenerated?: number) => void
 ): Promise<any[]> => {
   const config = { ...PARAGRAPH_BATCH_OPTIONS, ...options };
   const results: any[] = [];
@@ -24,14 +22,8 @@ export const processParagraphBatches = async (
   let totalOutputGenerated = 0;
   
   console.log(`Starting paragraph batch processing of ${paragraphs.length} paragraphs`);
-  console.log(`Streaming callback available: ${!!window.streamingRedlineCallback}`);
-  console.log(`Document extraction result available for streaming:`, {
-    hasDocumentExtraction: !!documentExtractionResult,
-    fileName: documentExtractionResult?.fileName,
-    contentLength: documentExtractionResult?.originalContent?.length || 0
-  });
   
-  // Report initial progress correctly
+  // FIXED: Report initial progress correctly
   if (onProgress) {
     onProgress(0, paragraphs.length, 0);
   }
@@ -90,51 +82,10 @@ export const processParagraphBatches = async (
     results.push(...batchResults);
     completedCount += batch.length;
     
-    // Update progress with correct counts
+    // FIXED: Update progress with correct counts
     console.log(`Progress update: ${completedCount}/${paragraphs.length} paragraphs completed`);
     if (onProgress) {
       onProgress(completedCount, paragraphs.length, totalOutputGenerated);
-    }
-    
-    // STREAMING: Emit incremental results for immediate redline processing with document context
-    if (window.streamingRedlineCallback && batchResults.length > 0) {
-      // Combine batch results for streaming with document extraction result
-      const combinedBatchResult = {
-        output: {
-          analysis: batchResults.flatMap(result => result.output?.analysis || [])
-        },
-        // CRITICAL: Include the original document extraction result for redline access
-        documentExtractionResult,
-        metadata: {
-          batchNumber,
-          totalBatches,
-          paragraphsInBatch: batch.length,
-          completedParagraphs: completedCount,
-          // Also include document metadata for fallback access
-          originalDocument: documentExtractionResult ? {
-            fileName: documentExtractionResult.fileName,
-            fileType: documentExtractionResult.fileType,
-            originalContent: documentExtractionResult.originalContent,
-            processableContent: documentExtractionResult.processableContent,
-            originalPreview: documentExtractionResult.originalPreview
-          } : undefined
-        }
-      };
-      
-      try {
-        console.log(`🚀 STREAMING: Calling callback for batch ${batchNumber}/${totalBatches} with document context:`, {
-          analysisItems: combinedBatchResult.output.analysis.length,
-          hasDocumentExtraction: !!combinedBatchResult.documentExtractionResult,
-          documentFileName: combinedBatchResult.documentExtractionResult?.fileName,
-          documentContentLength: combinedBatchResult.documentExtractionResult?.originalContent?.length || 0
-        });
-        window.streamingRedlineCallback(combinedBatchResult, batchNumber - 1, totalBatches);
-        console.log(`✅ STREAMING: Callback executed successfully for batch ${batchNumber}/${totalBatches} with document context`);
-      } catch (error) {
-        console.error('❌ STREAMING: Error in streaming paragraph callback:', error);
-      }
-    } else {
-      console.warn(`⚠️ STREAMING: No callback available for batch ${batchNumber}/${totalBatches} (callback exists: ${!!window.streamingRedlineCallback})`);
     }
     
     // Delay between batches

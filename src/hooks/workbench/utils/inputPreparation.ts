@@ -8,7 +8,7 @@
 import { ModuleKind } from "@/data/modules";
 
 /**
- * Prepare input data for module processing (updated for position awareness and document metadata preservation)
+ * Prepare input data for module processing (updated for position awareness)
  */
 export function prepareModuleInput(inputData: any, moduleType: ModuleKind): any {
   if (!inputData) return inputData;
@@ -21,50 +21,19 @@ export function prepareModuleInput(inputData: any, moduleType: ModuleKind): any 
         content: inputData.processableContent,
         // Preserve position mapping for later use
         positionMap: inputData.positionMap,
-        originalContent: inputData.originalContent,
-        // Preserve document metadata
-        metadata: {
-          ...inputData.metadata,
-          fileName: inputData.fileName || inputData.metadata?.fileName,
-          fileType: inputData.fileType || inputData.metadata?.fileType,
-          originalContent: inputData.originalContent || inputData.metadata?.originalContent
-        }
+        originalContent: inputData.originalContent
       };
     }
     
     // Fallback to existing structure
     if (inputData.content && typeof inputData.content === 'string') {
-      return { 
-        content: inputData.content,
-        metadata: {
-          ...inputData.metadata,
-          originalContent: inputData.originalContent || inputData.content
-        }
-      };
+      return { content: inputData.content };
     }
     
-    // If it's already in the expected format, return as-is but ensure metadata
+    // If it's already in the expected format, return as-is
     if (typeof inputData === 'string') {
-      return { 
-        content: inputData,
-        metadata: {
-          originalContent: inputData
-        }
-      };
+      return { content: inputData };
     }
-  }
-  
-  // For other modules, preserve document metadata
-  if (inputData && typeof inputData === 'object') {
-    return {
-      ...inputData,
-      metadata: {
-        ...inputData.metadata,
-        fileName: inputData.fileName || inputData.metadata?.fileName,
-        fileType: inputData.fileType || inputData.metadata?.fileType,
-        originalContent: inputData.originalContent || inputData.metadata?.originalContent || inputData.content
-      }
-    };
   }
   
   return inputData;

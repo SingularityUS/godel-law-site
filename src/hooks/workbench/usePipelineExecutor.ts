@@ -41,7 +41,7 @@ export const usePipelineExecutor = (nodes: AllNodes[], edges: Edge[]) => {
   const executionManager = createExecutionManager(nodes, edges);
 
   /**
-   * Execute pipeline starting from a document input node with enhanced document context flow
+   * Execute pipeline starting from a document input node
    */
   const executePipeline = useCallback(async (startNodeId: string) => {
     if (isExecuting) return;
@@ -58,7 +58,6 @@ export const usePipelineExecutor = (nodes: AllNodes[], edges: Edge[]) => {
       initializeState(executionOrder);
 
       let currentData: any = null;
-      let documentExtractionResult: any = null; // Store initial document result
       const pipelineResults: any[] = [];
 
       // Process each node in order
@@ -71,27 +70,13 @@ export const usePipelineExecutor = (nodes: AllNodes[], edges: Edge[]) => {
         try {
           if (node?.data?.moduleType === 'document-input') {
             currentData = await processDocumentNode(node as DocumentInputNode);
-            documentExtractionResult = currentData; // Preserve the initial document extraction
-            console.log('Document extraction result preserved for streaming:', {
-              hasOriginalContent: !!documentExtractionResult?.originalContent,
-              hasProcessableContent: !!documentExtractionResult?.processableContent,
-              fileName: documentExtractionResult?.fileName,
-              contentLength: documentExtractionResult?.originalContent?.length || 0
-            });
           } else {
-            // ENHANCED: Pass document extraction result to module processing
-            // Fix progress callback signature to match expected format
-            const progressCallback = (nodeId: string, progress: { completed: number; total: number; label?: string }) => {
-              updateProgress(nodeId, progress.completed, progress.total);
-            };
-            
             currentData = await processModuleNode(
               nodeId, 
               currentData, 
-              progressCallback, 
+              updateProgress, 
               updateNodeStatus, 
-              clearProgress,
-              documentExtractionResult // PASS: Document extraction result for streaming context
+              clearProgress
             );
           }
 
@@ -120,19 +105,17 @@ export const usePipelineExecutor = (nodes: AllNodes[], edges: Edge[]) => {
         }
       }
 
-      // Create comprehensive final output for legal review with preserved document extraction
-      const finalLegalOutput = executionManager.createFinalOutput(pipelineResults, currentData, documentExtractionResult);
+      // Create comprehensive final output for legal review
+      const finalLegalOutput = executionManager.createFinalOutput(pipelineResults, currentData);
       setFinalOutput(finalLegalOutput);
       
       // Log final pipeline statistics
-      console.log('Legal document processing pipeline completed successfully with document context preserved');
+      console.log('Legal document processing pipeline completed successfully');
       console.log(`Final output contains:`, {
         totalModules: pipelineResults.length,
         finalDataType: typeof currentData,
         hasAnalysis: currentData?.output?.analysis ? currentData.output.analysis.length : 0,
-        hasParagraphs: currentData?.output?.paragraphs ? currentData.output.paragraphs.length : 0,
-        hasDocumentExtraction: !!documentExtractionResult,
-        documentExtractionOriginalContent: documentExtractionResult?.originalContent?.length || 0
+        hasParagraphs: currentData?.output?.paragraphs ? currentData.output.paragraphs.length : 0
       });
 
     } catch (error: any) {

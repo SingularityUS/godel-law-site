@@ -1,136 +1,89 @@
 
-
 /**
  * usePipelineModuleProcessor Hook
  * 
- * Purpose: Processes individual modules within a pipeline workflow
+ * Purpose: Handles module processing within pipeline execution
  */
 
 import { useCallback } from "react";
 import { AllNodes } from "@/types/workbench";
-import { processGrammarAnalysis } from "./utils/moduleProcessors/grammarAnalysisProcessor";
-import { processParagraphSplitter } from "./utils/moduleProcessors/paragraphSplitterProcessor";
-import { processParagraphBatches } from "./utils/paragraphBatchProcessor";
-import { handleTextExtractor } from "./utils/textExtractorHandler";
 import { useChatGPTApi } from "./useChatGPTApi";
+import { createNodeProcessor } from "./utils/nodeProcessor";
 
 export const usePipelineModuleProcessor = (nodes: AllNodes[]) => {
   const { callChatGPT } = useChatGPTApi();
+  const processNode = createNodeProcessor(nodes, callChatGPT);
 
-  /**
-   * Process module node
-   */
   const processModuleNode = useCallback(async (
-    nodeId: string,
-    inputData: any,
-    updateProgress: (nodeId: string, progress: { completed: number; total: number; label?: string }) => void,
+    nodeId: string, 
+    currentData: any, 
+    updateProgress: (nodeId: string, completed: number, total: number) => void,
     updateNodeStatus: (nodeId: string, status: any) => void,
-    clearProgress: (nodeId: string) => void,
-    documentExtractionResult?: any
+    clearProgress: (nodeId: string) => void
   ) => {
     const node = nodes.find(n => n.id === nodeId);
-    if (!node) throw new Error(`Node ${nodeId} not found`);
-
-    const startTime = Date.now();
-    console.log(`Processing module node: ${nodeId} (${node.data?.moduleType}) with document context:`, {
-      hasDocumentExtraction: !!documentExtractionResult,
-      fileName: documentExtractionResult?.fileName,
-      contentLength: documentExtractionResult?.originalContent?.length || 0
-    });
-
-    try {
-      let result;
+    
+    // Enhanced progress callback for module-specific tracking
+    const onProgress = (progress: any) => {
+      // Handle both old and new progress formats
+      let completed: number, total: number;
       
-      switch (node.data?.moduleType) {
-        case 'paragraph-splitter': {
-          console.log(`Processing paragraph splitter for ${nodeId}`);
-          
-          // Update progress for splitting
-          updateProgress(nodeId, { 
-            completed: 0, 
-            total: 1, 
-            label: 'Splitting document into paragraphs...' 
-          });
-          
-          // Process paragraph splitting
-          result = await processParagraphSplitter(inputData);
-          
-          // Update completion progress
-          updateProgress(nodeId, { 
-            completed: 1, 
-            total: 1, 
-            label: `Split into ${result.output?.paragraphs?.length || 0} paragraphs` 
-          });
-          
-          console.log(`Paragraph splitting completed for ${nodeId}:`, {
-            paragraphsGenerated: result.output?.paragraphs?.length || 0,
-            processingTime: result.metadata?.processingTime
-          });
-          break;
-        }
-
-        case 'grammar-checker': {
-          // Enhanced batch processing with document extraction result
-          const batchResults = await processParagraphBatches(
-            inputData.paragraphs || [],
-            async (paragraph: any, index: number) => {
-              // Use the grammar analysis processor
-              return await processGrammarAnalysis(
-                { paragraphs: [paragraph] },
-                callChatGPT
-              );
-            },
-            {},
-            (completed, total, outputGenerated) => {
-              updateProgress(nodeId, { 
-                completed, 
-                total, 
-                label: `Processing paragraphs: ${completed}/${total} (${outputGenerated || 0} suggestions generated)` 
-              });
-            },
-            documentExtractionResult
-          );
-          
-          // Combine results
-          const allAnalysis = batchResults.flatMap(batch => batch.output?.analysis || []);
-          result = {
-            output: {
-              analysis: allAnalysis,
-              paragraphs: inputData.paragraphs || []
-            },
-            metadata: {
-              processingTime: Date.now() - startTime,
-              paragraphsProcessed: batchResults.length,
-              totalSuggestions: allAnalysis.length
-            }
-          };
-          
-          console.log(`Grammar analysis completed for ${nodeId}:`, {
-            paragraphsProcessed: batchResults.length,
-            totalSuggestions: allAnalysis.length,
-            processingTime: result.metadata?.processingTime
-          });
-          break;
-        }
-
-        case 'text-extractor': {
-          result = handleTextExtractor(nodeId, inputData, startTime);
-          break;
-        }
-
-        default:
-          throw new Error(`Unknown module type: ${node.data?.moduleType}`);
+      if (typeof progress === 'object' && progress.completed !== undefined) {
+        // New ModuleProgress format
+        completed = progress.completed;
+        total = progress.total;
+        
+        // Log module-specific progress
+        const inputType = progress.inputType || 'items';
+        const outputInfo = progress.outputGenerated ? ` → ${progress.outputGenerated} ${progress.outputType || 'items'}` : '';
+        console.log(`${node?.data?.moduleType}: Processing ${inputType} ${completed}/${total}${outputInfo}`);
+      } else {
+        // Legacy format compatibility
+        completed = progress.completed || progress;
+        total = progress.total || 1;
       }
-
-      return result;
-    } catch (error: any) {
-      console.error(`Error in module processor for ${nodeId}:`, error);
-      throw error;
+      
+      updateProgress(nodeId, completed, total);
+      
+      // Update execution state with enhanced progress
+      updateNodeStatus(nodeId, { 
+        status: 'processing',
+        progress: `${completed}/${total}` 
+      });
+    };
+    
+    // Log input data statistics before processing
+    if (currentData) {
+      if (currentData.paragraphs && Array.isArray(currentData.paragraphs)) {
+        console.log(`${node?.data?.moduleType}: Processing ${currentData.paragraphs.length} paragraphs`);
+      } else if (currentData.chunks && Array.isArray(currentData.chunks)) {
+        console.log(`${node?.data?.moduleType}: Processing ${currentData.chunks.length} chunks`);
+      } else if (currentData.content) {
+        console.log(`${node?.data?.moduleType}: Processing content (${currentData.content.length} chars)`);
+      }
     }
-  }, [nodes, callChatGPT]);
+    
+    const result = await processNode(nodeId, currentData, onProgress);
+    
+    // Log output data statistics after processing
+    if (result && result.output) {
+      const output = result.output;
+      if (output.paragraphs && Array.isArray(output.paragraphs)) {
+        console.log(`${node?.data?.moduleType}: Generated ${output.paragraphs.length} paragraphs`);
+      } else if (output.analysis && Array.isArray(output.analysis)) {
+        console.log(`${node?.data?.moduleType}: Analyzed ${output.analysis.length} items`);
+      } else if (output.totalParagraphs) {
+        console.log(`${node?.data?.moduleType}: Processed ${output.totalParagraphs} paragraphs`);
+      }
+    }
+
+    // Clear progress for this node
+    clearProgress(nodeId);
+    
+    return result;
+  }, [nodes, processNode]);
 
   return {
     processModuleNode
   };
 };
-

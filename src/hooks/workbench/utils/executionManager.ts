@@ -40,14 +40,7 @@ export const createExecutionManager = (nodes: AllNodes[], edges: Edge[]) => {
     return executionOrder;
   };
 
-  const createFinalOutput = (pipelineResults: PipelineResult[], currentData: any, documentExtractionResult?: any): FinalLegalOutput => {
-    console.log('Creating final output with document extraction result:', {
-      hasDocumentExtraction: !!documentExtractionResult,
-      documentOriginalContent: documentExtractionResult?.originalContent?.length || 0,
-      documentFileName: documentExtractionResult?.fileName,
-      pipelineResultsCount: pipelineResults.length
-    });
-
+  const createFinalOutput = (pipelineResults: PipelineResult[], currentData: any): FinalLegalOutput => {
     return {
       summary: {
         documentsProcessed: 1,
@@ -56,20 +49,7 @@ export const createExecutionManager = (nodes: AllNodes[], edges: Edge[]) => {
         pipelineType: "Legal Document Analysis"
       },
       results: pipelineResults,
-      finalOutput: currentData,
-      // Include the original document extraction result for redline access
-      documentExtractionResult: documentExtractionResult,
-      // Also add it to metadata for multiple access paths
-      metadata: {
-        ...currentData?.metadata,
-        originalDocument: documentExtractionResult ? {
-          fileName: documentExtractionResult.fileName,
-          fileType: documentExtractionResult.fileType,
-          originalContent: documentExtractionResult.originalContent,
-          processableContent: documentExtractionResult.processableContent,
-          originalPreview: documentExtractionResult.originalPreview
-        } : undefined
-      }
+      finalOutput: currentData
     };
   };
 

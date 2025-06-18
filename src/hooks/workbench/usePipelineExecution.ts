@@ -3,7 +3,7 @@
  * usePipelineExecution Hook
  * 
  * Purpose: Orchestrates sequential execution of AI modules in the workbench
- * Enhanced with pipeline start events for immediate UI feedback
+ * Refactored to use smaller, focused hooks for better maintainability
  */
 
 import { useCallback } from "react";
@@ -12,14 +12,9 @@ import { AllNodes } from "@/types/workbench";
 import { createExecutionManager } from "./utils/executionManager";
 import { usePipelineExecutor } from "./usePipelineExecutor";
 
-export const usePipelineExecution = (
-  nodes: AllNodes[], 
-  edges: Edge[],
-  onPipelineStart?: () => void,
-  onPipelineComplete?: (output: any) => void
-) => {
+export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
   const {
-    executePipeline: baseExecutePipeline,
+    executePipeline,
     executionState,
     isExecuting,
     finalOutput,
@@ -30,49 +25,6 @@ export const usePipelineExecution = (
 
   // Create execution manager for utility functions
   const executionManager = createExecutionManager(nodes, edges);
-
-  /**
-   * Enhanced pipeline execution with immediate start events
-   */
-  const executePipeline = useCallback(async (startNodeId: string) => {
-    console.log('Pipeline execution starting - emitting start event');
-    
-    // Emit pipeline start event IMMEDIATELY
-    const startEvent = new CustomEvent('pipelineStarted', {
-      detail: {
-        startNodeId,
-        timestamp: new Date().toISOString(),
-        nodes: nodes.length,
-        edges: edges.length
-      }
-    });
-    window.dispatchEvent(startEvent);
-    
-    // Also call the callback if provided
-    if (onPipelineStart) {
-      onPipelineStart();
-    }
-
-    // Execute the pipeline
-    const result = await baseExecutePipeline(startNodeId);
-
-    // Emit completion event with final output
-    console.log('Pipeline execution completed - emitting completion event');
-    const completionEvent = new CustomEvent('pipelineCompleted', {
-      detail: {
-        finalOutput,
-        timestamp: new Date().toISOString(),
-        success: !!finalOutput
-      }
-    });
-    window.dispatchEvent(completionEvent);
-
-    if (onPipelineComplete && finalOutput) {
-      onPipelineComplete(finalOutput);
-    }
-
-    return result;
-  }, [baseExecutePipeline, onPipelineStart, onPipelineComplete, finalOutput, nodes, edges]);
 
   /**
    * Execute all pipelines (from all document input nodes)

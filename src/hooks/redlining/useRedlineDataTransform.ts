@@ -1,3 +1,4 @@
+
 import { useCallback } from 'react';
 import { RedlineDocument } from "@/types/redlining";
 import { convertGrammarAnalysisToRedline } from "@/utils/redlining/grammarToRedline";
@@ -5,15 +6,12 @@ import { convertGrammarAnalysisToRedline } from "@/utils/redlining/grammarToRedl
 export const useRedlineDataTransform = () => {
   const transformGrammarData = useCallback((result: any): RedlineDocument | null => {
     try {
-      console.log('Transforming grammar data with enhanced document extraction access:', result);
+      console.log('Transforming grammar data with controlled whitespace management:', result);
       console.log('Result structure:', {
         hasOutput: !!result?.output,
         hasAnalysis: !!result?.output?.analysis,
         hasFinalOutput: !!result?.finalOutput,
-        hasDocumentExtractionResult: !!result?.documentExtractionResult,
-        hasMetadataOriginalDocument: !!result?.metadata?.originalDocument,
         analysisLength: result?.output?.analysis?.length || 0,
-        hasMetadata: !!result?.metadata,
         resultKeys: Object.keys(result || {})
       });
       
@@ -56,9 +54,9 @@ export const useRedlineDataTransform = () => {
 
       console.log(`Found analysis data with ${analysisData.length} items`);
 
-      // Extract original document metadata with enhanced access to document extraction result
-      const originalDocument = extractOriginalDocumentFromPipelineWithExtraction(result);
-      console.log('Extracted original document info from pipeline with document extraction:', originalDocument);
+      // Extract original document metadata with enhanced formatting preservation
+      const originalDocument = extractOriginalDocumentInfoWithFormatting(result);
+      console.log('Extracted original document info with formatting preservation:', originalDocument);
 
       return convertGrammarAnalysisToRedline(sourceResult, originalDocument);
     } catch (error) {
@@ -92,161 +90,7 @@ export const useRedlineDataTransform = () => {
 };
 
 /**
- * Enhanced document extraction with direct access to preserved document extraction result
- */
-function extractOriginalDocumentFromPipelineWithExtraction(result: any) {
-  console.log('Extracting original document from pipeline with document extraction result');
-  
-  // Priority 1: Direct access to preserved document extraction result
-  if (result?.documentExtractionResult) {
-    console.log('Found preserved document extraction result:', {
-      hasOriginalContent: !!result.documentExtractionResult.originalContent,
-      hasProcessableContent: !!result.documentExtractionResult.processableContent,
-      fileName: result.documentExtractionResult.fileName,
-      contentLength: result.documentExtractionResult.originalContent?.length || 0
-    });
-    
-    return {
-      name: result.documentExtractionResult.fileName || 'Document',
-      type: result.documentExtractionResult.fileType || 'text/plain',
-      content: result.documentExtractionResult.originalContent || '',
-      preview: result.documentExtractionResult.originalPreview
-    };
-  }
-  
-  // Priority 2: Access via metadata.originalDocument
-  if (result?.metadata?.originalDocument) {
-    console.log('Found metadata.originalDocument:', {
-      hasOriginalContent: !!result.metadata.originalDocument.originalContent,
-      fileName: result.metadata.originalDocument.fileName,
-      contentLength: result.metadata.originalDocument.originalContent?.length || 0
-    });
-    
-    return {
-      name: result.metadata.originalDocument.fileName || 'Document',
-      type: result.metadata.originalDocument.fileType || 'text/plain',
-      content: result.metadata.originalDocument.originalContent || '',
-      preview: result.metadata.originalDocument.originalPreview
-    };
-  }
-  
-  // Priority 3: Check pipeline results for document input result
-  if (result?.results && Array.isArray(result.results)) {
-    const documentResult = result.results.find((r: any) => r.moduleType === 'document-input');
-    if (documentResult?.result) {
-      console.log('Found document result in pipeline results:', {
-        hasOriginalContent: !!documentResult.result.originalContent,
-        hasProcessableContent: !!documentResult.result.processableContent,
-        fileName: documentResult.result.fileName,
-        contentLength: documentResult.result.originalContent?.length || 0
-      });
-      
-      return {
-        name: documentResult.result.fileName || 'Document',
-        type: documentResult.result.fileType || 'text/plain',
-        content: documentResult.result.originalContent || '',
-        preview: documentResult.result.originalPreview
-      };
-    }
-  }
-  
-  // Priority 4: Fallback to existing extraction method
-  console.log('Using fallback document extraction method');
-  return extractOriginalDocumentInfoWithFormattingFromPipeline(result);
-}
-
-/**
- * Enhanced original document info extraction with formatting preservation from pipeline metadata
- */
-function extractOriginalDocumentInfoWithFormattingFromPipeline(result: any) {
-  console.log('Extracting original document info from pipeline with all metadata paths');
-  
-  // Try multiple metadata paths from the pipeline
-  const metadataPaths = [
-    result?.metadata?.originalDocument,
-    result?.finalOutput?.metadata?.originalDocument,
-    result?.input?.metadata?.originalDocument,
-    result?.metadata,
-    result?.finalOutput?.metadata,
-    result?.input?.metadata
-  ];
-  
-  let originalDocumentInfo = null;
-  
-  // Find the first valid metadata with document info
-  for (const metadata of metadataPaths) {
-    if (metadata && (metadata.fileName || metadata.originalContent)) {
-      originalDocumentInfo = metadata;
-      console.log('Found original document metadata in pipeline:', {
-        hasFileName: !!metadata.fileName,
-        hasOriginalContent: !!metadata.originalContent,
-        contentLength: metadata.originalContent?.length || 0
-      });
-      break;
-    }
-  }
-  
-  // If no metadata found, try direct content extraction
-  if (!originalDocumentInfo) {
-    console.log('No pipeline metadata found, trying direct content extraction');
-    originalDocumentInfo = extractOriginalDocumentInfoWithFormatting(result);
-  }
-  
-  // CRITICAL: Prioritize sources that preserve original formatting
-  let originalContent = '';
-  
-  const contentPaths = [
-    // Priority 1: Pipeline metadata original content
-    originalDocumentInfo?.originalContent,
-    
-    // Priority 2: Other metadata sources
-    result?.metadata?.originalContent,
-    result?.input?.originalContent,
-    result?.originalContent,
-    
-    // Priority 3: Less processed content sources
-    result?.input?.content,
-    originalDocumentInfo?.content,
-    
-    // Priority 4: Content from initial processing (might be cleaned)
-    result?.content
-  ];
-  
-  for (const path of contentPaths) {
-    if (path && typeof path === 'string' && path.length > 0) {
-      originalContent = path; // DO NOT TRIM - preserve exact formatting
-      console.log('Selected content source with formatting preservation:', {
-        source: 'pipeline content path',
-        length: originalContent.length,
-        hasLineBreaks: originalContent.includes('\n'),
-        hasDoubleLineBreaks: originalContent.includes('\n\n'),
-        hasLeadingWhitespace: /^\s/.test(originalContent),
-        hasTrailingWhitespace: /\s$/.test(originalContent)
-      });
-      break;
-    }
-  }
-  
-  if (!originalContent) {
-    console.error('Could not extract original content from pipeline - this will cause redline display issues');
-    originalContent = 'Original document content could not be retrieved from pipeline';
-  }
-
-  return {
-    name: originalDocumentInfo?.fileName || 
-          result?.fileName || 
-          'Document',
-    type: originalDocumentInfo?.fileType || 
-          result?.fileType || 
-          'text/plain',
-    content: originalContent, // Preserved with all original formatting
-    preview: originalDocumentInfo?.originalPreview || 
-             result?.originalPreview
-  };
-}
-
-/**
- * Fallback original document info extraction (legacy support)
+ * Enhanced original document info extraction with formatting preservation
  */
 function extractOriginalDocumentInfoWithFormatting(result: any) {
   // Try multiple paths for document metadata
@@ -277,7 +121,7 @@ function extractOriginalDocumentInfoWithFormatting(result: any) {
     if (path && typeof path === 'string' && path.length > 0) {
       originalContent = path; // DO NOT TRIM - preserve exact formatting
       console.log('Selected content source with formatting preservation:', {
-        source: 'fallback content path',
+        source: 'content path',
         length: originalContent.length,
         hasLineBreaks: originalContent.includes('\n'),
         hasDoubleLineBreaks: originalContent.includes('\n\n'),

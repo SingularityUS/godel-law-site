@@ -30,6 +30,4 @@ export interface FinalLegalOutput {
   };
   results: PipelineResult[];
   finalOutput: any;
-  documentExtractionResult?: any;
-  metadata?: any;
 }

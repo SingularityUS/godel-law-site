@@ -3,7 +3,6 @@
  * useOutputPanel Hook
  * 
  * Purpose: Shared logic for output panel operations and state management
- * Enhanced to support immediate opening on pipeline execution start
  */
 
 import { useCallback, useState } from "react";
@@ -11,7 +10,6 @@ import { useCallback, useState } from "react";
 export const useOutputPanel = () => {
   const [output, setOutput] = useState<any>(null);
   const [isOutputOpen, setIsOutputOpen] = useState(false);
-  const [isPipelineExecuting, setIsPipelineExecuting] = useState(false);
 
   const formatOutput = useCallback((data: any): string => {
     if (typeof data === 'string') {
@@ -58,8 +56,6 @@ export const useOutputPanel = () => {
 
   const closeOutput = useCallback(() => {
     setIsOutputOpen(false);
-    setIsPipelineExecuting(false);
-    setOutput(null); // Clear output when closing
   }, []);
 
   const toggleOutput = useCallback(() => {
@@ -69,29 +65,11 @@ export const useOutputPanel = () => {
   const openOutput = useCallback((newOutput: any) => {
     setOutput(newOutput);
     setIsOutputOpen(true);
-    setIsPipelineExecuting(false);
-  }, []);
-
-  // Enhanced method to open sidebar immediately when pipeline starts
-  const openForPipelineExecution = useCallback(() => {
-    console.log('useOutputPanel: Opening sidebar for pipeline execution');
-    setIsPipelineExecuting(true);
-    setIsOutputOpen(true);
-    setOutput(null); // Clear previous output
-  }, []);
-
-  // Enhanced method to handle pipeline completion
-  const handlePipelineCompletion = useCallback((finalOutput: any) => {
-    console.log('useOutputPanel: Handling pipeline completion with output:', finalOutput);
-    setOutput(finalOutput);
-    setIsPipelineExecuting(false);
-    // Keep sidebar open
   }, []);
 
   return {
     output,
     isOutputOpen,
-    isPipelineExecuting,
     formatOutput,
     copyToClipboard,
     downloadAsFile,
@@ -100,8 +78,6 @@ export const useOutputPanel = () => {
     closeOutput,
     toggleOutput,
     openOutput,
-    openForPipelineExecution,
-    handlePipelineCompletion,
     setOutput
   };
 };

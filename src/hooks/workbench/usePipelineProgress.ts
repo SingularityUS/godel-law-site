@@ -11,17 +11,16 @@ export interface ProgressInfo {
   [nodeId: string]: {
     completed: number;
     total: number;
-    label?: string;
   };
 }
 
 export const usePipelineProgress = () => {
   const [progressInfo, setProgressInfo] = useState<ProgressInfo>({});
 
-  const updateProgress = useCallback((nodeId: string, completed: number, total: number, label?: string) => {
+  const updateProgress = useCallback((nodeId: string, completed: number, total: number) => {
     setProgressInfo(prev => ({
       ...prev,
-      [nodeId]: { completed, total, label }
+      [nodeId]: { completed, total }
     }));
   }, []);
 
