@@ -2,7 +2,7 @@
 /**
  * Markup Injection Utilities
  * 
- * Purpose: Core logic for injecting redline markup into content
+ * Purpose: Core logic for injecting redline markup into content while preserving HTML formatting
  */
 
 import { RedlineSuggestion } from "@/types/redlining";
@@ -42,7 +42,7 @@ const validateSuggestion = (suggestion: RedlineSuggestion, contentLength: number
 };
 
 /**
- * Applies a single suggestion to content
+ * Applies a single suggestion to content (works with both plain text and HTML)
  */
 const applySuggestion = (
   content: string,
@@ -66,10 +66,17 @@ const applySuggestion = (
 };
 
 /**
- * Converts content to HTML structure while preserving paragraph breaks
+ * Preserves existing HTML structure while adding paragraph tags only where needed
  */
-const convertToHtmlWithParagraphs = (content: string): string => {
-  // Split on double line breaks to identify paragraphs
+const preserveHtmlStructure = (content: string): string => {
+  // If content already has HTML structure, preserve it
+  if (/<[^>]+>/.test(content)) {
+    console.log('Content already has HTML structure, preserving it');
+    return content;
+  }
+  
+  // If it's plain text, convert to HTML with paragraph structure
+  console.log('Converting plain text to HTML with paragraph structure');
   const paragraphs = content.split('\n\n');
   
   return paragraphs
@@ -88,7 +95,7 @@ const convertToHtmlWithParagraphs = (content: string): string => {
 };
 
 /**
- * Processes all suggestions and applies them to content while preserving paragraph structure
+ * Processes all suggestions and applies them to content while preserving HTML formatting
  */
 export const processSuggestions = (
   content: string,
@@ -96,6 +103,7 @@ export const processSuggestions = (
   selectedId: string | null
 ): string => {
   console.log(`Processing ${suggestions.length} suggestions for markup injection`);
+  console.log('Content has HTML formatting:', /<[^>]+>/.test(content));
   
   // Filter and sort suggestions
   const validSuggestions = suggestions.filter(s => validateSuggestion(s, content.length));
@@ -105,7 +113,7 @@ export const processSuggestions = (
   
   let enhancedContent = content;
   
-  // Apply suggestions to the raw content first
+  // Apply suggestions to the content (whether plain text or HTML)
   sortedSuggestions.forEach((suggestion, index) => {
     try {
       enhancedContent = applySuggestion(enhancedContent, suggestion, selectedId);
@@ -115,9 +123,9 @@ export const processSuggestions = (
     }
   });
   
-  // Convert to HTML structure while preserving paragraph breaks
-  const htmlContent = convertToHtmlWithParagraphs(enhancedContent);
+  // Preserve HTML structure or convert to HTML if needed
+  const htmlContent = preserveHtmlStructure(enhancedContent);
   
-  console.log('Completed suggestion processing with paragraph preservation');
+  console.log('Completed suggestion processing with HTML formatting preservation');
   return htmlContent;
 };

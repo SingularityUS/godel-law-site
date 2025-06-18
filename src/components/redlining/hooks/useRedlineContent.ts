@@ -2,7 +2,7 @@
 /**
  * useRedlineContent Hook
  * 
- * Purpose: Manages loading and processing of redline content with controlled whitespace management
+ * Purpose: Manages loading and processing of redline content with enhanced document formatting
  */
 
 import { useEffect, useState } from "react";
@@ -30,38 +30,34 @@ export const useRedlineContent = ({
     const loadRichContent = async () => {
       setIsLoading(true);
       try {
-        console.log('Loading rich content with controlled whitespace management');
+        console.log('Loading rich content with enhanced document formatting');
         console.log('Document current content length:', document.currentContent.length);
         console.log('Document original content length:', document.originalContent.length);
         console.log('Suggestions count:', suggestions.length);
         
         let baseContent = '';
         
-        // PRIORITY: Use currentContent to preserve manual edits AND formatting
-        if (document.currentContent && document.currentContent.length > 0) {
-          console.log('Using document current content (preserves manual edits AND formatting)');
+        // PRIORITY 1: Use enhanced formatted content from original document
+        if (originalDocument?.preview) {
+          console.log('Extracting enhanced formatted content from original document');
+          try {
+            baseContent = await extractDocumentContent(originalDocument);
+            console.log('Successfully extracted enhanced formatted content');
+          } catch (error) {
+            console.warn('Failed to extract enhanced content, falling back to stored content:', error);
+            baseContent = document.currentContent || document.originalContent || '';
+          }
+        }
+        // FALLBACK 1: Use currentContent to preserve manual edits
+        else if (document.currentContent && document.currentContent.length > 0) {
+          console.log('Using document current content (preserves manual edits)');
           baseContent = document.currentContent;
-          
-          // Log formatting details for debugging
-          console.log('Current content formatting:', {
-            hasLineBreaks: baseContent.includes('\n'),
-            hasDoubleLineBreaks: baseContent.includes('\n\n'),
-            hasMultipleSpaces: baseContent.includes('  '),
-            startsWithWhitespace: /^\s/.test(baseContent),
-            endsWithWhitespace: /\s$/.test(baseContent)
-          });
         } 
-        // FALLBACK 1: Use originalContent (should have preserved formatting)
+        // FALLBACK 2: Use originalContent 
         else if (document.originalContent && document.originalContent.length > 0) {
-          console.log('Using document original content (preserves formatting)');
+          console.log('Using document original content');
           baseContent = document.originalContent;
         }
-        // FALLBACK 2: Extract from original document preview
-        else if (originalDocument?.preview) {
-          console.log('Using original document preview as fallback');
-          const content = await extractDocumentContent(originalDocument);
-          baseContent = content;
-        } 
         // FALLBACK 3: Error state
         else {
           console.log('No meaningful content found for redlining');
@@ -74,22 +70,17 @@ export const useRedlineContent = ({
           baseContent = 'No document content available for redlining.';
         }
         
+        console.log('Base content type:', typeof baseContent);
         console.log('Base content preview (first 200 chars):', JSON.stringify(baseContent.substring(0, 200)));
-        console.log('Base content formatting preserved:', {
-          totalLength: baseContent.length,
-          lineBreaks: (baseContent.match(/\n/g) || []).length,
-          paragraphBreaks: (baseContent.match(/\n\n/g) || []).length,
-          leadingSpaces: baseContent.match(/^\s*/)?.[0]?.length || 0,
-          trailingSpaces: baseContent.match(/\s*$/)?.[0]?.length || 0
-        });
+        console.log('Base content has HTML tags:', /<[^>]+>/.test(baseContent));
         
-        // Apply redline markup to the current content (preserving all formatting)
+        // Apply redline markup to the enhanced formatted content
         const enhancedContent = injectRedlineMarkup(baseContent, suggestions, selectedSuggestionId);
         setRichContent(enhancedContent);
         
       } catch (error) {
         console.error('Error loading rich content:', error);
-        // Use current content as absolute fallback to preserve manual edits and formatting
+        // Use current content as absolute fallback
         const fallbackContent = document.currentContent || document.originalContent || 'Error loading document content.';
         const enhancedContent = injectRedlineMarkup(fallbackContent, suggestions, selectedSuggestionId);
         setRichContent(enhancedContent);
