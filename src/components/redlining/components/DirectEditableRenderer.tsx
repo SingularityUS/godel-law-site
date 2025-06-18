@@ -24,7 +24,7 @@
  * 6. CursorPositionManager maintains cursor during updates
  */
 
-import React, { useRef, useEffect, useCallback } from "react";
+import React, { useRef, useEffect, useCallback, useState } from "react";
 import { RedlineDocument, RedlineSuggestion } from "@/types/redlining";
 import { useRedlineContent } from "../hooks/useRedlineContent";
 import RedlineStyles from "./RedlineStyles";
@@ -86,52 +86,98 @@ const DirectEditableRenderer: React.FC<DirectEditableRendererProps> = ({
   const editorRef = useRef<HTMLDivElement>(null);
   const { saveCursorPosition, restoreCursor } = useCursorPositionManager(editorRef);
   const lastRichContentRef = useRef<string>('');
+  const [isUserTyping, setIsUserTyping] = useState(false);
+  const [pendingContentUpdate, setPendingContentUpdate] = useState<string | null>(null);
 
   /**
-   * Optimized content synchronization with conflict prevention
+   * Smart content synchronization that prevents screen jumping during typing
    * 
-   * Update Strategy:
-   * 1. Only update if content has significantly changed
-   * 2. Save cursor position before update
-   * 3. Update the HTML content with new redline markup
-   * 4. Restore cursor to approximately the same location
-   * 5. Add debouncing to prevent rapid successive updates
+   * Strategy:
+   * 1. Skip innerHTML updates during active typing sessions
+   * 2. Only update when redline markup actually changes
+   * 3. Debounce updates to prevent rapid successive changes
+   * 4. Queue content updates if user is actively typing
    */
   useEffect(() => {
     if (!editorRef.current) return;
     
-    // Only update if content has actually changed significantly
-    if (richContent !== lastRichContentRef.current && richContent !== editorRef.current.innerHTML) {
-      console.log('Synchronizing rich content update');
-      console.log('Rich content changed from', lastRichContentRef.current.length, 'to', richContent.length, 'chars');
+    // Skip updates during active typing to prevent screen jumping
+    if (isUserTyping) {
+      console.log('User is typing, queuing content update');
+      setPendingContentUpdate(richContent);
+      return;
+    }
+    
+    // Only update if content has significantly changed
+    const hasSignificantChange = richContent !== lastRichContentRef.current && 
+                                richContent !== editorRef.current.innerHTML;
+    
+    if (hasSignificantChange) {
+      console.log('Applying queued content update');
       
-      // Save cursor position before content update
-      saveCursorPosition();
+      // Save cursor position only for markup changes
+      const hasMarkupChange = richContent.includes('redline-suggestion') || 
+                             lastRichContentRef.current.includes('redline-suggestion');
+      
+      if (hasMarkupChange) {
+        saveCursorPosition();
+      }
       
       // Update content with new redline markup
       editorRef.current.innerHTML = richContent;
       lastRichContentRef.current = richContent;
       
-      // Restore cursor position after update
-      setTimeout(() => {
-        console.log('Restoring cursor position after content sync');
-        restoreCursor();
-      }, 0);
+      // Restore cursor only if we saved it
+      if (hasMarkupChange) {
+        setTimeout(() => {
+          console.log('Restoring cursor after markup change');
+          restoreCursor();
+        }, 0);
+      }
     }
-  }, [richContent, saveCursorPosition, restoreCursor]);
+    
+    // Clear pending update
+    setPendingContentUpdate(null);
+  }, [richContent, isUserTyping, saveCursorPosition, restoreCursor]);
 
   /**
-   * Handles content changes from direct user editing with improved debouncing
+   * Apply pending content updates when user stops typing
+   */
+  useEffect(() => {
+    if (!isUserTyping && pendingContentUpdate && editorRef.current) {
+      console.log('User stopped typing, applying pending update');
+      
+      if (pendingContentUpdate !== editorRef.current.innerHTML) {
+        editorRef.current.innerHTML = pendingContentUpdate;
+        lastRichContentRef.current = pendingContentUpdate;
+      }
+      
+      setPendingContentUpdate(null);
+    }
+  }, [isUserTyping, pendingContentUpdate]);
+
+  /**
+   * Handles content changes from direct user editing with improved typing detection
    * 
    * Processing Flow:
    * 1. Receives plain text from ContentEditableCore
-   * 2. Validates content has actually changed
+   * 2. Sets typing state to prevent content synchronization conflicts
    * 3. Forwards to parent component for document state update
-   * 4. Parent will trigger re-render with updated redline positions
+   * 4. Debounces typing state reset to allow smooth continuous typing
    */
   const handleContentChange = useCallback((newContent: string) => {
     console.log('DirectEditableRenderer: Content change received, length:', newContent.length);
+    
+    // Mark user as actively typing
+    setIsUserTyping(true);
+    
+    // Forward content change to parent
     onContentChange(newContent);
+    
+    // Reset typing state after a delay to allow for continuous typing
+    setTimeout(() => {
+      setIsUserTyping(false);
+    }, 1000); // 1 second delay to allow for continuous typing
   }, [onContentChange]);
 
   /**

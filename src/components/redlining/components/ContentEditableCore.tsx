@@ -51,6 +51,7 @@ const ContentEditableCore = forwardRef<HTMLDivElement, ContentEditableCoreProps>
 }, ref) => {
   const [isComposing, setIsComposing] = useState(false);
   const lastContentRef = useRef<string>('');
+  const changeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   /**
    * Extracts plain text from HTML while preserving redline suggestions
@@ -79,32 +80,43 @@ const ContentEditableCore = forwardRef<HTMLDivElement, ContentEditableCoreProps>
   }, []);
 
   /**
-   * Handles content changes from direct editing with debouncing
+   * Handles content changes with improved debouncing for smooth typing
    * 
    * Debouncing Strategy:
    * - Only processes changes when not composing (important for international keyboards)
+   * - Uses timeout to batch rapid keystrokes together
    * - Compares against last known content to prevent unnecessary updates
    * - Extracts plain text to send clean content to parent components
    */
   const handleContentChange = useCallback(() => {
+    if (isComposing) return;
+    
     const editorElement = ref && 'current' in ref ? ref.current : null;
-    if (!editorElement || isComposing) return;
+    if (!editorElement) return;
 
-    const currentHtml = editorElement.innerHTML;
-    const plainText = extractPlainText(currentHtml);
-    
-    console.log('Content change detected:', { 
-      plainTextLength: plainText.length, 
-      lastContentLength: lastContentRef.current.length,
-      isComposing 
-    });
-    
-    // Only trigger change if content actually changed
-    if (plainText !== lastContentRef.current) {
-      lastContentRef.current = plainText;
-      console.log('Triggering content change callback');
-      onContentChange(plainText);
+    // Clear existing timeout to debounce rapid changes
+    if (changeTimeoutRef.current) {
+      clearTimeout(changeTimeoutRef.current);
     }
+
+    // Debounce content changes to prevent excessive updates during typing
+    changeTimeoutRef.current = setTimeout(() => {
+      const currentHtml = editorElement.innerHTML;
+      const plainText = extractPlainText(currentHtml);
+      
+      console.log('Content change processed:', { 
+        plainTextLength: plainText.length, 
+        lastContentLength: lastContentRef.current.length,
+        isComposing 
+      });
+      
+      // Only trigger change if content actually changed
+      if (plainText !== lastContentRef.current) {
+        lastContentRef.current = plainText;
+        console.log('Triggering debounced content change callback');
+        onContentChange(plainText);
+      }
+    }, 100); // 100ms debounce for smooth typing
   }, [extractPlainText, onContentChange, isComposing, ref]);
 
   /**
