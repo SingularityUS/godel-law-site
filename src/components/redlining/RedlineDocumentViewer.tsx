@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -83,9 +82,9 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
   }, [tooltipState]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-white">
+    <div className="fixed inset-0 z-50 bg-white flex flex-col">
       <Card className="h-full flex flex-col border-0 rounded-none">
-        <CardHeader className="border-b bg-gray-50">
+        <CardHeader className="border-b bg-gray-50 flex-shrink-0">
           <div className="flex items-center justify-between">
             <CardTitle className="text-xl font-semibold">
               Document Redlining - {currentDoc.metadata.fileName}
@@ -103,26 +102,24 @@ const RedlineDocumentViewer: React.FC<RedlineDocumentViewerProps> = ({
           </div>
         </CardHeader>
         
-        <CardContent className="flex-1 flex p-0">
+        <CardContent className="flex-1 flex p-0 overflow-hidden">
           {/* Main document area */}
-          <div className={`flex-1 ${showSidebar ? 'mr-80' : ''} transition-all duration-200`}>
-            <ScrollArea className="h-full">
-              <div className="p-6">
-                <EnhancedDocumentRenderer
-                  document={currentDoc}
-                  originalDocument={originalDocument || { type: 'text/plain' }}
-                  suggestions={filteredSuggestions}
-                  selectedSuggestionId={redlineState.selectedSuggestionId}
-                  onSuggestionClick={handleSuggestionClick}
-                />
-              </div>
-            </ScrollArea>
+          <div className={`flex-1 ${showSidebar ? 'mr-80' : ''} transition-all duration-200 overflow-hidden`}>
+            <div className="h-full overflow-y-auto">
+              <EnhancedDocumentRenderer
+                document={currentDoc}
+                originalDocument={originalDocument || { type: 'text/plain' }}
+                suggestions={filteredSuggestions}
+                selectedSuggestionId={redlineState.selectedSuggestionId}
+                onSuggestionClick={handleSuggestionClick}
+              />
+            </div>
           </div>
           
           {/* Sidebar */}
           {showSidebar && (
-            <div className="w-80 border-l bg-gray-50 flex flex-col">
-              <div className="p-4 border-b bg-white">
+            <div className="w-80 border-l bg-gray-50 flex flex-col flex-shrink-0">
+              <div className="p-4 border-b bg-white flex-shrink-0">
                 <h3 className="font-semibold text-lg text-gray-800">
                   Suggestions ({pendingSuggestions.length})
                 </h3>

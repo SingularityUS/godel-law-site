@@ -1,3 +1,4 @@
+
 /**
  * Enhanced Document Renderer Component
  * 
@@ -136,21 +137,46 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
     });
     
     // Convert plain text formatting to HTML while preserving redlines
-    enhancedContent = preserveFormattingAsHtml(enhancedContent);
+    enhancedContent = convertTextToHtml(enhancedContent);
     
     console.log('Redline markup injection complete');
     return enhancedContent;
   };
 
   /**
-   * Converts plain text to HTML while preserving redline markup
+   * Converts plain text to HTML while preserving existing HTML markup
    */
-  const preserveFormattingAsHtml = (content: string): string => {
-    // Convert line breaks to HTML, but be careful not to break redline markup
-    return content
-      .split('\n')
-      .map(line => line.trim() === '' ? '<br>' : `<p>${line}</p>`)
-      .join('');
+  const convertTextToHtml = (content: string): string => {
+    console.log('Converting text to HTML, preserving existing markup');
+    
+    // Check if content already contains HTML elements (redline spans)
+    const hasHtmlMarkup = /<span[^>]*class="redline-suggestion"/.test(content);
+    
+    if (!hasHtmlMarkup) {
+      // Plain text - convert line breaks to paragraphs
+      return content
+        .split('\n')
+        .map(line => line.trim() === '' ? '<br>' : `<p>${line}</p>`)
+        .join('');
+    }
+    
+    // Content has HTML markup - preserve it and only convert non-markup text
+    const lines = content.split('\n');
+    const htmlLines = lines.map(line => {
+      if (line.trim() === '') {
+        return '<br>';
+      }
+      
+      // If line contains redline markup, preserve it
+      if (/<span[^>]*class="redline-suggestion"/.test(line)) {
+        return `<p>${line}</p>`;
+      }
+      
+      // Plain text line - wrap in paragraph
+      return `<p>${line}</p>`;
+    });
+    
+    return htmlLines.join('');
   };
 
   /**
@@ -205,7 +231,7 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-96">
+      <div className="flex items-center justify-center py-16">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading document with redlines...</p>
@@ -278,10 +304,10 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
   `;
 
   return (
-    <div className="bg-gray-100 min-h-full">
+    <div className="bg-gray-100 w-full h-full overflow-y-auto">
       <style dangerouslySetInnerHTML={{ __html: redlineStyles }} />
       <div className="max-w-4xl mx-auto py-8 px-4">
-        <div className="bg-white shadow-lg p-16 relative min-h-[800px]">
+        <div className="bg-white shadow-lg p-16 relative">
           <div 
             className="prose prose-sm max-w-none"
             style={{
