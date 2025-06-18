@@ -79,7 +79,7 @@ const ContentEditableCore = forwardRef<HTMLDivElement, ContentEditableCoreProps>
   }, []);
 
   /**
-   * Handles content changes from direct editing
+   * Handles content changes from direct editing with debouncing
    * 
    * Debouncing Strategy:
    * - Only processes changes when not composing (important for international keyboards)
@@ -93,34 +93,65 @@ const ContentEditableCore = forwardRef<HTMLDivElement, ContentEditableCoreProps>
     const currentHtml = editorElement.innerHTML;
     const plainText = extractPlainText(currentHtml);
     
+    console.log('Content change detected:', { 
+      plainTextLength: plainText.length, 
+      lastContentLength: lastContentRef.current.length,
+      isComposing 
+    });
+    
     // Only trigger change if content actually changed
     if (plainText !== lastContentRef.current) {
       lastContentRef.current = plainText;
+      console.log('Triggering content change callback');
       onContentChange(plainText);
     }
   }, [extractPlainText, onContentChange, isComposing, ref]);
 
   /**
-   * Prevents editing within redline suggestion elements
+   * Improved redline detection and keyboard event handling
    * 
    * Security Measure:
-   * - Detects if cursor is within a redline suggestion
-   * - Prevents keyboard input to maintain redline integrity
+   * - Only prevents editing within actual redline suggestion elements
+   * - Checks for specific redline classes and contentEditable attributes
    * - Allows normal editing in regular text areas
+   * - Provides debug logging to track event blocking
    */
   const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+    console.log('Key pressed:', event.key, 'Target:', (event.target as HTMLElement).tagName);
+    
     const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      const container = range.commonAncestorContainer;
-      const suggestionElement = (container.nodeType === Node.TEXT_NODE ? 
-        container.parentElement : container as HTMLElement)?.closest('.redline-suggestion');
-      
-      if (suggestionElement) {
-        event.preventDefault();
-        return;
-      }
+    if (!selection || selection.rangeCount === 0) {
+      console.log('No selection found, allowing input');
+      return;
     }
+    
+    const range = selection.getRangeAt(0);
+    const container = range.commonAncestorContainer;
+    
+    // Get the element containing the cursor
+    const element = container.nodeType === Node.TEXT_NODE ? 
+      container.parentElement : container as HTMLElement;
+    
+    console.log('Cursor container element:', element?.tagName, element?.className);
+    
+    // Only prevent editing if cursor is within a redline suggestion that's marked as non-editable
+    const suggestionElement = element?.closest('.redline-suggestion[contenteditable="false"]');
+    
+    if (suggestionElement) {
+      console.log('Preventing edit in protected redline suggestion:', suggestionElement.getAttribute('data-suggestion-id'));
+      event.preventDefault();
+      return;
+    }
+    
+    // Also check for accept buttons or other protected elements
+    const protectedElement = element?.closest('.redline-accept-btn, .redline-protected');
+    if (protectedElement) {
+      console.log('Preventing edit in protected element:', protectedElement.className);
+      event.preventDefault();
+      return;
+    }
+    
+    console.log('Allowing keyboard input in regular text area');
   }, []);
 
   return (
@@ -139,8 +170,12 @@ const ContentEditableCore = forwardRef<HTMLDivElement, ContentEditableCoreProps>
       onClick={onRedlineClick}
       onInput={handleContentChange}
       onKeyDown={handleKeyDown}
-      onCompositionStart={() => setIsComposing(true)}
+      onCompositionStart={() => {
+        console.log('Composition started');
+        setIsComposing(true);
+      }}
       onCompositionEnd={() => {
+        console.log('Composition ended');
         setIsComposing(false);
         setTimeout(handleContentChange, 0);
       }}

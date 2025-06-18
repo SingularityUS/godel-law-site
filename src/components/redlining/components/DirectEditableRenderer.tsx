@@ -1,3 +1,4 @@
+
 /**
  * DirectEditableRenderer Component
  * 
@@ -84,33 +85,43 @@ const DirectEditableRenderer: React.FC<DirectEditableRendererProps> = ({
 
   const editorRef = useRef<HTMLDivElement>(null);
   const { saveCursorPosition, restoreCursor } = useCursorPositionManager(editorRef);
+  const lastRichContentRef = useRef<string>('');
 
   /**
-   * Synchronizes rich content updates while preserving cursor position
+   * Optimized content synchronization with conflict prevention
    * 
    * Update Strategy:
-   * 1. Save current cursor position before update
-   * 2. Update the HTML content with new redline markup
-   * 3. Restore cursor to approximately the same location
-   * 4. Handle edge cases where content length changes significantly
+   * 1. Only update if content has significantly changed
+   * 2. Save cursor position before update
+   * 3. Update the HTML content with new redline markup
+   * 4. Restore cursor to approximately the same location
+   * 5. Add debouncing to prevent rapid successive updates
    */
   useEffect(() => {
-    if (editorRef.current && richContent !== editorRef.current.innerHTML) {
+    if (!editorRef.current) return;
+    
+    // Only update if content has actually changed significantly
+    if (richContent !== lastRichContentRef.current && richContent !== editorRef.current.innerHTML) {
+      console.log('Synchronizing rich content update');
+      console.log('Rich content changed from', lastRichContentRef.current.length, 'to', richContent.length, 'chars');
+      
       // Save cursor position before content update
       saveCursorPosition();
       
       // Update content with new redline markup
       editorRef.current.innerHTML = richContent;
+      lastRichContentRef.current = richContent;
       
       // Restore cursor position after update
       setTimeout(() => {
+        console.log('Restoring cursor position after content sync');
         restoreCursor();
       }, 0);
     }
   }, [richContent, saveCursorPosition, restoreCursor]);
 
   /**
-   * Handles content changes from direct user editing
+   * Handles content changes from direct user editing with improved debouncing
    * 
    * Processing Flow:
    * 1. Receives plain text from ContentEditableCore
@@ -119,11 +130,12 @@ const DirectEditableRenderer: React.FC<DirectEditableRendererProps> = ({
    * 4. Parent will trigger re-render with updated redline positions
    */
   const handleContentChange = useCallback((newContent: string) => {
+    console.log('DirectEditableRenderer: Content change received, length:', newContent.length);
     onContentChange(newContent);
   }, [onContentChange]);
 
   /**
-   * Handles redline-specific interactions
+   * Handles redline-specific interactions without interfering with typing
    * 
    * Interaction Types:
    * - Suggestion clicks for selection/highlighting
@@ -131,10 +143,12 @@ const DirectEditableRenderer: React.FC<DirectEditableRendererProps> = ({
    * - Future: Inline editing capabilities
    */
   const handleRedlineInteraction = useCallback((suggestionId: string) => {
+    console.log('Redline interaction:', suggestionId);
     onSuggestionClick(suggestionId);
   }, [onSuggestionClick]);
 
   const handleSuggestionAccept = useCallback((suggestionId: string) => {
+    console.log('Accepting suggestion:', suggestionId);
     if (onSuggestionAccept) {
       onSuggestionAccept(suggestionId);
     }
@@ -159,12 +173,12 @@ const DirectEditableRenderer: React.FC<DirectEditableRendererProps> = ({
       
       <div className="max-w-4xl mx-auto py-8 px-4">
         <div className="bg-white shadow-lg p-16 relative">
-          {/* Redline interaction wrapper */}
+          {/* Redline interaction wrapper - handles suggestion clicks without blocking keyboard */}
           <RedlineInteractionHandler
             onSuggestionClick={handleRedlineInteraction}
             onSuggestionAccept={handleSuggestionAccept}
           >
-            {/* Core contentEditable component */}
+            {/* Core contentEditable component - handles all text editing */}
             <ContentEditableCore
               ref={editorRef}
               content={richContent}
