@@ -1,35 +1,25 @@
 
-import React, { useState, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { X, ChevronRight, ChevronLeft } from "lucide-react";
-import { RedlineDocument } from "@/types/redlining";
-import EmbeddedRedlineViewer from "@/components/redlining/EmbeddedRedlineViewer";
-import { useRedlineDataTransform } from "@/hooks/redlining/useRedlineDataTransform";
+import React from "react";
 import { useWorkspaceSidebarState } from "@/hooks/workbench/useWorkspaceSidebarState";
-import { toast } from "@/hooks/use-toast";
-import LegalSummaryTab from "./output/LegalSummaryTab";
-import LegalAnalysisTab from "./output/LegalAnalysisTab";
-import GrammarAnalysisTab from "./output/GrammarAnalysisTab";
-import RawDataTab from "./output/RawDataTab";
+import { useRedlineGeneration } from "@/hooks/workbench/useRedlineGeneration";
+import WorkspaceSidebarHeader from "./sidebar/WorkspaceSidebarHeader";
+import SidebarTabsContent from "./sidebar/SidebarTabsContent";
 
 /**
  * WorkspaceSidebar Component
  * 
  * Purpose: Integrated sidebar for pipeline results and redlining
- * Refactored to use focused state management hooks
+ * Refactored to use smaller, focused components and hooks
  * 
  * Key Responsibilities:
- * - Displays pipeline results in organized tabs
- * - Provides redline document generation and editing
- * - Manages sidebar visibility and resize states
+ * - Orchestrates sidebar layout and behavior
  * - Integrates with pipeline output data
+ * - Provides redline document generation and editing
  * 
  * Architecture:
- * - Uses focused state management hook
- * - Maintains existing functionality with better organization
- * - Provides clear separation between UI and business logic
+ * - Uses focused state management and generation hooks
+ * - Delegates UI rendering to specialized components
+ * - Maintains clean separation of concerns
  */
 
 interface WorkspaceSidebarProps {
@@ -45,193 +35,48 @@ const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   onClose,
   onToggle
 }) => {
-  const [redlineDocument, setRedlineDocument] = useState<RedlineDocument | null>(null);
-  const { transformGrammarData } = useRedlineDataTransform();
-  
   // Use focused state management hook
   const {
     activeTab,
     setActiveTab,
-    isGeneratingRedline,
-    toggleGeneratingRedline,
     isLegalPipeline
   } = useWorkspaceSidebarState(output);
 
-  // Generate redline document when output is available
-  React.useEffect(() => {
-    if (output && isLegalPipeline && !redlineDocument && !isGeneratingRedline) {
-      toggleGeneratingRedline(true);
-      try {
-        console.log('Generating redline document from output:', output);
-        console.log('Output structure:', {
-          hasOutput: !!output.output,
-          hasAnalysis: !!output.output?.analysis,
-          hasFinalOutput: !!output.finalOutput,
-          finalOutputStructure: output.finalOutput ? Object.keys(output.finalOutput) : [],
-          outputKeys: Object.keys(output)
-        });
-        
-        // Try multiple data sources for redline transformation
-        let transformResult = null;
-        
-        // First try: direct output
-        if (output.output?.analysis) {
-          transformResult = transformGrammarData(output);
-        }
-        
-        // Second try: finalOutput
-        if (!transformResult && output.finalOutput?.output?.analysis) {
-          transformResult = transformGrammarData(output.finalOutput);
-        }
-        
-        // Third try: nested finalOutput
-        if (!transformResult && output.finalOutput?.finalOutput?.output?.analysis) {
-          transformResult = transformGrammarData(output.finalOutput.finalOutput);
-        }
-        
-        if (transformResult) {
-          setRedlineDocument(transformResult);
-          console.log('Redline document generated successfully');
-        } else {
-          console.warn('Failed to generate redline document - no valid analysis data found');
-          console.log('Available data paths checked:', [
-            'output.output.analysis',
-            'output.finalOutput.output.analysis', 
-            'output.finalOutput.finalOutput.output.analysis'
-          ]);
-        }
-      } catch (error) {
-        console.error('Error generating redline document:', error);
-        toast({
-          title: "Warning",
-          description: "Could not generate redline document",
-          variant: "destructive"
-        });
-      } finally {
-        toggleGeneratingRedline(false);
-      }
-    }
-  }, [output, isLegalPipeline, redlineDocument, isGeneratingRedline, transformGrammarData, toggleGeneratingRedline]);
-
-  const handleSaveRedline = useCallback((document: RedlineDocument) => {
-    console.log('Saving redline document:', document);
-    setRedlineDocument(document);
-    toast({
-      title: "Success",
-      description: "Redline document saved successfully"
-    });
-  }, []);
-
-  const handleExportRedline = useCallback((document: RedlineDocument, format: string) => {
-    console.log(`Exporting redline document in ${format} format:`, document);
-    toast({
-      title: "Success",
-      description: `Redline document exported in ${format} format`
-    });
-  }, []);
+  // Use redline generation hook
+  const {
+    redlineDocument,
+    isGeneratingRedline,
+    handleSaveRedline,
+    handleExportRedline
+  } = useRedlineGeneration({
+    output,
+    isLegalPipeline
+  });
 
   if (!output) return null;
 
-  // Handle collapsed state for resizable layout
-  if (!isOpen) {
-    return (
-      <div className="w-12 flex flex-col border-l bg-white h-full">
-        <div className="flex items-center justify-center p-4 border-b bg-gray-50">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onToggle}
-            className="flex items-center gap-2"
-          >
-            <ChevronLeft size={16} />
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col border-l bg-white h-full">
-      {/* Sidebar Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-gray-50 flex-shrink-0">
-        <h3 className="font-semibold text-gray-800">Pipeline Results</h3>
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          <X size={16} />
-        </Button>
-      </div>
+      <WorkspaceSidebarHeader 
+        isOpen={isOpen}
+        onClose={onClose}
+        onToggle={onToggle}
+      />
 
-      {/* Sidebar Content */}
-      <div className="flex-1 overflow-hidden">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-          <TabsList className="grid w-full grid-cols-5 shrink-0 m-2">
-            <TabsTrigger value="redline">Redline</TabsTrigger>
-            <TabsTrigger value="summary">Summary</TabsTrigger>
-            <TabsTrigger value="analysis">Analysis</TabsTrigger>
-            <TabsTrigger value="grammar">Grammar</TabsTrigger>
-            <TabsTrigger value="raw">Raw Data</TabsTrigger>
-          </TabsList>
-
-          <div className="flex-1 overflow-hidden">
-            <TabsContent value="redline" className="h-full m-0">
-              {isGeneratingRedline ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Generating redline document...</p>
-                  </div>
-                </div>
-              ) : redlineDocument ? (
-                <EmbeddedRedlineViewer
-                  document={redlineDocument}
-                  originalDocument={{
-                    type: output.metadata?.fileType || 'text/plain',
-                    preview: output.metadata?.originalPreview,
-                    name: output.metadata?.fileName || 'Document'
-                  }}
-                  onSave={handleSaveRedline}
-                  onExport={handleExportRedline}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full p-6">
-                  <div className="text-center">
-                    <p className="text-gray-600 mb-2">No redline document available</p>
-                    <p className="text-sm text-gray-500">
-                      {isLegalPipeline 
-                        ? "Unable to generate redline from current pipeline output"
-                        : "Run a legal document analysis pipeline to generate redline suggestions"
-                      }
-                    </p>
-                    {isLegalPipeline && (
-                      <div className="mt-4 p-3 bg-yellow-50 rounded border text-xs text-left">
-                        <p className="font-medium text-yellow-800 mb-1">Debug Info:</p>
-                        <p className="text-yellow-700">Pipeline Type: {output?.summary?.pipelineType || 'Unknown'}</p>
-                        <p className="text-yellow-700">Has Analysis: {!!output?.output?.analysis ? 'Yes' : 'No'}</p>
-                        <p className="text-yellow-700">Analysis Items: {output?.output?.analysis?.length || 0}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="summary" className="h-full m-0 overflow-auto">
-              <LegalSummaryTab output={output} />
-            </TabsContent>
-
-            <TabsContent value="analysis" className="h-full m-0 overflow-auto">
-              <LegalAnalysisTab output={output} />
-            </TabsContent>
-
-            <TabsContent value="grammar" className="h-full m-0 overflow-auto">
-              <GrammarAnalysisTab result={output} />
-            </TabsContent>
-
-            <TabsContent value="raw" className="h-full m-0 overflow-auto">
-              <RawDataTab output={output} />
-            </TabsContent>
-          </div>
-        </Tabs>
-      </div>
+      {isOpen && (
+        <div className="flex-1 overflow-hidden">
+          <SidebarTabsContent
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            isGeneratingRedline={isGeneratingRedline}
+            redlineDocument={redlineDocument}
+            isLegalPipeline={isLegalPipeline}
+            output={output}
+            onSaveRedline={handleSaveRedline}
+            onExportRedline={handleExportRedline}
+          />
+        </div>
+      )}
     </div>
   );
 };
