@@ -59,35 +59,58 @@ export const createCitationFinderProcessor = (callChatGPT: ReturnType<typeof use
     console.log('=== CITATION FINDER PROCESSOR ===');
     console.log('Input data structure:', typeof inputData, inputData ? Object.keys(inputData) : 'null');
     
-    // Extract text content from various input formats
+    // Extract text content from various input formats - IMPROVED HANDLING
     let textContent = '';
     let paragraphs: any[] = [];
     
+    // Handle structured paragraph output from paragraph splitter
     if (inputData?.output?.paragraphs && Array.isArray(inputData.output.paragraphs)) {
-      // From paragraph splitter output
       paragraphs = inputData.output.paragraphs;
       textContent = paragraphs.map(p => p.content || p.text || '').join('\n\n');
-      console.log(`Processing ${paragraphs.length} paragraphs from paragraph splitter`);
-    } else if (inputData?.paragraphs && Array.isArray(inputData.paragraphs)) {
-      // Direct paragraphs array
+      console.log(`Processing ${paragraphs.length} paragraphs from paragraph splitter output`);
+    } 
+    // Handle direct paragraphs array
+    else if (inputData?.paragraphs && Array.isArray(inputData.paragraphs)) {
       paragraphs = inputData.paragraphs;
       textContent = paragraphs.map(p => p.content || p.text || '').join('\n\n');
       console.log(`Processing ${paragraphs.length} paragraphs directly`);
-    } else if (inputData?.content && typeof inputData.content === 'string') {
-      // Raw text content
+    } 
+    // Handle string content from content property
+    else if (inputData?.content && typeof inputData.content === 'string') {
       textContent = inputData.content;
-      console.log('Processing raw text content');
-    } else if (typeof inputData === 'string') {
-      // Direct string input
+      console.log('Processing content from inputData.content');
+    } 
+    // Handle direct string input
+    else if (typeof inputData === 'string') {
       textContent = inputData;
       console.log('Processing direct string input');
-    } else {
-      console.warn('No suitable text content found for citation analysis');
-      return createEmptyCitationResult();
+    }
+    // Handle case where inputData has text but different structure
+    else if (inputData && typeof inputData === 'object') {
+      // Try to find text content in any reasonable property
+      const possibleTextFields = ['text', 'processableContent', 'originalContent'];
+      for (const field of possibleTextFields) {
+        if (inputData[field] && typeof inputData[field] === 'string') {
+          textContent = inputData[field];
+          console.log(`Processing text from inputData.${field}`);
+          break;
+        }
+      }
+      
+      // If still no text found, try to extract from nested structures
+      if (!textContent && inputData.output) {
+        const output = inputData.output;
+        if (output.paragraphs && Array.isArray(output.paragraphs)) {
+          paragraphs = output.paragraphs;
+          textContent = paragraphs.map(p => p.content || p.text || '').join('\n\n');
+          console.log(`Processing ${paragraphs.length} paragraphs from nested output structure`);
+        }
+      }
     }
     
     if (!textContent || textContent.trim().length === 0) {
-      console.warn('Empty text content for citation analysis');
+      console.warn('No suitable text content found for citation analysis');
+      console.log('Available input data keys:', inputData ? Object.keys(inputData) : 'none');
       return createEmptyCitationResult();
     }
     
@@ -191,15 +214,22 @@ export const createCitationFinderProcessor = (callChatGPT: ReturnType<typeof use
   };
 };
 
-function createEmptyCitationResult(): CitationFinderOutput {
+function createEmptyCitationResult(): { success: true; output: CitationFinderOutput; metadata: any } {
   return {
-    citations: [],
-    summary: {
-      totalCitations: 0,
-      caseCount: 0,
-      statuteCount: 0,
-      incompleteCount: 0
+    success: true,
+    output: {
+      citations: [],
+      summary: {
+        totalCitations: 0,
+        caseCount: 0,
+        statuteCount: 0,
+        incompleteCount: 0
+      },
+      redlineSuggestions: []
     },
-    redlineSuggestions: []
+    metadata: {
+      moduleType: 'citation-finder',
+      timestamp: new Date().toISOString()
+    }
   };
 }
