@@ -47,11 +47,16 @@ const PipelineExecutionButton: React.FC<PipelineExecutionButtonProps> = ({
   const isValid = validatePipeline();
 
   const handleExecute = () => {
+    console.log('🚀 PipelineExecutionButton: handleExecute called');
+    
     // Emit pipeline start event for immediate sidebar opening
+    console.log('📡 PipelineExecutionButton: Emitting pipelineExecutionStart event');
     const event = new CustomEvent('pipelineExecutionStart');
     window.dispatchEvent(event);
+    console.log('✅ PipelineExecutionButton: pipelineExecutionStart event dispatched');
     
     // Execute the pipeline
+    console.log('⚡ PipelineExecutionButton: Calling onExecute');
     onExecute();
   };
 

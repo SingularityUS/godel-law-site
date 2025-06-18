@@ -74,10 +74,12 @@ export const useOutputPanel = () => {
   }, []);
 
   const startProcessing = useCallback((document: any) => {
+    console.log('🔄 useOutputPanel: startProcessing called with document:', document?.name);
     setProcessingDocument(document);
     setIsProcessing(true);
     setOutput(null);
     setIsOutputOpen(true);
+    console.log('🔄 useOutputPanel: Sidebar should now be open for processing');
   }, []);
 
   return {
