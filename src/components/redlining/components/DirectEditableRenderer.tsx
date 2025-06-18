@@ -24,7 +24,7 @@ interface DirectEditableRendererProps {
 }
 
 const DirectEditableRenderer: React.FC<DirectEditableRendererProps> = ({
-  document,
+  document: redlineDocument,
   originalDocument,
   suggestions,
   selectedSuggestionId,
@@ -35,7 +35,7 @@ const DirectEditableRenderer: React.FC<DirectEditableRendererProps> = ({
   onContentChange
 }) => {
   const { richContent, isLoading } = useRedlineContent({
-    document,
+    document: redlineDocument,
     originalDocument,
     suggestions,
     selectedSuggestionId
@@ -47,7 +47,7 @@ const DirectEditableRenderer: React.FC<DirectEditableRendererProps> = ({
 
   // Extract plain text from HTML content
   const extractPlainText = useCallback((htmlContent: string): string => {
-    const tempDiv = document.createElement('div');
+    const tempDiv = window.document.createElement('div');
     tempDiv.innerHTML = htmlContent;
     
     // Remove redline markup but preserve the suggested text
@@ -55,7 +55,7 @@ const DirectEditableRenderer: React.FC<DirectEditableRendererProps> = ({
     redlineSuggestions.forEach(suggestion => {
       const suggestedText = suggestion.querySelector('.suggested-text');
       if (suggestedText) {
-        const textNode = document.createTextNode(suggestedText.textContent || '');
+        const textNode = window.document.createTextNode(suggestedText.textContent || '');
         suggestion.parentNode?.replaceChild(textNode, suggestion);
       }
     });
@@ -149,7 +149,7 @@ const DirectEditableRenderer: React.FC<DirectEditableRendererProps> = ({
       // Restore cursor position
       if (cursorPosition > 0) {
         try {
-          const walker = document.createTreeWalker(
+          const walker = window.document.createTreeWalker(
             editorRef.current,
             NodeFilter.SHOW_TEXT,
             null
@@ -162,7 +162,7 @@ const DirectEditableRenderer: React.FC<DirectEditableRendererProps> = ({
             const nodeLength = textNode.textContent?.length || 0;
             if (currentPos + nodeLength >= cursorPosition) {
               const offset = cursorPosition - currentPos;
-              const newRange = document.createRange();
+              const newRange = window.document.createRange();
               newRange.setStart(textNode, Math.min(offset, nodeLength));
               newRange.collapse(true);
               selection?.removeAllRanges();
