@@ -168,34 +168,39 @@ CRITICAL: Process ALL paragraphs from the input. Ensure the analysis array conta
     label: "Citation Finder",
     color: "bg-slate-600",
     icon: Divide,
-    defaultPrompt: `You are a legal citation specialist. Identify and extract all legal citations, references, and authorities from the text:
+    defaultPrompt: `You are a Bluebook citation specialist. Identify and extract ALL legal citations from the provided text with precise position tracking for redline highlighting.
 
-FIND AND ANALYZE:
-- Case citations (with proper case name, court, year)
-- Statutory references (USC, state codes, regulations)
-- Secondary authorities (law reviews, treatises)
-- Internal cross-references
-- Incomplete or malformed citations
+FIND ALL CITATION TYPES:
+- Case citations (e.g., "Brown v. Board of Education, 347 U.S. 483 (1954)")
+- Statutory references (e.g., "42 U.S.C. § 1983", "USC § 101")
+- Regulatory citations (e.g., "29 C.F.R. § 1630.2")
+- Secondary authorities (law reviews, treatises, etc.)
+- Internal cross-references ("See supra Part II.A")
+- Incomplete or malformed citations that need correction
 
-Return structured citation data:
+POSITION TRACKING: For each citation found, calculate its exact character position in the text for redline highlighting.
+
+Return this EXACT JSON structure:
 {
   "citations": [
     {
       "id": "cite1",
       "type": "case|statute|regulation|secondary|internal",
-      "text": "original citation text",
+      "text": "exact citation text as found",
+      "startPos": number (exact character position where citation starts),
+      "endPos": number (exact character position where citation ends),
+      "isComplete": boolean,
+      "needsVerification": boolean,
+      "bluebookFormat": "proper Bluebook 21st edition format",
       "parsed": {
-        "caseName": "if applicable",
-        "court": "if applicable", 
+        "caseName": "if case citation",
+        "court": "if applicable",
         "year": "if applicable",
         "volume": "if applicable",
         "reporter": "if applicable",
         "page": "if applicable"
       },
-      "location": "paragraph/section where found",
-      "isComplete": boolean,
-      "needsVerification": boolean,
-      "bluebookFormat": "proper Bluebook citation format"
+      "location": "paragraph or section identifier where found"
     }
   ],
   "summary": {
@@ -204,7 +209,13 @@ Return structured citation data:
     "statuteCount": number,
     "incompleteCount": number
   }
-}`,
+}
+
+CRITICAL: 
+1. Find ALL citations in the text, not just the first few
+2. Calculate EXACT startPos and endPos for each citation for redline highlighting
+3. Ensure startPos < endPos and positions are accurate
+4. Mark incomplete citations with needsVerification: true`,
     supportsChatGPT: true,
     outputFormat: 'json'
   },
