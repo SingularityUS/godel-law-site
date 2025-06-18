@@ -1,5 +1,5 @@
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef } from "react";
 import ModuleSettingsDrawer from "@/components/ModuleSettingsDrawer";
 import DocumentLibrary from "@/components/DocumentLibrary";
 import AppHeader from "@/components/layout/AppHeader";
@@ -19,7 +19,24 @@ const IndexContent = () => {
   const [editingNode, setEditingNode] = useState<any>();
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [finalOutput, setFinalOutput] = useState<any>(null);
   const { refetch } = useDocuments();
+
+  const workbenchRef = useRef<any>(null);
+
+  // Listen for pipeline completion events from the workbench
+  React.useEffect(() => {
+    const handlePipelineOutput = (event: CustomEvent) => {
+      console.log('Pipeline output received in Index:', event.detail);
+      setFinalOutput(event.detail);
+    };
+
+    window.addEventListener('pipelineCompleted', handlePipelineOutput as EventListener);
+    
+    return () => {
+      window.removeEventListener('pipelineCompleted', handlePipelineOutput as EventListener);
+    };
+  }, []);
 
   const handlePaletteDragStart = (mod: any, event: React.DragEvent) => {
     event.dataTransfer.setData("application/json", JSON.stringify(mod));
@@ -55,7 +72,9 @@ const IndexContent = () => {
     }
   };
 
-  const workbenchRef = React.useRef<any>(null);
+  const handleCloseFinalOutput = () => {
+    setFinalOutput(null);
+  };
 
   const drawerOpen = Boolean(editingNodeId && editingNode);
   let drawerModuleDef = undefined;
@@ -74,13 +93,17 @@ const IndexContent = () => {
         onDocumentAdded={handleDocumentAdded}
       />
 
-      <MainWorkspace 
-        onPaletteDragStart={handlePaletteDragStart}
-        onModuleEdit={handleModuleEdit}
-        editingPromptNodeId={editingNodeId}
-        uploadedFiles={uploadedFiles}
-        workbenchRef={workbenchRef}
-      />
+      <div className="flex-1 overflow-hidden">
+        <MainWorkspace 
+          onPaletteDragStart={handlePaletteDragStart}
+          onModuleEdit={handleModuleEdit}
+          editingPromptNodeId={editingNodeId}
+          uploadedFiles={uploadedFiles}
+          workbenchRef={workbenchRef}
+          finalOutput={finalOutput}
+          onCloseFinalOutput={handleCloseFinalOutput}
+        />
+      </div>
 
       <DocumentLibrary
         isOpen={isLibraryOpen}

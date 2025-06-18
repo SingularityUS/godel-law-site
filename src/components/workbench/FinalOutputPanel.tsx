@@ -1,8 +1,13 @@
+
 /**
  * FinalOutputPanel Component
  * 
- * Purpose: Displays the final output of legal document pipeline execution
- * Refactored to use smaller, focused tab components
+ * Purpose: Legacy component - functionality moved to WorkspaceSidebar
+ * This component is kept for backward compatibility but functionality
+ * has been moved to the integrated WorkspaceSidebar component.
+ * 
+ * Note: This component should no longer be used in new implementations.
+ * Use WorkspaceSidebar instead for integrated pipeline results and redlining.
  */
 
 import React, { useState } from "react";

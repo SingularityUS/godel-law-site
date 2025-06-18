@@ -13,7 +13,6 @@ import { useWorkbenchOrchestration } from "@/hooks/workbench/orchestration/useWo
 import { useNodeEnhancement } from "@/hooks/workbench/orchestration/useNodeEnhancement";
 import { useEdgeEnhancement } from "@/hooks/workbench/orchestration/useEdgeEnhancement";
 import WorkbenchControls from "./WorkbenchControls";
-import FinalOutputPanel from "./FinalOutputPanel";
 import {
   initialNodes,
   initialEdges,
@@ -37,7 +36,7 @@ interface WorkbenchFlowProps {
 const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow(
   { onModuleEdit, editingPromptNodeId, uploadedFiles, reactFlowWrapper },
   ref
-) {
+) => {
   // Initialize workbench event handling
   const {
     nodes,
@@ -77,6 +76,17 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
     onModuleEdit,
     ref
   });
+
+  // Emit pipeline completion events when finalOutput changes
+  React.useEffect(() => {
+    if (finalOutput) {
+      console.log('Emitting pipeline completion event with output:', finalOutput);
+      const event = new CustomEvent('pipelineCompleted', {
+        detail: finalOutput
+      });
+      window.dispatchEvent(event);
+    }
+  }, [finalOutput]);
 
   // Enhance nodes with execution status
   const { enhancedNodes } = useNodeEnhancement({
@@ -131,39 +141,31 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
   );
 
   return (
-    <>
-      <ReactFlow
-        nodes={enhancedNodes}
-        edges={enhancedEdges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onDrop={onDrop}
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onNodeClick={handleNodeClick}
-        onPaneClick={handlePaneClick}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        defaultEdgeOptions={defaultEdgeOptions}
-        {...flowOptions}
-      >
-        <WorkbenchControls 
-          getNodeColor={getNodeColor}
-          nodes={nodes}
-          edges={edges}
-          isExecuting={isExecuting}
-          onExecutePipeline={executeAllPipelines}
-          onStopPipeline={resetExecution}
-        />
-      </ReactFlow>
-
-      {/* Final output panel */}
-      <FinalOutputPanel 
-        output={finalOutput}
-        onClose={resetExecution}
+    <ReactFlow
+      nodes={enhancedNodes}
+      edges={enhancedEdges}
+      onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
+      onConnect={onConnect}
+      onDrop={onDrop}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onNodeClick={handleNodeClick}
+      onPaneClick={handlePaneClick}
+      nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
+      defaultEdgeOptions={defaultEdgeOptions}
+      {...flowOptions}
+    >
+      <WorkbenchControls 
+        getNodeColor={getNodeColor}
+        nodes={nodes}
+        edges={edges}
+        isExecuting={isExecuting}
+        onExecutePipeline={executeAllPipelines}
+        onStopPipeline={resetExecution}
       />
-    </>
+    </ReactFlow>
   );
 });
 
