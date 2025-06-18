@@ -1,3 +1,4 @@
+
 /**
  * usePipelineModuleProcessor Hook
  * 
@@ -6,12 +7,14 @@
 
 import { useCallback } from "react";
 import { AllNodes } from "@/types/workbench";
-import { createGrammarAnalysisProcessor } from "./utils/grammarAnalysisProcessor";
+import { processGrammarAnalysis } from "./utils/moduleProcessors/grammarAnalysisProcessor";
 import { processParagraphBatches } from "./utils/paragraphBatchProcessor";
-import { combineGrammarResults } from "./utils/combineResults";
 import { handleTextExtractor } from "./utils/textExtractorHandler";
+import { useChatGPTApi } from "./useChatGPTApi";
 
 export const usePipelineModuleProcessor = (nodes: AllNodes[]) => {
+  const { callChatGPT } = useChatGPTApi();
+
   /**
    * Process module node
    */
@@ -37,13 +40,17 @@ export const usePipelineModuleProcessor = (nodes: AllNodes[]) => {
       let result;
       
       switch (node.data?.moduleType) {
-        case 'grammar-analysis': {
-          const { processingFunction } = await createGrammarAnalysisProcessor(node, inputData, updateProgress, clearProgress);
-          
+        case 'grammar-checker': {
           // Enhanced batch processing with document extraction result
           const batchResults = await processParagraphBatches(
             inputData.paragraphs || [],
-            processingFunction,
+            async (paragraph: any, index: number) => {
+              // Use the grammar analysis processor
+              return await processGrammarAnalysis(
+                { paragraphs: [paragraph] },
+                callChatGPT
+              );
+            },
             {},
             (completed, total, outputGenerated) => {
               updateProgress(nodeId, { 
@@ -55,10 +62,23 @@ export const usePipelineModuleProcessor = (nodes: AllNodes[]) => {
             documentExtractionResult
           );
           
-          result = combineGrammarResults(batchResults, inputData, Date.now() - startTime);
+          // Combine results
+          const allAnalysis = batchResults.flatMap(batch => batch.output?.analysis || []);
+          result = {
+            output: {
+              analysis: allAnalysis,
+              paragraphs: inputData.paragraphs || []
+            },
+            metadata: {
+              processingTime: Date.now() - startTime,
+              paragraphsProcessed: batchResults.length,
+              totalSuggestions: allAnalysis.length
+            }
+          };
+          
           console.log(`Grammar analysis completed for ${nodeId}:`, {
             paragraphsProcessed: batchResults.length,
-            totalSuggestions: result.output?.analysis?.length || 0,
+            totalSuggestions: allAnalysis.length,
             processingTime: result.metadata?.processingTime
           });
           break;
@@ -78,7 +98,7 @@ export const usePipelineModuleProcessor = (nodes: AllNodes[]) => {
       console.error(`Error in module processor for ${nodeId}:`, error);
       throw error;
     }
-  }, [nodes, createGrammarAnalysisProcessor, combineGrammarResults]);
+  }, [nodes, callChatGPT]);
 
   return {
     processModuleNode

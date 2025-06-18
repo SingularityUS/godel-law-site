@@ -80,10 +80,15 @@ export const usePipelineExecutor = (nodes: AllNodes[], edges: Edge[]) => {
             });
           } else {
             // ENHANCED: Pass document extraction result to module processing
+            // Fix progress callback signature to match expected format
+            const progressCallback = (nodeId: string, progress: { completed: number; total: number; label?: string }) => {
+              updateProgress(nodeId, progress.completed, progress.total);
+            };
+            
             currentData = await processModuleNode(
               nodeId, 
               currentData, 
-              updateProgress, 
+              progressCallback, 
               updateNodeStatus, 
               clearProgress,
               documentExtractionResult // PASS: Document extraction result for streaming context
