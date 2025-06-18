@@ -13,6 +13,9 @@ interface MainWorkspaceProps {
   workbenchRef?: React.RefObject<any>;
   finalOutput?: any;
   onCloseFinalOutput?: () => void;
+  isExecuting?: boolean;
+  onPipelineStart?: () => void;
+  onPipelineComplete?: (output: any) => void;
 }
 
 const MainWorkspace: React.FC<MainWorkspaceProps> = ({
@@ -22,16 +25,35 @@ const MainWorkspace: React.FC<MainWorkspaceProps> = ({
   uploadedFiles,
   workbenchRef,
   finalOutput,
-  onCloseFinalOutput
+  onCloseFinalOutput,
+  isExecuting,
+  onPipelineStart,
+  onPipelineComplete
 }) => {
-  const { output, isOutputOpen, closeOutput, toggleOutput, openOutput } = useOutputPanel();
+  const { 
+    output, 
+    isOutputOpen, 
+    isPipelineExecuting,
+    closeOutput, 
+    toggleOutput, 
+    openOutput,
+    openForPipelineExecution,
+    handlePipelineCompletion
+  } = useOutputPanel();
+
+  // Handle pipeline start - open sidebar immediately
+  React.useEffect(() => {
+    if (isExecuting && onPipelineStart) {
+      openForPipelineExecution();
+    }
+  }, [isExecuting, onPipelineStart, openForPipelineExecution]);
 
   // Use finalOutput when available
   React.useEffect(() => {
     if (finalOutput) {
-      openOutput(finalOutput);
+      handlePipelineCompletion(finalOutput);
     }
-  }, [finalOutput, openOutput]);
+  }, [finalOutput, handlePipelineCompletion]);
 
   const handleClose = () => {
     closeOutput();
@@ -57,10 +79,12 @@ const MainWorkspace: React.FC<MainWorkspaceProps> = ({
             <ResizableHandle />
             <ResizablePanel defaultSize={50} minSize={25}>
               <WorkspaceSidebar 
-                output={output}
+                output={output || {}} // Provide empty object during execution
                 isOpen={isOutputOpen}
                 onClose={handleClose}
                 onToggle={toggleOutput}
+                isPipelineExecuting={isPipelineExecuting}
+                isExecuting={isExecuting}
               />
             </ResizablePanel>
           </>

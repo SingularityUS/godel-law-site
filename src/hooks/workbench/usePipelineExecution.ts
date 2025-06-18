@@ -3,7 +3,7 @@
  * usePipelineExecution Hook
  * 
  * Purpose: Orchestrates sequential execution of AI modules in the workbench
- * Refactored to use smaller, focused hooks for better maintainability
+ * Enhanced with pipeline start events for immediate UI feedback
  */
 
 import { useCallback } from "react";
@@ -12,9 +12,14 @@ import { AllNodes } from "@/types/workbench";
 import { createExecutionManager } from "./utils/executionManager";
 import { usePipelineExecutor } from "./usePipelineExecutor";
 
-export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
+export const usePipelineExecution = (
+  nodes: AllNodes[], 
+  edges: Edge[],
+  onPipelineStart?: () => void,
+  onPipelineComplete?: (output: any) => void
+) => {
   const {
-    executePipeline,
+    executePipeline: baseExecutePipeline,
     executionState,
     isExecuting,
     finalOutput,
@@ -25,6 +30,26 @@ export const usePipelineExecution = (nodes: AllNodes[], edges: Edge[]) => {
 
   // Create execution manager for utility functions
   const executionManager = createExecutionManager(nodes, edges);
+
+  /**
+   * Enhanced pipeline execution with start/complete events
+   */
+  const executePipeline = useCallback(async (startNodeId: string) => {
+    // Emit pipeline start event immediately
+    if (onPipelineStart) {
+      onPipelineStart();
+    }
+
+    // Execute the pipeline
+    const result = await baseExecutePipeline(startNodeId);
+
+    // Emit completion event with final output
+    if (onPipelineComplete && finalOutput) {
+      onPipelineComplete(finalOutput);
+    }
+
+    return result;
+  }, [baseExecutePipeline, onPipelineStart, onPipelineComplete, finalOutput]);
 
   /**
    * Execute all pipelines (from all document input nodes)

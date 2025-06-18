@@ -3,7 +3,7 @@
  * SidebarTabsContent Component
  * 
  * Purpose: Main tabs content for the workspace sidebar with streaming support
- * Extracted from WorkspaceSidebar for better organization
+ * Enhanced to handle executing state and early streaming callbacks
  */
 
 import React from "react";
@@ -29,6 +29,8 @@ interface SidebarTabsContentProps {
   };
   onSaveRedline: (document: RedlineDocument) => void;
   onExportRedline: (document: RedlineDocument, format: string) => void;
+  isPipelineExecuting?: boolean;
+  isExecuting?: boolean;
 }
 
 const SidebarTabsContent: React.FC<SidebarTabsContentProps> = ({
@@ -40,7 +42,9 @@ const SidebarTabsContent: React.FC<SidebarTabsContentProps> = ({
   output,
   streamingProgress,
   onSaveRedline,
-  onExportRedline
+  onExportRedline,
+  isPipelineExecuting = false,
+  isExecuting = false
 }) => {
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
@@ -51,6 +55,9 @@ const SidebarTabsContent: React.FC<SidebarTabsContentProps> = ({
             <span className="ml-1 text-xs text-blue-600">
               ({streamingProgress.completed}/{streamingProgress.total})
             </span>
+          )}
+          {(isPipelineExecuting || isExecuting) && !streamingProgress?.total && (
+            <span className="ml-1 text-xs text-orange-600">Processing...</span>
           )}
         </TabsTrigger>
         <TabsTrigger value="summary">Summary</TabsTrigger>
@@ -69,23 +76,49 @@ const SidebarTabsContent: React.FC<SidebarTabsContentProps> = ({
             streamingProgress={streamingProgress}
             onSaveRedline={onSaveRedline}
             onExportRedline={onExportRedline}
+            isPipelineExecuting={isPipelineExecuting}
+            isExecuting={isExecuting}
           />
         </TabsContent>
 
         <TabsContent value="summary" className="h-full m-0 overflow-auto">
-          <LegalSummaryTab output={output} />
+          {(isPipelineExecuting || isExecuting) && !output?.output ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-500">Waiting for pipeline results...</p>
+            </div>
+          ) : (
+            <LegalSummaryTab output={output} />
+          )}
         </TabsContent>
 
         <TabsContent value="analysis" className="h-full m-0 overflow-auto">
-          <LegalAnalysisTab output={output} />
+          {(isPipelineExecuting || isExecuting) && !output?.output ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-500">Waiting for pipeline results...</p>
+            </div>
+          ) : (
+            <LegalAnalysisTab output={output} />
+          )}
         </TabsContent>
 
         <TabsContent value="grammar" className="h-full m-0 overflow-auto">
-          <GrammarAnalysisTab result={output} />
+          {(isPipelineExecuting || isExecuting) && !output?.output ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-500">Waiting for pipeline results...</p>
+            </div>
+          ) : (
+            <GrammarAnalysisTab result={output} />
+          )}
         </TabsContent>
 
         <TabsContent value="raw" className="h-full m-0 overflow-auto">
-          <RawDataTab output={output} />
+          {(isPipelineExecuting || isExecuting) && !output?.output ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-500">Waiting for pipeline results...</p>
+            </div>
+          ) : (
+            <RawDataTab output={output} />
+          )}
         </TabsContent>
       </div>
     </Tabs>

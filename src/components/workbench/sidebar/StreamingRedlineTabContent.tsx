@@ -3,7 +3,7 @@
  * StreamingRedlineTabContent Component
  * 
  * Purpose: Enhanced redline tab that displays streaming results as they arrive
- * Shows progress and partial results for better user experience
+ * Enhanced to handle immediate display during pipeline execution
  */
 
 import React from "react";
@@ -23,6 +23,8 @@ interface StreamingRedlineTabContentProps {
   };
   onSaveRedline: (document: RedlineDocument) => void;
   onExportRedline: (document: RedlineDocument, format: string) => void;
+  isPipelineExecuting?: boolean;
+  isExecuting?: boolean;
 }
 
 const StreamingRedlineTabContent: React.FC<StreamingRedlineTabContentProps> = ({
@@ -32,10 +34,32 @@ const StreamingRedlineTabContent: React.FC<StreamingRedlineTabContentProps> = ({
   output,
   streamingProgress,
   onSaveRedline,
-  onExportRedline
+  onExportRedline,
+  isPipelineExecuting = false,
+  isExecuting = false
 }) => {
+  // Show pipeline executing state
+  if ((isPipelineExecuting || isExecuting) && !streamingProgress?.hasPartialResults && !redlineDocument) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Pipeline Executing...</p>
+          <p className="text-sm text-gray-500 mt-2">
+            Redline suggestions will appear as batches complete
+          </p>
+          <div className="mt-4 p-3 bg-blue-50 rounded border text-xs">
+            <p className="text-blue-700">
+              ✨ Streaming results enabled - you'll see updates in real-time!
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Show loading state during initial generation
-  if (isGeneratingRedline && !streamingProgress?.hasPartialResults) {
+  if (isGeneratingRedline && !streamingProgress?.hasPartialResults && !redlineDocument) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
@@ -63,7 +87,7 @@ const StreamingRedlineTabContent: React.FC<StreamingRedlineTabContentProps> = ({
     return (
       <div className="h-full flex flex-col">
         {/* Streaming progress indicator */}
-        {isGeneratingRedline && streamingProgress && streamingProgress.total > 0 && (
+        {(isGeneratingRedline || isPipelineExecuting || isExecuting) && streamingProgress && streamingProgress.total > 0 && (
           <div className="bg-blue-50 border-b border-blue-200 p-3 flex-shrink-0">
             <div className="flex items-center justify-between text-sm">
               <span className="text-blue-700 font-medium">

@@ -1,8 +1,8 @@
-
 /**
  * useOutputPanel Hook
  * 
  * Purpose: Shared logic for output panel operations and state management
+ * Enhanced to support immediate opening on pipeline execution start
  */
 
 import { useCallback, useState } from "react";
@@ -10,6 +10,7 @@ import { useCallback, useState } from "react";
 export const useOutputPanel = () => {
   const [output, setOutput] = useState<any>(null);
   const [isOutputOpen, setIsOutputOpen] = useState(false);
+  const [isPipelineExecuting, setIsPipelineExecuting] = useState(false);
 
   const formatOutput = useCallback((data: any): string => {
     if (typeof data === 'string') {
@@ -56,6 +57,7 @@ export const useOutputPanel = () => {
 
   const closeOutput = useCallback(() => {
     setIsOutputOpen(false);
+    setIsPipelineExecuting(false);
   }, []);
 
   const toggleOutput = useCallback(() => {
@@ -65,11 +67,27 @@ export const useOutputPanel = () => {
   const openOutput = useCallback((newOutput: any) => {
     setOutput(newOutput);
     setIsOutputOpen(true);
+    setIsPipelineExecuting(false);
+  }, []);
+
+  // New method to open sidebar immediately when pipeline starts
+  const openForPipelineExecution = useCallback(() => {
+    setIsPipelineExecuting(true);
+    setIsOutputOpen(true);
+    setOutput(null); // Clear previous output
+  }, []);
+
+  // New method to handle pipeline completion
+  const handlePipelineCompletion = useCallback((finalOutput: any) => {
+    setOutput(finalOutput);
+    setIsPipelineExecuting(false);
+    // Keep sidebar open
   }, []);
 
   return {
     output,
     isOutputOpen,
+    isPipelineExecuting,
     formatOutput,
     copyToClipboard,
     downloadAsFile,
@@ -78,6 +96,8 @@ export const useOutputPanel = () => {
     closeOutput,
     toggleOutput,
     openOutput,
+    openForPipelineExecution,
+    handlePipelineCompletion,
     setOutput
   };
 };
