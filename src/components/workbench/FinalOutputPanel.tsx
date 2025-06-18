@@ -1,4 +1,3 @@
-
 /**
  * FinalOutputPanel Component
  * 
@@ -30,10 +29,16 @@ const FinalOutputPanel: React.FC<FinalOutputPanelProps> = ({
 
   if (!output) return null;
 
+  console.log('FinalOutputPanel received output:', output);
+
   const isLegalPipeline = output.summary?.pipelineType === "Legal Document Analysis";
 
   const renderContent = () => {
     if (isLegalPipeline) {
+      // Extract the grammar analysis data for the grammar tab
+      const grammarAnalysisData = output.finalOutput || output;
+      console.log('Grammar analysis data being passed:', grammarAnalysisData);
+
       return (
         <Tabs defaultValue="summary" className="w-full h-full">
           <TabsList className="grid w-full grid-cols-4">
@@ -52,7 +57,7 @@ const FinalOutputPanel: React.FC<FinalOutputPanelProps> = ({
           </TabsContent>
 
           <TabsContent value="grammar" className="h-full">
-            <GrammarAnalysisTab result={output} />
+            <GrammarAnalysisTab result={grammarAnalysisData} />
           </TabsContent>
 
           <TabsContent value="raw" className="h-full">
