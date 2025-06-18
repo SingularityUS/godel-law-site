@@ -117,9 +117,9 @@ const EmbeddedRedlineViewer: React.FC<EmbeddedRedlineViewerProps> = ({
         </div>
       </div>
       
-      {/* Content Area */}
-      <div className="flex-1 flex overflow-hidden">
-        <div className={`flex-1 min-w-0 ${showSuggestionsSidebar && !isEditMode ? '' : 'w-full'}`}>
+      {/* Content Area - Fixed height with proper overflow */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
+        <div className={`flex-1 min-w-0 overflow-auto ${showSuggestionsSidebar && !isEditMode ? '' : 'w-full'}`}>
           <RedlineDocumentArea
             document={currentDocument}
             originalDocument={originalDocument || { type: 'text/plain' }}
@@ -137,7 +137,7 @@ const EmbeddedRedlineViewer: React.FC<EmbeddedRedlineViewerProps> = ({
         
         {/* Suggestions Sidebar - Only show in view mode */}
         {showSuggestionsSidebar && !isEditMode && (
-          <div className="w-64 border-l bg-gray-50 flex-shrink-0">
+          <div className="w-64 border-l bg-gray-50 flex-shrink-0 overflow-auto">
             <RedlineSidebar
               suggestions={filteredSuggestions}
               selectedSuggestionId={redlineState.selectedSuggestionId}
