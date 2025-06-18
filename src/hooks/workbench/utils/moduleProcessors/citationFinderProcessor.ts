@@ -43,19 +43,30 @@ export const processCitationFinder = async (
   onProgress?: (completed: number, total: number) => void
 ): Promise<{ output: CitationFinderResult; metadata: any }> => {
   console.log('=== CITATION FINDER PROCESSOR ===');
+  console.log('Input data type:', typeof inputData);
+  console.log('Input data keys:', inputData ? Object.keys(inputData) : 'null');
   
-  // Extract paragraphs from input data
+  // Extract paragraphs from input data - enhanced detection
   let paragraphs: any[] = [];
   
+  // Check multiple possible data structures
   if (inputData && inputData.output && Array.isArray(inputData.output.paragraphs)) {
     paragraphs = inputData.output.paragraphs;
-    console.log(`Processing ${paragraphs.length} paragraphs for citation detection`);
-  } else if (Array.isArray(inputData.paragraphs)) {
+    console.log(`Found paragraphs in inputData.output: ${paragraphs.length} paragraphs`);
+  } else if (inputData && Array.isArray(inputData.paragraphs)) {
     paragraphs = inputData.paragraphs;
-    console.log(`Processing ${paragraphs.length} paragraphs for citation detection`);
+    console.log(`Found paragraphs in inputData: ${paragraphs.length} paragraphs`);
+  } else if (inputData && inputData.finalOutput && Array.isArray(inputData.finalOutput.paragraphs)) {
+    paragraphs = inputData.finalOutput.paragraphs;
+    console.log(`Found paragraphs in inputData.finalOutput: ${paragraphs.length} paragraphs`);
+  } else if (Array.isArray(inputData)) {
+    // If inputData itself is an array of paragraphs
+    paragraphs = inputData;
+    console.log(`Input data is directly an array: ${paragraphs.length} paragraphs`);
   } else {
+    // Debug the actual structure
     console.warn('Citation finder: No paragraph data found');
-    console.log('Input data structure:', typeof inputData, inputData ? Object.keys(inputData) : 'null');
+    console.log('Full input data structure:', JSON.stringify(inputData, null, 2));
     
     return {
       output: {
@@ -73,7 +84,10 @@ export const processCitationFinder = async (
         error: 'No paragraph data available - connect Citation Finder to Paragraph Splitter output',
         userFriendlyError: 'Citation Finder needs paragraph data to analyze citations. Connect it to the Paragraph Splitter output.',
         citationAware: true,
-        redliningReady: true
+        redliningReady: true,
+        inputDataReceived: !!inputData,
+        inputDataType: typeof inputData,
+        availableKeys: inputData ? Object.keys(inputData) : []
       }
     };
   }

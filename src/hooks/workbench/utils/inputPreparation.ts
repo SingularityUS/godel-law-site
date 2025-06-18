@@ -36,6 +36,12 @@ export function prepareModuleInput(inputData: any, moduleType: ModuleKind): any 
     }
   }
   
+  // For citation finder, preserve the full paragraph structure
+  if (moduleType === 'citation-finder') {
+    // Return the full structured data without conversion
+    return inputData;
+  }
+  
   return inputData;
 }
 
@@ -57,6 +63,12 @@ export function extractCleanContent(inputData: any, moduleType: ModuleKind): str
       if (inputData.processableContent && typeof inputData.processableContent === 'string') {
         return inputData.processableContent;
       }
+    }
+    
+    // For citation finder, don't extract - it needs the full structure
+    if (moduleType === 'citation-finder') {
+      // Citation finder expects structured data, not extracted text
+      return JSON.stringify(inputData, null, 2);
     }
     
     // For other modules, return JSON representation

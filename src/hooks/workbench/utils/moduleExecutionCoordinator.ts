@@ -38,7 +38,16 @@ export const createModuleExecutionCoordinator = (callChatGPT: ReturnType<typeof 
       });
     }
     
-    // Prepare clean input data for the module
+    // Special handling for citation finder - it needs structured data
+    if (moduleType === 'citation-finder') {
+      console.log('Processing citation finder with structured data');
+      
+      // Use the specialized citation finder processor directly
+      const { processCitationFinder } = await import('./moduleProcessors/citationFinderProcessor');
+      return await processCitationFinder(inputData, callChatGPT, onProgress);
+    }
+    
+    // Prepare clean input data for other modules
     const cleanInputData = prepareModuleInput(inputData, moduleType);
     console.log('Prepared input type:', typeof cleanInputData);
 
