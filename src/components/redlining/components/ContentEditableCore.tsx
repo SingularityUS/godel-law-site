@@ -17,7 +17,7 @@
  * - Manages cursor position restoration after programmatic updates
  */
 
-import React, { useRef, useCallback, useState } from "react";
+import React, { useRef, useCallback, useState, forwardRef } from "react";
 
 interface ContentEditableCoreProps {
   /** HTML content to display and edit */
@@ -40,15 +40,15 @@ interface ContentEditableCoreProps {
  * - Implements composition handling for international keyboards
  * - Debounces content changes to prevent excessive updates
  * - Preserves cursor position during programmatic content updates
+ * - Uses forwardRef to allow parent components to access the DOM element
  */
-const ContentEditableCore: React.FC<ContentEditableCoreProps> = ({
+const ContentEditableCore = forwardRef<HTMLDivElement, ContentEditableCoreProps>(({
   content,
   onContentChange,
   onRedlineClick,
   className = "",
   style = {}
-}) => {
-  const editorRef = useRef<HTMLDivElement>(null);
+}, ref) => {
   const [isComposing, setIsComposing] = useState(false);
   const lastContentRef = useRef<string>('');
 
@@ -87,9 +87,10 @@ const ContentEditableCore: React.FC<ContentEditableCoreProps> = ({
    * - Extracts plain text to send clean content to parent components
    */
   const handleContentChange = useCallback(() => {
-    if (!editorRef.current || isComposing) return;
+    const editorElement = ref && 'current' in ref ? ref.current : null;
+    if (!editorElement || isComposing) return;
 
-    const currentHtml = editorRef.current.innerHTML;
+    const currentHtml = editorElement.innerHTML;
     const plainText = extractPlainText(currentHtml);
     
     // Only trigger change if content actually changed
@@ -97,7 +98,7 @@ const ContentEditableCore: React.FC<ContentEditableCoreProps> = ({
       lastContentRef.current = plainText;
       onContentChange(plainText);
     }
-  }, [extractPlainText, onContentChange, isComposing]);
+  }, [extractPlainText, onContentChange, isComposing, ref]);
 
   /**
    * Prevents editing within redline suggestion elements
@@ -124,7 +125,7 @@ const ContentEditableCore: React.FC<ContentEditableCoreProps> = ({
 
   return (
     <div 
-      ref={editorRef}
+      ref={ref}
       className={`prose prose-sm max-w-none min-h-96 outline-none ${className}`}
       style={{
         fontFamily: 'Calibri, "Segoe UI", Tahoma, Geneva, Verdana, sans-serif',
@@ -146,6 +147,8 @@ const ContentEditableCore: React.FC<ContentEditableCoreProps> = ({
       dangerouslySetInnerHTML={{ __html: content }}
     />
   );
-};
+});
+
+ContentEditableCore.displayName = 'ContentEditableCore';
 
 export default ContentEditableCore;
