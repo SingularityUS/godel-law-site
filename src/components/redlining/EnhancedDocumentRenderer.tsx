@@ -157,7 +157,7 @@ const EnhancedDocumentRenderer: React.FC<EnhancedDocumentRendererProps> = ({
    * Escapes HTML characters to prevent XSS
    */
   const escapeHtml = (text: string): string => {
-    const div = document.createElement('div');
+    const div = window.document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
   };

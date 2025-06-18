@@ -51,6 +51,7 @@ export interface AnalysisResult {
     positionAware?: boolean;
     handledStringInput?: boolean;
     singleParagraphMode?: boolean;
+    originalContent?: string;
     error?: string;
   };
 }

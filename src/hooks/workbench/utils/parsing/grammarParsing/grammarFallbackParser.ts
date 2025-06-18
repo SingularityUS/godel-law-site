@@ -20,9 +20,11 @@ export const createFallbackAnalysis = (responseText: string): {
   
   chunks.forEach((chunk, index) => {
     if (chunk.trim().length > 100) { // Only process substantial chunks
+      const content = chunk.trim().substring(0, 2000);
       analysis.push({
         paragraphId: `para-${index + 1}`,
-        original: chunk.trim().substring(0, 2000),
+        originalContent: content, // Add the missing originalContent property
+        original: content,
         corrected: "Analysis completed - see full response",
         suggestions: [],
         legalWritingScore: 8,
