@@ -6,7 +6,7 @@ import { convertGrammarAnalysisToRedline } from "@/utils/redlining/grammarToRedl
 export const useRedlineDataTransform = () => {
   const transformGrammarData = useCallback((result: any): RedlineDocument | null => {
     try {
-      console.log('Transforming grammar data:', result);
+      console.log('Transforming grammar data with controlled whitespace management:', result);
       console.log('Result structure:', {
         hasOutput: !!result?.output,
         hasAnalysis: !!result?.output?.analysis,
@@ -54,9 +54,9 @@ export const useRedlineDataTransform = () => {
 
       console.log(`Found analysis data with ${analysisData.length} items`);
 
-      // Extract original document metadata with enhanced fallback
-      const originalDocument = extractOriginalDocumentInfo(result);
-      console.log('Extracted original document info:', originalDocument);
+      // Extract original document metadata with enhanced formatting preservation
+      const originalDocument = extractOriginalDocumentInfoWithFormatting(result);
+      console.log('Extracted original document info with formatting preservation:', originalDocument);
 
       return convertGrammarAnalysisToRedline(sourceResult, originalDocument);
     } catch (error) {
@@ -90,29 +90,44 @@ export const useRedlineDataTransform = () => {
 };
 
 /**
- * Enhanced original document info extraction
+ * Enhanced original document info extraction with formatting preservation
  */
-function extractOriginalDocumentInfo(result: any) {
+function extractOriginalDocumentInfoWithFormatting(result: any) {
   // Try multiple paths for document metadata
   const metadata = result?.metadata || 
                   result?.finalOutput?.metadata || 
                   result?.input?.metadata ||
                   {};
 
-  // Try multiple paths for original content
+  // CRITICAL: Prioritize sources that preserve original formatting
   let originalContent = '';
   
   const contentPaths = [
+    // Priority 1: Original content that should preserve ALL formatting
     metadata?.originalContent,
     result?.metadata?.originalContent,
-    result?.input?.content,
+    result?.input?.originalContent,
     result?.originalContent,
-    metadata?.content
+    
+    // Priority 2: Less processed content sources
+    result?.input?.content,
+    metadata?.content,
+    
+    // Priority 3: Content from initial processing (might be cleaned)
+    result?.content
   ];
   
   for (const path of contentPaths) {
-    if (path && typeof path === 'string' && path.trim().length > 0) {
-      originalContent = path.trim();
+    if (path && typeof path === 'string' && path.length > 0) {
+      originalContent = path; // DO NOT TRIM - preserve exact formatting
+      console.log('Selected content source with formatting preservation:', {
+        source: 'content path',
+        length: originalContent.length,
+        hasLineBreaks: originalContent.includes('\n'),
+        hasDoubleLineBreaks: originalContent.includes('\n\n'),
+        hasLeadingWhitespace: /^\s/.test(originalContent),
+        hasTrailingWhitespace: /\s$/.test(originalContent)
+      });
       break;
     }
   }
@@ -124,7 +139,7 @@ function extractOriginalDocumentInfo(result: any) {
     type: metadata?.fileType || 
           result?.fileType || 
           'text/plain',
-    content: originalContent,
+    content: originalContent, // Preserved with all original formatting
     preview: metadata?.originalPreview || 
              result?.originalPreview
   };

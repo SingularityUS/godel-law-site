@@ -2,7 +2,7 @@
 /**
  * Grammar to Redline Converter
  * 
- * Purpose: Converts grammar analysis results to redlining format
+ * Purpose: Converts grammar analysis results to redlining format with controlled whitespace management
  */
 
 import { RedlineDocument, RedlineSuggestion } from "@/types/redlining";
@@ -11,7 +11,7 @@ export const convertGrammarAnalysisToRedline = (
   grammarResult: any,
   originalDocument: { name: string; type: string; content: string }
 ): RedlineDocument => {
-  console.log('Converting grammar analysis to redline format');
+  console.log('Converting grammar analysis to redline format with controlled whitespace management');
   console.log('Grammar result:', grammarResult);
   console.log('Original document:', originalDocument);
 
@@ -23,10 +23,10 @@ export const convertGrammarAnalysisToRedline = (
     return createEmptyRedlineDocument(originalDocument);
   }
 
-  // Extract the clean original content with enhanced fallback
-  const originalContent = extractOriginalContent(grammarResult, originalDocument);
+  // Extract the original content with FULL formatting preservation for redline display
+  const originalContent = extractOriginalContentForDisplay(grammarResult, originalDocument);
   console.log('Extracted original content length:', originalContent.length);
-  console.log('Original content preview:', originalContent.substring(0, 200) + '...');
+  console.log('Original content preview (first 200 chars):', JSON.stringify(originalContent.substring(0, 200)));
 
   // Extract suggestions from grammar analysis with enhanced path handling
   try {
@@ -58,8 +58,8 @@ export const convertGrammarAnalysisToRedline = (
           // Create a unique ID for each suggestion
           const suggestionId = `${paragraph.paragraphId || paragraphIndex}-${index}`;
           
-          // Calculate positions within the original content
-          const positions = calculateSuggestionPositions(
+          // Calculate positions within the original content using enhanced position mapping
+          const positions = calculateSuggestionPositionsWithWhitespaceHandling(
             suggestion,
             paragraph,
             originalContent,
@@ -100,8 +100,8 @@ export const convertGrammarAnalysisToRedline = (
 
   return {
     id: `redline-${Date.now()}`,
-    originalContent: originalContent,
-    currentContent: originalContent,
+    originalContent: originalContent, // PRESERVE EXACT FORMATTING for display
+    currentContent: originalContent,  // Start with original formatting
     suggestions,
     metadata: {
       fileName: originalDocument.name || 'Untitled Document',
@@ -116,31 +116,42 @@ export const convertGrammarAnalysisToRedline = (
 };
 
 /**
- * Enhanced original content extraction with multiple fallback paths
+ * Enhanced original content extraction that PRESERVES ALL FORMATTING for redline display
  */
-function extractOriginalContent(grammarResult: any, originalDocument: { content: string }): string {
-  console.log('Extracting original content from multiple sources');
+function extractOriginalContentForDisplay(grammarResult: any, originalDocument: { content: string }): string {
+  console.log('Extracting original content with FULL formatting preservation for redline display');
   
   const contentSources = [
-    // Priority 1: Original document content
+    // Priority 1: Original document content (NEVER cleaned, preserves all formatting)
     originalDocument?.content,
     
-    // Priority 2: Various metadata paths
+    // Priority 2: Metadata paths that might preserve original formatting
     grammarResult?.metadata?.originalContent,
-    grammarResult?.input?.content,
+    grammarResult?.input?.originalContent,
     grammarResult?.originalContent,
     
-    // Priority 3: Extract from analysis paragraphs
+    // Priority 3: Input content (might be cleaned but better than nothing)
+    grammarResult?.input?.content,
+    
+    // Priority 4: Extract from analysis paragraphs
     extractFromAnalysisParagraphs(grammarResult),
     
-    // Priority 4: Any content field
+    // Priority 5: Any content field
     grammarResult?.content
   ];
   
   for (const source of contentSources) {
-    if (source && typeof source === 'string' && source.trim().length > 0) {
+    if (source && typeof source === 'string' && source.length > 0) {
       console.log(`Using content source with length: ${source.length}`);
-      return source.trim();
+      console.log('Content formatting preserved:', {
+        hasLineBreaks: source.includes('\n'),
+        hasDoubleLineBreaks: source.includes('\n\n'),
+        hasSpaces: source.includes('  '),
+        leadingWhitespace: source.match(/^[\s\n]+/)?.[0]?.length || 0,
+        trailingWhitespace: source.match(/[\s\n]+$/)?.[0]?.length || 0
+      });
+      // DO NOT TRIM - preserve exact formatting for redline display
+      return source;
     }
   }
   
@@ -163,12 +174,12 @@ function extractFromAnalysisParagraphs(grammarResult: any): string {
                  para.text || 
                  para.content || '';
         })
-        .filter((content: string) => content.trim().length > 0)
-        .join('\n\n');
+        .filter((content: string) => content.length > 0)
+        .join('\n\n'); // Preserve paragraph separation
       
-      if (reconstructedContent.trim().length > 0) {
-        console.log('Reconstructed content from analysis paragraphs');
-        return reconstructedContent.trim();
+      if (reconstructedContent.length > 0) {
+        console.log('Reconstructed content from analysis paragraphs with formatting preservation');
+        return reconstructedContent;
       }
     }
   } catch (error) {
@@ -179,9 +190,9 @@ function extractFromAnalysisParagraphs(grammarResult: any): string {
 }
 
 /**
- * Enhanced position calculation with better text matching
+ * Enhanced position calculation with better whitespace-aware text matching
  */
-function calculateSuggestionPositions(
+function calculateSuggestionPositionsWithWhitespaceHandling(
   suggestion: any,
   paragraph: any,
   originalContent: string,
@@ -192,19 +203,31 @@ function calculateSuggestionPositions(
                       suggestion.text || 
                       suggestion.original || '';
   
-  if (!originalText || originalText.trim().length === 0) {
+  if (!originalText || originalText.length === 0) {
     console.warn('No original text for suggestion, using default positions');
     return { start: 0, end: 0 };
   }
   
-  const searchText = originalText.trim();
+  const searchText = originalText;
   
-  // Try exact match first
+  // Try exact match first (preserving all whitespace)
   let startPos = originalContent.indexOf(searchText);
   
-  // Try case-insensitive match
+  // Try case-insensitive match with exact whitespace
   if (startPos === -1) {
     startPos = originalContent.toLowerCase().indexOf(searchText.toLowerCase());
+  }
+  
+  // Try normalized whitespace matching (compress multiple spaces to single)
+  if (startPos === -1) {
+    const normalizedSearch = searchText.replace(/\s+/g, ' ').trim();
+    const normalizedContent = originalContent.replace(/\s+/g, ' ');
+    const normalizedPos = normalizedContent.toLowerCase().indexOf(normalizedSearch.toLowerCase());
+    
+    if (normalizedPos !== -1) {
+      // Map back to original content position
+      startPos = mapNormalizedToOriginalPosition(normalizedPos, originalContent);
+    }
   }
   
   // Try partial matching (first 20 characters)
@@ -227,6 +250,30 @@ function calculateSuggestionPositions(
     start: Math.max(0, startPos),
     end: Math.min(originalContent.length, endPos)
   };
+}
+
+/**
+ * Maps position from normalized content back to original content
+ */
+function mapNormalizedToOriginalPosition(normalizedPos: number, originalContent: string): number {
+  let originalPos = 0;
+  let normalizedCount = 0;
+  
+  while (originalPos < originalContent.length && normalizedCount < normalizedPos) {
+    const char = originalContent[originalPos];
+    if (char.match(/\s/)) {
+      // Skip consecutive whitespace in normalization
+      while (originalPos < originalContent.length && originalContent[originalPos].match(/\s/)) {
+        originalPos++;
+      }
+      normalizedCount++; // Count as single space in normalized version
+    } else {
+      originalPos++;
+      normalizedCount++;
+    }
+  }
+  
+  return originalPos;
 }
 
 /**
