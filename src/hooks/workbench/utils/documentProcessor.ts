@@ -35,8 +35,43 @@ export interface DocumentExtractionResult {
   };
 }
 
+/**
+ * Validates and fixes common character encoding issues in legal documents
+ */
+const validateAndFixEncoding = (text: string): string => {
+  // Common character replacements for legal documents
+  const encodingFixes = [
+    // Section symbol
+    [/�/g, '§'],
+    // Smart quotes
+    [/[""]/g, '"'],
+    [/['']/g, "'"],
+    // Em dash
+    [/—/g, '—'],
+    // En dash
+    [/–/g, '–'],
+  ];
+  
+  let fixedText = text;
+  let appliedFixes = [];
+  
+  for (const [pattern, replacement] of encodingFixes) {
+    const originalLength = fixedText.length;
+    fixedText = fixedText.replace(pattern, replacement);
+    if (fixedText.length !== originalLength || fixedText !== text) {
+      appliedFixes.push(`Fixed ${pattern} -> ${replacement}`);
+    }
+  }
+  
+  if (appliedFixes.length > 0) {
+    console.log('Applied character encoding fixes:', appliedFixes);
+  }
+  
+  return fixedText;
+};
+
 export const extractDocumentText = async (docNode: DocumentInputNode): Promise<DocumentExtractionResult> => {
-  console.log('=== DOCUMENT PROCESSOR DEBUG (Minimal Cleaning) ===');
+  console.log('=== DOCUMENT PROCESSOR DEBUG (UTF-8 Character Preservation) ===');
   
   if (!docNode.data?.file) {
     throw new Error('No file attached to document node');
@@ -46,7 +81,7 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
   const fileName = docNode.data.documentName;
   const fileType = file.type;
   
-  console.log(`Extracting text from ${fileName} (${fileType}) with minimal cleaning`);
+  console.log(`Extracting text from ${fileName} (${fileType}) with UTF-8 preservation`);
   console.log('File object:', file);
   
   try {
@@ -69,18 +104,47 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
       throw new Error('Unable to access file content - no arrayBuffer method or preview URL');
     }
     
-    // Handle different file types
+    // Handle different file types with proper UTF-8 handling
     if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || fileName.endsWith('.docx')) {
-      const result = await mammoth.extractRawText({ arrayBuffer });
+      console.log('Extracting DOCX with UTF-8 preservation...');
+      
+      // Use mammoth with explicit options for better character handling
+      const result = await mammoth.extractRawText({ 
+        arrayBuffer,
+        // Options to preserve formatting and special characters
+        options: {
+          includeDefaultStyleMap: true,
+          convertImage: mammoth.images.imgElement(function(image) {
+            return image.read("base64").then(function(imageBuffer) {
+              return {
+                src: "data:" + image.contentType + ";base64," + imageBuffer
+              };
+            });
+          })
+        }
+      });
+      
       extractedText = result.value;
       documentType = "docx";
+      
       console.log(`Extracted ${extractedText.length} characters from DOCX file`);
+      console.log('First 200 characters (raw):', extractedText.substring(0, 200));
+      
+      // Apply character encoding fixes for common issues
+      const originalText = extractedText;
+      extractedText = validateAndFixEncoding(extractedText);
+      
+      if (extractedText !== originalText) {
+        console.log('Character encoding fixes applied');
+        console.log('First 200 characters (fixed):', extractedText.substring(0, 200));
+      }
       
     } else if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
       throw new Error('PDF text extraction requires additional setup. Please convert to DOCX or plain text format.');
       
     } else if (fileType?.startsWith('text/') || fileName.endsWith('.txt')) {
-      const textDecoder = new TextDecoder('utf-8');
+      console.log('Extracting text file with UTF-8 decoder...');
+      const textDecoder = new TextDecoder('utf-8', { fatal: false, ignoreBOM: true });
       extractedText = textDecoder.decode(arrayBuffer);
       documentType = "text";
       console.log(`Extracted ${extractedText.length} characters from text file`);
@@ -92,6 +156,18 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
     // Validate that we actually extracted content
     if (!extractedText || extractedText.trim().length === 0) {
       throw new Error('No text content could be extracted from the document');
+    }
+    
+    // Log character validation
+    const hasSpecialChars = /[§""'']/.test(extractedText);
+    const hasReplacementChars = /�/.test(extractedText);
+    
+    console.log('Character validation:');
+    console.log(`- Contains special legal characters: ${hasSpecialChars}`);
+    console.log(`- Contains replacement characters (�): ${hasReplacementChars}`);
+    
+    if (hasReplacementChars) {
+      console.warn('WARNING: Document contains replacement characters (�) - encoding may be corrupted');
     }
     
     // Apply minimal cleaning while preserving original
@@ -146,14 +222,16 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
       }
     };
     
-    console.log('Document extraction result (minimal cleaning):', {
+    console.log('Document extraction result (UTF-8 preserved):', {
       originalLength: result.originalContent.length,
       processableLength: result.processableContent.length,
       positionMappings: result.positionMap.characterMap.length,
       paragraphBoundaries: result.positionMap.paragraphBoundaries.length,
       chunkCount: result.chunks?.length || 0,
       estimatedTokens: result.metadata.estimatedTokens,
-      cleaningApplied: result.metadata.cleaningApplied
+      cleaningApplied: result.metadata.cleaningApplied,
+      hasSpecialCharacters: hasSpecialChars,
+      hasEncodingIssues: hasReplacementChars
     });
     
     return result;
