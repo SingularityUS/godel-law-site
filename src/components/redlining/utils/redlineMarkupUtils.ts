@@ -15,7 +15,7 @@ export { getSeverityClass, getTypeClass, getTypeIcon } from "./styleUtils";
 export { processSuggestions } from "./markupInjection";
 
 /**
- * Injects redline markup into content while preserving paragraph structure
+ * Injects redline markup into content with smart positioning
  */
 export const injectRedlineMarkup = (
   content: string, 
@@ -28,12 +28,12 @@ export const injectRedlineMarkup = (
     return '<p>No content available</p>';
   }
   
-  // Process suggestions and apply markup - this now handles paragraph preservation internally
+  // Process suggestions with smart positioning that handles both HTML and plain text
   const enhancedContent = processSuggestions(content, suggestions, selectedId);
   
   // Validate the final HTML structure
   const validatedContent = validateHtml(enhancedContent);
   
-  console.log('Redline markup injection complete with paragraph preservation');
+  console.log('Redline markup injection complete with smart positioning');
   return validatedContent;
 };

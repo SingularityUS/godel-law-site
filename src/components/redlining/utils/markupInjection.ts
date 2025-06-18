@@ -6,8 +6,9 @@
  */
 
 import { RedlineSuggestion } from "@/types/redlining";
-import { escapeHtml } from "./htmlUtils";
+import { escapeHtml, hasHtmlMarkup } from "./htmlUtils";
 import { getSeverityClass, getTypeClass, getTypeIcon } from "./styleUtils";
+import { createPositionMapping, mapPlainTextToHtml, findTextInHtml, extractPlainText } from "./positionMapping";
 
 /**
  * Creates a redline markup span for a suggestion with interactive elements
@@ -42,9 +43,52 @@ const validateSuggestion = (suggestion: RedlineSuggestion, contentLength: number
 };
 
 /**
- * Applies a single suggestion to content (works with both plain text and HTML)
+ * Applies a single suggestion to HTML content using smart positioning
  */
-const applySuggestion = (
+const applySuggestionToHtml = (
+  htmlContent: string,
+  suggestion: RedlineSuggestion,
+  selectedId: string | null
+): string => {
+  // Try position mapping first
+  const mapping = createPositionMapping(htmlContent);
+  const htmlStart = mapPlainTextToHtml(suggestion.startPos, mapping);
+  const htmlEnd = mapPlainTextToHtml(suggestion.endPos, mapping);
+  
+  // Validate that the mapped positions make sense
+  if (htmlStart < htmlContent.length && htmlEnd <= htmlContent.length && htmlStart < htmlEnd) {
+    const beforeText = htmlContent.substring(0, htmlStart);
+    const originalText = extractPlainText(htmlContent.substring(htmlStart, htmlEnd));
+    const afterText = htmlContent.substring(htmlEnd);
+    
+    // Verify the text matches what we expect
+    if (originalText.trim() === suggestion.originalText.trim()) {
+      const isSelected = selectedId === suggestion.id;
+      const redlineMarkup = createRedlineMarkup(suggestion, originalText, isSelected);
+      return beforeText + redlineMarkup + afterText;
+    }
+  }
+  
+  // Fallback: Use text-based matching
+  console.warn(`Position mapping failed for suggestion ${suggestion.id}, using text-based matching`);
+  const textMatch = findTextInHtml(htmlContent, suggestion.originalText);
+  
+  if (textMatch) {
+    const beforeText = htmlContent.substring(0, textMatch.start);
+    const afterText = htmlContent.substring(textMatch.end);
+    const isSelected = selectedId === suggestion.id;
+    const redlineMarkup = createRedlineMarkup(suggestion, suggestion.originalText, isSelected);
+    return beforeText + redlineMarkup + afterText;
+  }
+  
+  console.warn(`Could not apply suggestion ${suggestion.id}: text not found`);
+  return htmlContent;
+};
+
+/**
+ * Applies a single suggestion to plain text content
+ */
+const applySuggestionToPlainText = (
   content: string,
   suggestion: RedlineSuggestion,
   selectedId: string | null
@@ -66,17 +110,12 @@ const applySuggestion = (
 };
 
 /**
- * Preserves existing HTML structure while adding paragraph tags only where needed
+ * Converts plain text content to HTML with paragraph structure
  */
-const preserveHtmlStructure = (content: string): string => {
-  // If content already has HTML structure, preserve it
-  if (/<[^>]+>/.test(content)) {
-    console.log('Content already has HTML structure, preserving it');
-    return content;
-  }
-  
-  // If it's plain text, convert to HTML with paragraph structure
+const convertPlainTextToHtml = (content: string): string => {
   console.log('Converting plain text to HTML with paragraph structure');
+  
+  // Split on double line breaks to identify paragraphs
   const paragraphs = content.split('\n\n');
   
   return paragraphs
@@ -95,7 +134,7 @@ const preserveHtmlStructure = (content: string): string => {
 };
 
 /**
- * Processes all suggestions and applies them to content while preserving HTML formatting
+ * Processes all suggestions and applies them to content with smart positioning
  */
 export const processSuggestions = (
   content: string,
@@ -103,29 +142,47 @@ export const processSuggestions = (
   selectedId: string | null
 ): string => {
   console.log(`Processing ${suggestions.length} suggestions for markup injection`);
-  console.log('Content has HTML formatting:', /<[^>]+>/.test(content));
   
-  // Filter and sort suggestions
-  const validSuggestions = suggestions.filter(s => validateSuggestion(s, content.length));
+  const isHtmlContent = hasHtmlMarkup(content);
+  console.log('Content type:', isHtmlContent ? 'HTML' : 'Plain Text');
+  
+  // Filter and validate suggestions based on content type
+  let validSuggestions: RedlineSuggestion[];
+  
+  if (isHtmlContent) {
+    // For HTML content, validate against plain text length
+    const plainTextLength = extractPlainText(content).length;
+    validSuggestions = suggestions.filter(s => validateSuggestion(s, plainTextLength));
+  } else {
+    validSuggestions = suggestions.filter(s => validateSuggestion(s, content.length));
+  }
+  
   console.log(`Applying ${validSuggestions.length} valid suggestions`);
   
+  // Sort suggestions by position (descending to avoid position shifts)
   const sortedSuggestions = [...validSuggestions].sort((a, b) => b.startPos - a.startPos);
   
   let enhancedContent = content;
   
-  // Apply suggestions to the content (whether plain text or HTML)
+  // Apply suggestions based on content type
   sortedSuggestions.forEach((suggestion, index) => {
     try {
-      enhancedContent = applySuggestion(enhancedContent, suggestion, selectedId);
+      if (isHtmlContent) {
+        enhancedContent = applySuggestionToHtml(enhancedContent, suggestion, selectedId);
+      } else {
+        enhancedContent = applySuggestionToPlainText(enhancedContent, suggestion, selectedId);
+      }
       console.log(`Applied suggestion ${index + 1}/${sortedSuggestions.length}`);
     } catch (error) {
       console.error(`Error applying suggestion ${suggestion.id}:`, error);
     }
   });
   
-  // Preserve HTML structure or convert to HTML if needed
-  const htmlContent = preserveHtmlStructure(enhancedContent);
+  // Convert to HTML if needed (only for plain text)
+  if (!hasHtmlMarkup(enhancedContent)) {
+    enhancedContent = convertPlainTextToHtml(enhancedContent);
+  }
   
-  console.log('Completed suggestion processing with HTML formatting preservation');
-  return htmlContent;
+  console.log('Completed suggestion processing with smart positioning');
+  return enhancedContent;
 };
