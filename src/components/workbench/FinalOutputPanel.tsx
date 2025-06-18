@@ -30,7 +30,7 @@ const FinalOutputPanel: React.FC<FinalOutputPanelProps> = ({
   onClose
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const { handleCopy, handleDownload } = useOutputPanel(output);
+  const { handleCopy, handleDownload } = useOutputPanel();
 
   if (!output) return null;
 
