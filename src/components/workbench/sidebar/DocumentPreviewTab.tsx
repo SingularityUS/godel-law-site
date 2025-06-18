@@ -48,12 +48,12 @@ const DocumentPreviewTab: React.FC<DocumentPreviewTabProps> = ({ document }) => 
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-3 border-b bg-gray-50">
+      <div className="p-3 border-b bg-gray-50 flex-shrink-0">
         <h3 className="font-medium text-sm text-gray-900 truncate">{document.name}</h3>
         <p className="text-xs text-gray-500 capitalize">{document.type.replace('application/', '').replace('text/', '')}</p>
       </div>
       
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-auto">
         <div className="p-4">
           <div 
             className="prose prose-sm max-w-none"
@@ -80,7 +80,7 @@ const DocumentPreviewTab: React.FC<DocumentPreviewTabProps> = ({ document }) => 
             )}
           </div>
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 };
