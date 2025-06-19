@@ -94,7 +94,7 @@ export const useRedlineProcessor = ({
           ...prev,
           document: redlineDocument,
           isProcessing: false,
-          terminalModules
+          terminalModules: terminalModules.map(tm => tm.moduleType)
         }));
 
       } catch (error: any) {
