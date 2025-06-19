@@ -1,3 +1,4 @@
+
 /**
  * Content Extractor
  * 
@@ -115,7 +116,7 @@ function isValidContent(content: any): content is string {
 }
 
 function extractContentFromAnalysis(moduleResult: any): string | null {
-  console.log('Attempting to extract content from analysis structures...');
+  console.log('🔍 EXTRACTING FROM ANALYSIS - Enhanced for Grammar Results');
   
   const analysisPaths = [
     { path: moduleResult?.output?.analysis, name: 'output.analysis' },
@@ -125,32 +126,71 @@ function extractContentFromAnalysis(moduleResult: any): string | null {
   
   for (const { path, name } of analysisPaths) {
     if (Array.isArray(path) && path.length > 0) {
-      console.log(`Found analysis array at ${name} with ${path.length} items`);
+      console.log(`📄 Found analysis array at ${name} with ${path.length} items`);
       
-      // Try to reconstruct content from paragraph analysis
-      const paragraphTexts = path
+      // Log structure of first few items to understand the data
+      path.slice(0, 3).forEach((item, index) => {
+        console.log(`Analysis item ${index} structure:`, {
+          hasOriginalContent: !!item?.originalContent,
+          originalContentLength: item?.originalContent?.length || 0,
+          hasContent: !!item?.content,
+          hasText: !!item?.text,
+          hasParagraphContent: !!item?.paragraph?.content,
+          hasOriginalIndex: !!item?.originalIndex,
+          paragraphId: item?.paragraphId,
+          keys: Object.keys(item || {})
+        });
+      });
+      
+      // Extract paragraphs with their content, prioritizing originalContent
+      const paragraphData = path
         .map((item: any, index: number) => {
-          const text = item?.content || 
-                 item?.text || 
-                 item?.paragraph?.content || 
-                 item?.originalText;
+          // Priority order for content extraction
+          const content = item?.originalContent ||      // ✅ Your data has this!
+                         item?.content || 
+                         item?.text || 
+                         item?.paragraph?.content || 
+                         item?.originalText;
           
-          if (typeof text === 'string' && text.length > 0) {
-            console.log(`Analysis item ${index}: ${text.length} chars`);
-            return text;
+          if (typeof content === 'string' && content.length > 0) {
+            return {
+              content,
+              originalIndex: item?.originalIndex ?? index,
+              paragraphId: item?.paragraphId || `para-${index}`,
+              length: content.length
+            };
           }
           return null;
         })
-        .filter(text => text !== null);
+        .filter(item => item !== null);
       
-      if (paragraphTexts.length > 0) {
-        const reconstructed = paragraphTexts.join('\n\n');
-        console.log(`Reconstructed ${reconstructed.length} chars from ${paragraphTexts.length} analysis items`);
-        return reconstructed;
+      console.log(`📄 Extracted ${paragraphData.length} valid paragraphs from analysis`);
+      
+      if (paragraphData.length > 0) {
+        // Sort by originalIndex to maintain document order
+        paragraphData.sort((a, b) => (a.originalIndex || 0) - (b.originalIndex || 0));
+        
+        console.log('📄 Paragraph reconstruction order:', 
+          paragraphData.map(p => `${p.paragraphId}(${p.length} chars, index: ${p.originalIndex})`));
+        
+        // Reconstruct the full document
+        const reconstructed = paragraphData.map(p => p.content).join('\n\n');
+        
+        console.log(`✅ Successfully reconstructed document: ${reconstructed.length} chars from ${paragraphData.length} paragraphs`);
+        console.log('📄 Reconstructed content preview:', reconstructed.substring(0, 300));
+        console.log('📄 Reconstructed content end:', reconstructed.slice(-100));
+        
+        // Validate the reconstructed content
+        if (reconstructed.length > 100) { // Ensure substantial content
+          return reconstructed;
+        } else {
+          console.warn('⚠️ Reconstructed content too short, may be incomplete');
+        }
       }
     }
   }
   
+  console.log('❌ No valid content found in analysis structures');
   return null;
 }
 
