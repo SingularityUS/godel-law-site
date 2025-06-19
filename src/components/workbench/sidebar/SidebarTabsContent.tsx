@@ -64,6 +64,7 @@ const SidebarTabsContent: React.FC<SidebarTabsContentProps> = ({
               isProcessing={isProcessing}
               processingDocument={processingDocument}
               output={output}
+              previewDocument={previewDocument}
               onSaveRedline={onSaveRedline}
               onExportRedline={onExportRedline}
             />

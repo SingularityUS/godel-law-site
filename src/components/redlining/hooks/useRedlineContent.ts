@@ -30,16 +30,17 @@ export const useRedlineContent = ({
     const loadRichContent = async () => {
       setIsLoading(true);
       try {
-        console.log('=== LOADING RICH CONTENT (Systematic Debug Phase 1) ===');
-        console.log('Goal: Display full original document content WITHOUT suggestions first');
+        console.log('=== LOADING RICH CONTENT (Enhanced for Full Document) ===');
+        console.log('🎯 Goal: Display complete original document content');
         
-        // Log all available content sources
+        // Log all available content sources with enhanced debugging
         console.log('Available content sources:');
         console.log('1. Original document preview:', {
           hasPreview: !!originalDocument?.preview,
           previewLength: originalDocument?.preview?.length || 0,
           previewType: originalDocument?.type,
-          previewStart: originalDocument?.preview?.substring(0, 100)
+          previewStart: originalDocument?.preview?.substring(0, 100),
+          isFullContent: (originalDocument?.preview?.length || 0) > 100 // Detect if this looks like full content
         });
         
         console.log('2. Document current content:', {
@@ -54,49 +55,50 @@ export const useRedlineContent = ({
           originalContentStart: document.originalContent?.substring(0, 100)
         });
         
-        console.log('4. Suggestions:', {
-          suggestionCount: suggestions.length,
-          suggestionIds: suggestions.map(s => s.id)
-        });
-        
         let baseContent = '';
         let contentSource = 'none';
         
-        // PHASE 1: PRIORITY - Use original document preview (this should have full content)
-        if (originalDocument?.preview && originalDocument.preview.trim().length > 0) {
-          console.log('🎯 PHASE 1: Attempting to extract from original document preview...');
+        // PRIORITY 1: Use original document preview if it contains substantial content
+        if (originalDocument?.preview && originalDocument.preview.trim().length > 100) {
+          console.log('✅ PRIORITY 1: Using original document preview (full content detected)');
           try {
-            baseContent = await extractDocumentContent(originalDocument);
-            contentSource = 'original-document-preview';
-            console.log('✅ Successfully extracted from original document preview:', {
-              extractedLength: baseContent.length,
-              hasHtml: hasHtmlMarkup(baseContent),
-              contentStart: baseContent.substring(0, 200)
-            });
-          } catch (error) {
-            console.error('❌ Failed to extract from original document preview:', error);
-            // Don't fallback yet, let's try the raw preview
-            if (originalDocument.preview.length > 50) {
+            // If it's already formatted content, use it directly
+            if (hasHtmlMarkup(originalDocument.preview) || originalDocument.preview.length > 500) {
               baseContent = originalDocument.preview;
-              contentSource = 'raw-original-preview';
-              console.log('✅ Using raw original document preview as fallback');
+              contentSource = 'direct-original-preview';
+              console.log('Using direct original preview content');
+            } else {
+              // Try to extract if it's a structured document
+              baseContent = await extractDocumentContent(originalDocument);
+              contentSource = 'extracted-original-preview';
+              console.log('Extracted from original document preview');
             }
+          } catch (error) {
+            console.warn('❌ Failed to extract from original document preview, using raw:', error);
+            baseContent = originalDocument.preview;
+            contentSource = 'raw-original-preview';
           }
         }
         
-        // PHASE 1: FALLBACK - Use stored content only if preview failed
-        if (!baseContent || baseContent.length < 50) {
-          console.log('⚠️ Original document preview insufficient, checking stored content...');
-          
-          if (document.currentContent && document.currentContent.length > 50) {
-            baseContent = document.currentContent;
-            contentSource = 'document-current-content';
-            console.log('Using document current content as fallback');
-          } else if (document.originalContent && document.originalContent.length > 50) {
-            baseContent = document.originalContent;
-            contentSource = 'document-original-content';
-            console.log('Using document original content as fallback');
-          }
+        // PRIORITY 2: Use document original content if preview is insufficient
+        else if (document.originalContent && document.originalContent.length > 100) {
+          console.log('✅ PRIORITY 2: Using document original content');
+          baseContent = document.originalContent;
+          contentSource = 'document-original-content';
+        }
+        
+        // PRIORITY 3: Use document current content as fallback
+        else if (document.currentContent && document.currentContent.length > 100) {
+          console.log('✅ PRIORITY 3: Using document current content');
+          baseContent = document.currentContent;
+          contentSource = 'document-current-content';
+        }
+        
+        // PRIORITY 4: Emergency fallback to any available content
+        else if (originalDocument?.preview && originalDocument.preview.length > 0) {
+          console.log('⚠️ PRIORITY 4: Using short original preview as emergency fallback');
+          baseContent = originalDocument.preview;
+          contentSource = 'emergency-original-preview';
         }
         
         // Validate we have meaningful content
@@ -113,8 +115,8 @@ export const useRedlineContent = ({
         console.log('Content preview (first 300 chars):', baseContent.substring(0, 300));
         console.log('Content preview (last 100 chars):', baseContent.slice(-100));
         
-        // PHASE 1: DISPLAY ORIGINAL CONTENT ONLY (no suggestions for now)
-        console.log('🎯 PHASE 1: Displaying original content WITHOUT suggestions for debugging');
+        // Display original content for redline overlay
+        console.log('🎯 Preparing content for redline display');
         
         let finalContent = baseContent;
         
@@ -134,16 +136,16 @@ export const useRedlineContent = ({
       } catch (error) {
         console.error('❌ Error loading rich content:', error);
         
-        // Emergency fallback
-        const emergencyContent = document.currentContent || 
+        // Emergency fallback with priority order
+        const emergencyContent = originalDocument?.preview || 
                                document.originalContent || 
-                               originalDocument?.preview ||
+                               document.currentContent || 
                                'Error loading document content.';
         
         console.log('Using emergency fallback content:', {
-          source: emergencyContent === document.currentContent ? 'document.currentContent' :
+          source: emergencyContent === originalDocument?.preview ? 'originalDocument.preview' :
                   emergencyContent === document.originalContent ? 'document.originalContent' :
-                  emergencyContent === originalDocument?.preview ? 'originalDocument.preview' : 'error',
+                  emergencyContent === document.currentContent ? 'document.currentContent' : 'error',
           length: emergencyContent.length
         });
         
@@ -158,7 +160,7 @@ export const useRedlineContent = ({
     };
 
     loadRichContent();
-  }, [document, originalDocument]); // Removed suggestions from dependencies to focus on original content
+  }, [document, originalDocument]); // Focus on original content, not suggestions
 
   return { richContent, isLoading };
 };

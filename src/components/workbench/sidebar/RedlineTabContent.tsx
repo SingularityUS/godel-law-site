@@ -15,6 +15,7 @@ interface RedlineTabContentProps {
   isProcessing?: boolean;
   processingDocument?: any;
   output: any;
+  previewDocument?: { name: string; type: string; preview?: string } | null;
   onSaveRedline: (document: RedlineDocument) => void;
   onExportRedline: (document: RedlineDocument, format: string) => void;
 }
@@ -23,6 +24,7 @@ const RedlineTabContent: React.FC<RedlineTabContentProps> = ({
   isProcessing,
   processingDocument,
   output,
+  previewDocument,
   onSaveRedline,
   onExportRedline
 }) => {
@@ -65,15 +67,30 @@ const RedlineTabContent: React.FC<RedlineTabContentProps> = ({
 
   // Show redline document when ready
   if (redlineDocument) {
+    // Priority: Use previewDocument if available (contains full content)
+    // Fallback: Use output metadata (may be truncated)
+    const originalDocument = previewDocument ? {
+      type: previewDocument.type,
+      preview: previewDocument.preview,
+      name: previewDocument.name
+    } : {
+      type: output?.metadata?.fileType || 'text/plain',
+      preview: output?.metadata?.originalPreview,
+      name: output?.metadata?.fileName || redlineDocument.metadata.fileName || 'Document'
+    };
+
+    console.log('🎯 REDLINE TAB: Original document source:', {
+      usingPreviewDocument: !!previewDocument,
+      previewLength: previewDocument?.preview?.length || 0,
+      fallbackLength: output?.metadata?.originalPreview?.length || 0,
+      documentName: originalDocument.name
+    });
+
     return (
       <div className="h-full overflow-hidden">
         <EmbeddedRedlineViewer
           document={redlineDocument}
-          originalDocument={{
-            type: output?.metadata?.fileType || 'text/plain',
-            preview: output?.metadata?.originalPreview,
-            name: output?.metadata?.fileName || redlineDocument.metadata.fileName || 'Document'
-          }}
+          originalDocument={originalDocument}
           onSave={onSaveRedline}
           onExport={onExportRedline}
         />
