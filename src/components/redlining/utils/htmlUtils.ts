@@ -2,39 +2,61 @@
 /**
  * HTML Utilities
  * 
- * Purpose: HTML manipulation and validation utilities
+ * Purpose: Enhanced HTML manipulation and validation utilities
  */
 
 /**
- * Escapes HTML characters to prevent XSS
+ * Escapes HTML characters to prevent XSS with improved handling
  */
 export const escapeHtml = (text: string): string => {
-  const div = window.document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+  if (typeof text !== 'string') {
+    return String(text || '');
+  }
+  
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
 };
 
 /**
- * Detects if content contains HTML markup
+ * Detects if content contains HTML markup with improved pattern matching
  */
 export const hasHtmlMarkup = (content: string): boolean => {
-  return /<[^>]+>/.test(content);
+  if (!content || typeof content !== 'string') {
+    return false;
+  }
+  
+  // Check for HTML tags
+  const htmlTagPattern = /<\/?[a-z][\s\S]*>/i;
+  return htmlTagPattern.test(content);
 };
 
 /**
  * Detects if content contains redline markup specifically
  */
 export const hasRedlineMarkup = (content: string): boolean => {
-  return /class="redline-suggestion/.test(content);
+  if (!content || typeof content !== 'string') {
+    return false;
+  }
+  
+  return /class="[^"]*redline-suggestion[^"]*"/.test(content);
 };
 
 /**
  * Converts plain text to HTML while preserving paragraph structure
  */
 export const convertTextToHtml = (content: string): string => {
+  if (!content || typeof content !== 'string') {
+    return '<p>No content available</p>';
+  }
+  
   console.log('Converting text to HTML, preserving paragraph structure');
   
-  // If content already contains redline markup, it should already be in HTML format
+  // If content already contains redline markup, preserve it
   if (hasRedlineMarkup(content)) {
     console.log('Content contains redline markup, preserving as-is');
     return content;
@@ -46,40 +68,82 @@ export const convertTextToHtml = (content: string): string => {
     return content;
   }
   
-  // Plain text - convert preserving paragraph structure
+  // Convert plain text to HTML paragraphs
   console.log('Converting plain text to HTML with proper paragraph handling');
   
-  // First, split on double line breaks to identify paragraphs
-  const paragraphs = content.split('\n\n');
+  const trimmedContent = content.trim();
+  if (!trimmedContent) {
+    return '<p>No content available</p>';
+  }
+  
+  // Split on double line breaks to identify paragraphs
+  const paragraphs = trimmedContent.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+  
+  if (paragraphs.length === 0) {
+    return '<p>No content available</p>';
+  }
   
   return paragraphs
     .map(paragraph => {
       const trimmedParagraph = paragraph.trim();
-      if (trimmedParagraph === '') {
-        return ''; // Skip empty paragraphs
-      }
-      
       // Within each paragraph, convert single line breaks to <br> tags
       const paragraphWithBreaks = trimmedParagraph.replace(/\n/g, '<br>');
       return `<p>${paragraphWithBreaks}</p>`;
     })
-    .filter(p => p !== '') // Remove empty paragraphs
     .join('');
 };
 
 /**
- * Validates and cleans up HTML content
+ * Validates and cleans up HTML content with improved error handling
  */
 export const validateHtml = (content: string): string => {
+  if (!content || typeof content !== 'string') {
+    return '<p>No content available</p>';
+  }
+  
   try {
     // Create a temporary div to validate HTML structure
     const div = document.createElement('div');
     div.innerHTML = content;
     
+    // Check if the HTML was parsed correctly
+    if (div.innerHTML.length === 0 && content.length > 0) {
+      console.warn('HTML validation resulted in empty content, returning original');
+      return content;
+    }
+    
     // Return the cleaned HTML
     return div.innerHTML;
   } catch (error) {
     console.warn('HTML validation failed, returning original content:', error);
+    return content;
+  }
+};
+
+/**
+ * Removes any existing redline markup from content
+ */
+export const stripRedlineMarkup = (content: string): string => {
+  if (!content || typeof content !== 'string') {
+    return '';
+  }
+  
+  try {
+    // Create a temporary div to validate HTML structure
+    const div = document.createElement('div');
+    div.innerHTML = content;
+    
+    // Find all redline suggestion elements
+    const redlineElements = div.querySelectorAll('.redline-suggestion');
+    redlineElements.forEach(element => {
+      // Replace with just the original text
+      const originalText = element.getAttribute('data-original') || element.textContent || '';
+      element.outerHTML = originalText;
+    });
+    
+    return div.innerHTML;
+  } catch (error) {
+    console.warn('Failed to strip redline markup:', error);
     return content;
   }
 };
