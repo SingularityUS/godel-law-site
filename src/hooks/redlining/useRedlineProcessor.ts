@@ -2,11 +2,10 @@
 /**
  * useRedlineProcessor Hook
  * 
- * Purpose: Core redline processing system that converts pipeline terminal module outputs
- * into a unified redline document for user review and editing.
+ * Purpose: Core redline processing system with enhanced error handling and processing guards
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { RedlineDocument } from "@/types/redlining";
 import { detectTerminalModules } from "./utils/terminalModuleDetector";
 import { collectTerminalData } from "./utils/terminalDataCollector";
@@ -36,59 +35,101 @@ export const useRedlineProcessor = ({
     terminalModules: []
   });
 
+  // Processing guards to prevent infinite loops
+  const lastProcessedRef = useRef<string>('');
+  const isProcessingRef = useRef<boolean>(false);
+
   useEffect(() => {
-    if (!enabled || !pipelineOutput) {
-      console.log('Redline processing disabled or no pipeline output');
+    if (!enabled || !pipelineOutput || isProcessingRef.current) {
+      console.log('Redline processing skipped:', {
+        enabled,
+        hasPipelineOutput: !!pipelineOutput,
+        isProcessing: isProcessingRef.current
+      });
+      return;
+    }
+
+    // Create a hash of the pipeline output to detect changes
+    const outputHash = JSON.stringify({
+      hasResults: !!pipelineOutput.results,
+      resultsLength: pipelineOutput.results?.length || 0,
+      hasEndpointResults: !!pipelineOutput.endpointResults,
+      endpointResultsLength: pipelineOutput.endpointResults?.length || 0,
+      summary: pipelineOutput.summary?.processingCompleted || null
+    });
+
+    // Skip if we've already processed this exact output
+    if (lastProcessedRef.current === outputHash) {
+      console.log('Skipping redline processing - already processed this output');
       return;
     }
 
     const processRedline = async () => {
+      if (isProcessingRef.current) return;
+      
+      isProcessingRef.current = true;
       setState(prev => ({ ...prev, isProcessing: true, error: null }));
       
       try {
-        console.log('=== REDLINE PROCESSOR START ===');
+        console.log('=== REDLINE PROCESSOR START (Enhanced) ===');
         console.log('Pipeline output structure:', {
+          hasResults: !!pipelineOutput.results,
+          resultsCount: pipelineOutput.results?.length || 0,
           hasEndpointResults: !!pipelineOutput.endpointResults,
           endpointCount: pipelineOutput.endpointResults?.length || 0,
+          hasPipelineResults: !!pipelineOutput.pipelineResults,
+          pipelineResultsCount: pipelineOutput.pipelineResults?.length || 0,
           hasSummary: !!pipelineOutput.summary,
           outputKeys: Object.keys(pipelineOutput)
         });
 
-        // Step 1: Detect terminal modules
+        // Step 1: Detect terminal modules with validation
         const terminalModules = detectTerminalModules(pipelineOutput);
         console.log('Terminal modules detected:', terminalModules);
 
         if (terminalModules.length === 0) {
-          console.warn('No terminal modules found in pipeline');
-          setState(prev => ({ 
-            ...prev, 
-            isProcessing: false, 
-            error: 'No terminal modules found in pipeline output',
-            terminalModules: []
-          }));
-          return;
+          throw new Error('No terminal modules found in pipeline output. This may indicate the pipeline has not completed processing or no analysis modules were executed.');
         }
 
-        // Step 2: Collect data from terminal modules
+        // Step 2: Collect data from terminal modules with validation
         const terminalData = collectTerminalData(pipelineOutput, terminalModules);
         console.log('Terminal data collected:', {
           moduleCount: terminalData.length,
-          hasOriginalContent: terminalData.some(d => d.originalContent),
-          totalSuggestions: terminalData.reduce((sum, d) => sum + d.suggestions.length, 0)
+          hasOriginalContent: terminalData.some(d => d.originalContent && d.originalContent.length > 0),
+          totalSuggestions: terminalData.reduce((sum, d) => sum + d.suggestions.length, 0),
+          modulesWithContent: terminalData.filter(d => d.originalContent && d.originalContent.length > 0).length
         });
 
-        // Step 3: Create redline document
+        if (terminalData.length === 0) {
+          throw new Error('No valid terminal data collected. Terminal modules may not have produced analyzable results.');
+        }
+
+        // Validate that we have some original content
+        const hasOriginalContent = terminalData.some(d => d.originalContent && d.originalContent.length > 0);
+        if (!hasOriginalContent) {
+          throw new Error('No original document content found in terminal modules. The document text may not have been preserved during processing.');
+        }
+
+        // Step 3: Create redline document with validation
         const redlineDocument = createRedlineDocument(terminalData);
         
         if (!redlineDocument) {
-          throw new Error('Failed to create redline document from terminal data');
+          throw new Error('Failed to create redline document structure. This may be due to incompatible data formats.');
+        }
+
+        if (redlineDocument.suggestions.length === 0) {
+          console.warn('Redline document created but contains no suggestions');
         }
 
         console.log('Redline document created successfully:', {
           id: redlineDocument.id,
           suggestionCount: redlineDocument.suggestions.length,
-          originalContentLength: redlineDocument.originalContent.length
+          originalContentLength: redlineDocument.originalContent.length,
+          sourceModules: redlineDocument.metadata.sourceModules
         });
+
+        // Mark this output as processed
+        lastProcessedRef.current = outputHash;
 
         setState(prev => ({
           ...prev,
@@ -99,22 +140,32 @@ export const useRedlineProcessor = ({
 
       } catch (error: any) {
         console.error('Redline processing failed:', error);
+        
+        const errorMessage = error.message || 'Unknown error during redline processing';
+        
         setState(prev => ({
           ...prev,
           isProcessing: false,
-          error: error.message || 'Unknown error during redline processing',
+          error: errorMessage,
           terminalModules: []
         }));
         
         toast({
           title: "Redline Processing Error",
-          description: error.message || "Failed to process pipeline output for redlining",
+          description: errorMessage,
           variant: "destructive"
         });
+      } finally {
+        isProcessingRef.current = false;
       }
     };
 
-    processRedline();
+    // Add a small delay to prevent rapid re-processing
+    const timeoutId = setTimeout(processRedline, 100);
+    
+    return () => {
+      clearTimeout(timeoutId);
+    };
   }, [pipelineOutput, enabled]);
 
   const clearRedline = () => {
@@ -124,6 +175,7 @@ export const useRedlineProcessor = ({
       error: null,
       terminalModules: []
     });
+    lastProcessedRef.current = '';
   };
 
   return {
