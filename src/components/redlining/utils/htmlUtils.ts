@@ -47,6 +47,28 @@ export const hasRedlineMarkup = (content: string): boolean => {
 };
 
 /**
+ * Extracts plain text from HTML content
+ */
+export const extractPlainText = (htmlContent: string): string => {
+  if (!htmlContent || typeof htmlContent !== 'string') {
+    return '';
+  }
+  
+  try {
+    // Create a temporary div to parse HTML
+    const div = document.createElement('div');
+    div.innerHTML = htmlContent;
+    
+    // Get the text content (this automatically strips HTML tags)
+    return div.textContent || div.innerText || '';
+  } catch (error) {
+    console.warn('Failed to extract plain text from HTML:', error);
+    // Fallback: simple regex-based HTML tag removal
+    return htmlContent.replace(/<[^>]*>/g, '');
+  }
+};
+
+/**
  * Converts plain text to HTML while preserving paragraph structure
  */
 export const convertTextToHtml = (content: string): string => {
