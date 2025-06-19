@@ -13,8 +13,8 @@ interface SidebarTabsContentProps {
   setActiveTab: (tab: string) => void;
   isProcessing?: boolean;
   processingDocument?: any;
-  isGeneratingRedline: boolean;
-  redlineDocument: RedlineDocument | null;
+  isGeneratingRedline: boolean; // Keep for compatibility but unused
+  redlineDocument: RedlineDocument | null; // Keep for compatibility but unused
   isLegalPipeline: boolean;
   output: any;
   previewDocument: { name: string; type: string; preview?: string } | null;
@@ -27,9 +27,6 @@ const SidebarTabsContent: React.FC<SidebarTabsContentProps> = ({
   setActiveTab,
   isProcessing,
   processingDocument,
-  isGeneratingRedline,
-  redlineDocument,
-  isLegalPipeline,
   output,
   previewDocument,
   onSaveRedline,
@@ -66,9 +63,6 @@ const SidebarTabsContent: React.FC<SidebarTabsContentProps> = ({
             <RedlineTabContent
               isProcessing={isProcessing}
               processingDocument={processingDocument}
-              isGeneratingRedline={isGeneratingRedline}
-              redlineDocument={redlineDocument}
-              isLegalPipeline={isLegalPipeline}
               output={output}
               onSaveRedline={onSaveRedline}
               onExportRedline={onExportRedline}
