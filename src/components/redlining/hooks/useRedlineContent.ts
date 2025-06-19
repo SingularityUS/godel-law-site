@@ -31,8 +31,8 @@ export const useRedlineContent = ({
     const loadRichContent = async () => {
       setIsLoading(true);
       try {
-        console.log('=== LOADING RICH CONTENT WITH SUGGESTION OVERLAY ===');
-        console.log('🎯 Goal: Display complete original document content WITH suggestions overlaid');
+        console.log('=== LOADING RICH CONTENT WITH REDLINE OVERLAYS (Fixed) ===');
+        console.log('🎯 Goal: Display complete original document content WITH suggestion overlays');
         console.log('Suggestions to overlay:', suggestions.length);
         
         // Log all available content sources with enhanced debugging
@@ -42,7 +42,7 @@ export const useRedlineContent = ({
           previewLength: originalDocument?.preview?.length || 0,
           previewType: originalDocument?.type,
           previewStart: originalDocument?.preview?.substring(0, 100),
-          isFullContent: (originalDocument?.preview?.length || 0) > 100 // Detect if this looks like full content
+          isFullContent: (originalDocument?.preview?.length || 0) > 100
         });
         
         console.log('2. Document current content:', {
@@ -115,10 +115,9 @@ export const useRedlineContent = ({
         console.log('Content length:', baseContent.length);
         console.log('Content type:', hasHtmlMarkup(baseContent) ? 'HTML' : 'Plain text');
         console.log('Content preview (first 300 chars):', baseContent.substring(0, 300));
-        console.log('Content preview (last 100 chars):', baseContent.slice(-100));
         
         // Prepare content for redline display
-        console.log('🎯 Preparing content for redline display with suggestion overlay');
+        console.log('🎯 Preparing content for redline display with suggestion overlays');
         
         let finalContent = baseContent;
         
@@ -128,7 +127,7 @@ export const useRedlineContent = ({
           finalContent = convertTextToHtml(finalContent);
         }
         
-        console.log('=== APPLYING SUGGESTION OVERLAY ===');
+        console.log('=== APPLYING REDLINE OVERLAYS (Fixed Implementation) ===');
         console.log('Base content ready, now applying suggestions...');
         console.log('Suggestions to apply:', {
           count: suggestions.length,
@@ -137,26 +136,29 @@ export const useRedlineContent = ({
           suggestionTypes: suggestions.map(s => s.type)
         });
         
-        // Apply redline markup with suggestions
+        // Apply redline markup with suggestions - this should preserve formatting AND show overlays
         if (suggestions.length > 0) {
-          console.log('🎯 INJECTING REDLINE MARKUP WITH SUGGESTIONS');
+          console.log('🎯 INJECTING REDLINE MARKUP WITH OVERLAYS');
           try {
             finalContent = injectRedlineMarkup(finalContent, suggestions, selectedSuggestionId);
-            console.log('✅ Suggestion overlay applied successfully');
-            console.log('Final content with suggestions length:', finalContent.length);
+            console.log('✅ Redline overlays applied successfully');
+            console.log('Final content with overlays length:', finalContent.length);
+            console.log('Contains redline-suggestion spans:', finalContent.includes('redline-suggestion'));
+            console.log('Contains redline-content wrapper:', finalContent.includes('redline-content'));
           } catch (error) {
-            console.error('❌ Error applying suggestion overlay:', error);
-            console.log('Falling back to content without suggestions');
+            console.error('❌ Error applying redline overlays:', error);
+            console.log('Falling back to content without overlays');
           }
         } else {
           console.log('No suggestions to apply, using base content');
         }
         
-        console.log('=== FINAL CONTENT READY WITH SUGGESTIONS ===');
+        console.log('=== FINAL CONTENT READY WITH FORMATTING AND OVERLAYS ===');
         console.log('Final content length:', finalContent.length);
         console.log('Final content type:', hasHtmlMarkup(finalContent) ? 'HTML' : 'Plain text');
         console.log('Final content preview:', finalContent.substring(0, 400));
         console.log('Contains redline markup:', finalContent.includes('redline-suggestion'));
+        console.log('Contains formatting tags:', finalContent.includes('<strong>') || finalContent.includes('<u>') || finalContent.includes('<p>'));
         
         setRichContent(finalContent);
         
@@ -187,7 +189,7 @@ export const useRedlineContent = ({
     };
 
     loadRichContent();
-  }, [document, originalDocument, suggestions, selectedSuggestionId]); // Added suggestions and selectedSuggestionId as dependencies
+  }, [document, originalDocument, suggestions, selectedSuggestionId]);
 
   return { richContent, isLoading };
 };

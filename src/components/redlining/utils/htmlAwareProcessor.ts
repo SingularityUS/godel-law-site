@@ -9,12 +9,13 @@ import { RedlineSuggestion } from "@/types/redlining";
 import { createRedlineSpan, validateSuggestionForMarkup } from "./markupGenerators";
 
 interface HtmlSegment {
-  type: 'text' | 'tag';
+  type: 'text' | 'tag' | 'redline';
   content: string;
   startPos: number;
   endPos: number;
   textStartPos?: number; // Position in plain text
   textEndPos?: number;   // Position in plain text
+  isRedlineSpan?: boolean;
 }
 
 /**
@@ -25,7 +26,7 @@ export const processHtmlWithRedlines = (
   suggestions: RedlineSuggestion[],
   selectedId: string | null
 ): string => {
-  console.log('=== HTML-AWARE REDLINE PROCESSING ===');
+  console.log('=== HTML-AWARE REDLINE PROCESSING (Fixed) ===');
   console.log(`HTML content length: ${htmlContent.length}`);
   console.log(`Suggestions: ${suggestions.length}`);
   
@@ -34,6 +35,7 @@ export const processHtmlWithRedlines = (
   }
   
   if (!suggestions || suggestions.length === 0) {
+    console.log('No suggestions to apply, returning original HTML');
     return htmlContent;
   }
   
@@ -53,17 +55,24 @@ export const processHtmlWithRedlines = (
     
     console.log(`Using ${validSuggestions.length} valid suggestions`);
     
+    if (validSuggestions.length === 0) {
+      console.log('No valid suggestions after filtering, returning original HTML');
+      return htmlContent;
+    }
+    
     // Apply suggestions to segments
     const processedSegments = applySuggestionsToSegments(
       segments, 
       validSuggestions, 
-      selectedId
+      selectedId,
+      plainText
     );
     
-    // Reconstruct HTML
+    // Reconstruct HTML with proper redline CSS classes
     const result = reconstructHtmlFromSegments(processedSegments);
     
-    console.log('HTML-aware processing complete');
+    console.log('HTML-aware processing complete with redline overlays');
+    console.log('Result contains redline spans:', result.includes('redline-suggestion'));
     return result;
     
   } catch (error) {
@@ -80,66 +89,52 @@ function parseHtmlToSegments(htmlContent: string): HtmlSegment[] {
   let htmlPos = 0;
   let textPos = 0;
   
-  while (htmlPos < htmlContent.length) {
-    // Look for HTML tags
-    const tagStart = htmlContent.indexOf('<', htmlPos);
-    
-    if (tagStart === -1) {
-      // No more tags, rest is text
-      const textContent = htmlContent.substring(htmlPos);
+  // Simple HTML parsing that preserves structure
+  const htmlRegex = /<[^>]*>/g;
+  let lastIndex = 0;
+  let match;
+  
+  while ((match = htmlRegex.exec(htmlContent)) !== null) {
+    // Add text before tag
+    if (match.index > lastIndex) {
+      const textContent = htmlContent.substring(lastIndex, match.index);
       if (textContent.length > 0) {
         segments.push({
           type: 'text',
           content: textContent,
-          startPos: htmlPos,
-          endPos: htmlContent.length,
+          startPos: lastIndex,
+          endPos: match.index,
           textStartPos: textPos,
           textEndPos: textPos + textContent.length
         });
+        textPos += textContent.length;
       }
-      break;
     }
     
-    // Add text before tag (if any)
-    if (tagStart > htmlPos) {
-      const textContent = htmlContent.substring(htmlPos, tagStart);
+    // Add tag
+    segments.push({
+      type: 'tag',
+      content: match[0],
+      startPos: match.index,
+      endPos: match.index + match[0].length
+    });
+    
+    lastIndex = match.index + match[0].length;
+  }
+  
+  // Add remaining text
+  if (lastIndex < htmlContent.length) {
+    const textContent = htmlContent.substring(lastIndex);
+    if (textContent.length > 0) {
       segments.push({
         type: 'text',
         content: textContent,
-        startPos: htmlPos,
-        endPos: tagStart,
-        textStartPos: textPos,
-        textEndPos: textPos + textContent.length
-      });
-      textPos += textContent.length;
-    }
-    
-    // Find tag end
-    const tagEnd = htmlContent.indexOf('>', tagStart);
-    if (tagEnd === -1) {
-      // Malformed HTML, treat rest as text
-      const textContent = htmlContent.substring(htmlPos);
-      segments.push({
-        type: 'text',
-        content: textContent,
-        startPos: htmlPos,
+        startPos: lastIndex,
         endPos: htmlContent.length,
         textStartPos: textPos,
         textEndPos: textPos + textContent.length
       });
-      break;
     }
-    
-    // Add tag segment
-    const tagContent = htmlContent.substring(tagStart, tagEnd + 1);
-    segments.push({
-      type: 'tag',
-      content: tagContent,
-      startPos: tagStart,
-      endPos: tagEnd + 1
-    });
-    
-    htmlPos = tagEnd + 1;
   }
   
   return segments;
@@ -156,14 +151,15 @@ function extractPlainTextFromSegments(segments: HtmlSegment[]): string {
 }
 
 /**
- * Apply suggestions to HTML segments
+ * Apply suggestions to HTML segments with proper redline integration
  */
 function applySuggestionsToSegments(
   segments: HtmlSegment[],
   suggestions: RedlineSuggestion[],
-  selectedId: string | null
+  selectedId: string | null,
+  plainText: string
 ): HtmlSegment[] {
-  console.log('Applying suggestions to HTML segments');
+  console.log('Applying suggestions to HTML segments with redline integration');
   
   const processedSegments: HtmlSegment[] = [];
   
@@ -174,8 +170,8 @@ function applySuggestionsToSegments(
       continue;
     }
     
-    // Process text segments
-    const textSegments = applyRedlinesToTextSegment(segment, suggestions, selectedId);
+    // Process text segments with suggestions
+    const textSegments = applyRedlinesToTextSegment(segment, suggestions, selectedId, plainText);
     processedSegments.push(...textSegments);
   }
   
@@ -188,31 +184,42 @@ function applySuggestionsToSegments(
 function applyRedlinesToTextSegment(
   textSegment: HtmlSegment,
   suggestions: RedlineSuggestion[],
-  selectedId: string | null
+  selectedId: string | null,
+  plainText: string
 ): HtmlSegment[] {
   const { content, textStartPos = 0, textEndPos = 0 } = textSegment;
   
   // Find suggestions that apply to this text segment
-  const applicableSuggestions = suggestions.filter(s => 
-    s.startPos >= textStartPos && s.endPos <= textEndPos
-  );
+  const applicableSuggestions = suggestions.filter(s => {
+    const suggestionStart = s.startPos;
+    const suggestionEnd = s.endPos;
+    
+    // Check if suggestion overlaps with this text segment
+    return suggestionStart < textEndPos && suggestionEnd > textStartPos;
+  });
   
   if (applicableSuggestions.length === 0) {
     return [textSegment];
   }
   
   console.log(`Applying ${applicableSuggestions.length} suggestions to text segment`);
+  console.log(`Text segment: "${content.substring(0, 50)}..." (${textStartPos}-${textEndPos})`);
   
   const segments: HtmlSegment[] = [];
   let currentPos = 0;
   
   // Sort suggestions by position within this text segment
   const sortedSuggestions = applicableSuggestions
-    .sort((a, b) => (a.startPos - textStartPos) - (b.startPos - textStartPos));
+    .map(s => ({
+      ...s,
+      relativeStart: Math.max(0, s.startPos - textStartPos),
+      relativeEnd: Math.min(content.length, s.endPos - textStartPos)
+    }))
+    .filter(s => s.relativeStart < s.relativeEnd)
+    .sort((a, b) => a.relativeStart - b.relativeStart);
   
   for (const suggestion of sortedSuggestions) {
-    const relativeStart = suggestion.startPos - textStartPos;
-    const relativeEnd = suggestion.endPos - textStartPos;
+    const { relativeStart, relativeEnd } = suggestion;
     
     // Add text before suggestion
     if (currentPos < relativeStart) {
@@ -230,11 +237,14 @@ function applyRedlinesToTextSegment(
     const isSelected = suggestion.id === selectedId;
     const redlineSpan = createRedlineSpan(suggestion, suggestionText, isSelected);
     
+    console.log(`Creating redline span for: "${suggestionText}" -> selected: ${isSelected}`);
+    
     segments.push({
-      type: 'text',
+      type: 'redline',
       content: redlineSpan,
       startPos: textSegment.startPos + relativeStart,
-      endPos: textSegment.startPos + relativeEnd
+      endPos: textSegment.startPos + relativeEnd,
+      isRedlineSpan: true
     });
     
     currentPos = relativeEnd;
@@ -255,8 +265,16 @@ function applyRedlinesToTextSegment(
 }
 
 /**
- * Reconstruct HTML from processed segments
+ * Reconstruct HTML from processed segments with redline styling
  */
 function reconstructHtmlFromSegments(segments: HtmlSegment[]): string {
-  return segments.map(s => s.content).join('');
+  const result = segments.map(s => s.content).join('');
+  
+  // Ensure we have the redline container class for proper styling
+  const wrappedResult = `<div class="redline-content">${result}</div>`;
+  
+  console.log('Reconstructed HTML with redline spans');
+  console.log('Final result contains redline-suggestion:', wrappedResult.includes('redline-suggestion'));
+  
+  return wrappedResult;
 }
