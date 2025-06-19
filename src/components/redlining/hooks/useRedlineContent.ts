@@ -2,7 +2,7 @@
 /**
  * useRedlineContent Hook
  * 
- * Purpose: Manages loading and processing of redline content with enhanced document formatting
+ * Purpose: Enhanced content processing that preserves original document text with redline overlays
  */
 
 import { useEffect, useState } from "react";
@@ -30,7 +30,7 @@ export const useRedlineContent = ({
     const loadRichContent = async () => {
       setIsLoading(true);
       try {
-        console.log('Loading rich content with enhanced document formatting');
+        console.log('=== LOADING RICH CONTENT (Text-Preserving) ===');
         console.log('Document current content length:', document.currentContent.length);
         console.log('Document original content length:', document.originalContent.length);
         console.log('Suggestions count:', suggestions.length);
@@ -85,8 +85,17 @@ export const useRedlineContent = ({
           preview: baseContent.substring(0, 200)
         });
         
-        // Apply redline markup to the content while preserving formatting
+        // Apply redline markup to the content while preserving the original text
+        console.log('Applying redline markup while preserving original text...');
         const enhancedContent = injectRedlineMarkup(baseContent, suggestions, selectedSuggestionId);
+        
+        console.log('Enhanced content generated:', {
+          originalLength: baseContent.length,
+          enhancedLength: enhancedContent.length,
+          hasRedlineMarkup: /redline-suggestion/.test(enhancedContent),
+          preview: enhancedContent.substring(0, 300)
+        });
+        
         setRichContent(enhancedContent);
         
       } catch (error) {

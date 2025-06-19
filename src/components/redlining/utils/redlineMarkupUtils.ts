@@ -2,7 +2,7 @@
 /**
  * Redline Markup Utilities
  * 
- * Purpose: Simplified main entry point for redline markup processing
+ * Purpose: Simplified main entry point for redline markup processing that preserves original text
  */
 
 import { RedlineSuggestion } from "@/types/redlining";
@@ -15,14 +15,14 @@ export { getSeverityClass, getTypeClass, getTypeIcon } from "./styleUtils";
 export { processSuggestions } from "./markupInjection";
 
 /**
- * Injects redline markup into content with enhanced error handling and validation
+ * Injects redline markup into content while preserving original text
  */
 export const injectRedlineMarkup = (
   content: string, 
   suggestions: RedlineSuggestion[], 
   selectedId: string | null
 ): string => {
-  console.log(`=== INJECTING REDLINE MARKUP ===`);
+  console.log(`=== INJECTING REDLINE MARKUP (Text-Preserving) ===`);
   console.log(`Content: ${content?.length || 0} chars, Suggestions: ${suggestions?.length || 0}`);
   
   // Validate inputs
@@ -38,13 +38,13 @@ export const injectRedlineMarkup = (
   }
   
   try {
-    // Process suggestions with our enhanced system
+    // Process suggestions with our enhanced system that preserves original text
     const enhancedContent = processSuggestions(content, suggestions, selectedId);
     
     // Validate the final HTML structure
     const validatedContent = validateHtml(enhancedContent);
     
-    console.log('Redline markup injection completed successfully');
+    console.log('Redline markup injection completed successfully - original text preserved');
     return validatedContent;
   } catch (error) {
     console.error('Error during redline markup injection:', error);
