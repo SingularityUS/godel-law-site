@@ -2,25 +2,26 @@
 /**
  * Content Processor
  * 
- * Purpose: Enhanced content processing with redline suggestions display
+ * Purpose: Enhanced content processing with redline suggestions display that preserves HTML formatting
  */
 
 import { RedlineSuggestion } from "@/types/redlining";
 import { hasHtmlMarkup, convertTextToHtml, escapeHtml } from "./htmlUtils";
 import { createRedlineSpan, validateSuggestionForMarkup } from "./markupGenerators";
+import { processHtmlWithRedlines } from "./htmlAwareProcessor";
 
 /**
- * Process content with redline suggestions - now fully enabled
+ * Process content with redline suggestions - now with HTML formatting preservation
  */
 export const processContentWithRedlines = (
   content: string,
   suggestions: RedlineSuggestion[],
   selectedId: string | null
 ): string => {
-  console.log('=== CONTENT PROCESSOR (REDLINES ENABLED) ===');
+  console.log('=== CONTENT PROCESSOR (HTML-PRESERVING REDLINES) ===');
   console.log(`Content length: ${content.length}`);
   console.log(`Suggestions: ${suggestions.length}`);
-  console.log('Content preview (first 200 chars):', content.substring(0, 200));
+  console.log('Content type:', content.includes('<') && content.includes('>') ? 'HTML' : 'Plain text');
   
   if (!content || content.trim().length === 0) {
     console.warn('❌ No content provided to process');
@@ -42,10 +43,10 @@ export const processContentWithRedlines = (
   })));
   
   try {
-    // Process based on content type
+    // Process based on content type - now with HTML preservation
     if (hasHtmlMarkup(content)) {
-      console.log('Processing HTML content with redlines');
-      return processHtmlContentWithRedlines(content, suggestions, selectedId);
+      console.log('Processing HTML content with formatting preservation');
+      return processHtmlWithRedlines(content, suggestions, selectedId);
     } else {
       console.log('Processing plain text content with redlines');
       return processPlainTextContentWithRedlines(content, suggestions, selectedId);
@@ -55,29 +56,6 @@ export const processContentWithRedlines = (
     return hasHtmlMarkup(content) ? content : convertTextToHtml(content);
   }
 };
-
-/**
- * Process HTML content with redline suggestions
- */
-function processHtmlContentWithRedlines(
-  content: string,
-  suggestions: RedlineSuggestion[],
-  selectedId: string | null
-): string {
-  console.log('Processing HTML content with redlines');
-  
-  // For now, convert to plain text processing since HTML parsing is complex
-  // This preserves the content while adding redline suggestions
-  const textContent = content.replace(/<[^>]*>/g, '');
-  const processedText = processPlainTextContentWithRedlines(textContent, suggestions, selectedId);
-  
-  // If original had HTML structure, try to preserve basic formatting
-  if (content.includes('<p>') || content.includes('<div>')) {
-    return processedText;
-  }
-  
-  return processedText;
-}
 
 /**
  * Process plain text content with redline suggestions
