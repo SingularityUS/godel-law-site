@@ -1,12 +1,14 @@
+
 import React from "react";
-import { BookOpen } from "lucide-react";
 import DocumentControls from "./DocumentControls";
 import UserSection from "./UserSection";
 import ChatGPTStatus from "./ChatGPTStatus";
+
 export type UploadedFile = File & {
   preview?: string;
   extractedText?: string;
 };
+
 interface AppHeaderProps {
   onFilesAccepted: (files: UploadedFile[]) => void;
   onUploadComplete: () => void;
@@ -15,6 +17,7 @@ interface AppHeaderProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
 }
+
 const AppHeader: React.FC<AppHeaderProps> = ({
   onFilesAccepted,
   onUploadComplete,
@@ -26,7 +29,11 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   return <header className="border-b-2 border-black bg-white">
       <div className="flex justify-between items-center py-4 px-8">
         <div className="flex items-center gap-3">
-          <BookOpen size={32} className="text-black" />
+          <img 
+            src="/lovable-uploads/55e034c9-5545-436e-aa13-325632103439.png" 
+            alt="Gödel Logo" 
+            className="w-8 h-8 object-contain"
+          />
           <h1 className="text-2xl font-bold tracking-tight text-black">Gödel</h1>
         </div>
         
@@ -51,4 +58,5 @@ const AppHeader: React.FC<AppHeaderProps> = ({
       </div>
     </header>;
 };
+
 export default AppHeader;
