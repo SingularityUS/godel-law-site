@@ -2,13 +2,14 @@
 /**
  * useRedlineContent Hook
  * 
- * Purpose: Enhanced content processing with systematic debugging for original content display
+ * Purpose: Enhanced content processing with systematic debugging for original content display and suggestion overlay
  */
 
 import { useEffect, useState } from "react";
 import { RedlineDocument, RedlineSuggestion } from "@/types/redlining";
 import { extractDocumentContent } from "@/components/DocumentPreview/documentUtils";
 import { hasHtmlMarkup, convertTextToHtml } from "../utils/htmlUtils";
+import { injectRedlineMarkup } from "../utils/redlineMarkupUtils";
 
 interface UseRedlineContentProps {
   document: RedlineDocument;
@@ -30,8 +31,9 @@ export const useRedlineContent = ({
     const loadRichContent = async () => {
       setIsLoading(true);
       try {
-        console.log('=== LOADING RICH CONTENT (Enhanced for Full Document) ===');
-        console.log('🎯 Goal: Display complete original document content');
+        console.log('=== LOADING RICH CONTENT WITH SUGGESTION OVERLAY ===');
+        console.log('🎯 Goal: Display complete original document content WITH suggestions overlaid');
+        console.log('Suggestions to overlay:', suggestions.length);
         
         // Log all available content sources with enhanced debugging
         console.log('Available content sources:');
@@ -115,8 +117,8 @@ export const useRedlineContent = ({
         console.log('Content preview (first 300 chars):', baseContent.substring(0, 300));
         console.log('Content preview (last 100 chars):', baseContent.slice(-100));
         
-        // Display original content for redline overlay
-        console.log('🎯 Preparing content for redline display');
+        // Prepare content for redline display
+        console.log('🎯 Preparing content for redline display with suggestion overlay');
         
         let finalContent = baseContent;
         
@@ -126,10 +128,35 @@ export const useRedlineContent = ({
           finalContent = convertTextToHtml(finalContent);
         }
         
-        console.log('=== FINAL CONTENT READY ===');
+        console.log('=== APPLYING SUGGESTION OVERLAY ===');
+        console.log('Base content ready, now applying suggestions...');
+        console.log('Suggestions to apply:', {
+          count: suggestions.length,
+          selectedId: selectedSuggestionId,
+          suggestionIds: suggestions.map(s => s.id),
+          suggestionTypes: suggestions.map(s => s.type)
+        });
+        
+        // Apply redline markup with suggestions
+        if (suggestions.length > 0) {
+          console.log('🎯 INJECTING REDLINE MARKUP WITH SUGGESTIONS');
+          try {
+            finalContent = injectRedlineMarkup(finalContent, suggestions, selectedSuggestionId);
+            console.log('✅ Suggestion overlay applied successfully');
+            console.log('Final content with suggestions length:', finalContent.length);
+          } catch (error) {
+            console.error('❌ Error applying suggestion overlay:', error);
+            console.log('Falling back to content without suggestions');
+          }
+        } else {
+          console.log('No suggestions to apply, using base content');
+        }
+        
+        console.log('=== FINAL CONTENT READY WITH SUGGESTIONS ===');
         console.log('Final content length:', finalContent.length);
         console.log('Final content type:', hasHtmlMarkup(finalContent) ? 'HTML' : 'Plain text');
         console.log('Final content preview:', finalContent.substring(0, 400));
+        console.log('Contains redline markup:', finalContent.includes('redline-suggestion'));
         
         setRichContent(finalContent);
         
@@ -160,7 +187,7 @@ export const useRedlineContent = ({
     };
 
     loadRichContent();
-  }, [document, originalDocument]); // Focus on original content, not suggestions
+  }, [document, originalDocument, suggestions, selectedSuggestionId]); // Added suggestions and selectedSuggestionId as dependencies
 
   return { richContent, isLoading };
 };
