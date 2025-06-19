@@ -21,13 +21,16 @@ export const createPositionMapping = (htmlContent: string): PositionMap[] => {
   let insideTag = false;
   let insideEntity = false;
   
+  console.log('Creating position mapping for HTML content of length:', htmlContent.length);
+  
   while (htmlPos < htmlContent.length) {
     const char = htmlContent[htmlPos];
-    const nextChar = htmlContent[htmlPos + 1] || '';
     
-    // Handle HTML entities
+    // Handle HTML entities (like &nbsp;, &amp;, etc.)
     if (char === '&' && !insideTag) {
       insideEntity = true;
+      htmlPos++;
+      continue;
     } else if (insideEntity && char === ';') {
       insideEntity = false;
       // Count entity as single character in plain text
@@ -47,13 +50,18 @@ export const createPositionMapping = (htmlContent: string): PositionMap[] => {
     // Handle HTML tags
     if (char === '<' && !insideEntity) {
       insideTag = true;
+      htmlPos++;
+      continue;
     } else if (char === '>' && insideTag) {
       insideTag = false;
       htmlPos++;
       continue;
+    } else if (insideTag) {
+      htmlPos++;
+      continue;
     }
     
-    // Map visible characters
+    // Map visible characters (not inside tags or entities)
     if (!insideTag && !insideEntity) {
       mapping.push({
         plainTextPos,
@@ -66,6 +74,7 @@ export const createPositionMapping = (htmlContent: string): PositionMap[] => {
     htmlPos++;
   }
   
+  console.log(`Created position mapping with ${mapping.length} entries for ${plainTextPos} plain text characters`);
   return mapping;
 };
 
