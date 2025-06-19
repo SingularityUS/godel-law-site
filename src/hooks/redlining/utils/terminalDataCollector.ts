@@ -27,11 +27,21 @@ export const collectTerminalData = (
   terminalModules: TerminalModule[]
 ): TerminalModuleData[] => {
   console.log('=== COLLECTING TERMINAL DATA ===');
+  console.log('Pipeline output for data collection:', {
+    hasResults: !!pipelineOutput.results,
+    resultsLength: pipelineOutput.results?.length || 0,
+    hasEndpointResults: !!pipelineOutput.endpointResults,
+    endpointResultsLength: pipelineOutput.endpointResults?.length || 0
+  });
   
   const terminalData: TerminalModuleData[] = [];
   
-  // Get the actual results data
-  const resultsData = pipelineOutput.endpointResults || pipelineOutput.pipelineResults || [];
+  // Get the actual results data - prioritize results array
+  const resultsData = pipelineOutput.results || pipelineOutput.endpointResults || pipelineOutput.pipelineResults || [];
+  console.log('Using results data:', {
+    dataSource: pipelineOutput.results ? 'results' : pipelineOutput.endpointResults ? 'endpointResults' : 'pipelineResults',
+    length: resultsData.length
+  });
   
   terminalModules.forEach(terminal => {
     console.log(`Processing terminal module: ${terminal.moduleType} (${terminal.nodeId})`);
@@ -43,6 +53,12 @@ export const collectTerminalData = (
       console.warn(`No result data found for terminal module: ${terminal.nodeId}`);
       return;
     }
+    
+    console.log(`Found result data for ${terminal.moduleType}:`, {
+      hasResult: !!resultData.result,
+      resultKeys: Object.keys(resultData.result),
+      hasMetadata: !!resultData.result.metadata
+    });
     
     const moduleData: TerminalModuleData = {
       nodeId: terminal.nodeId,
@@ -69,13 +85,18 @@ export const collectTerminalData = (
           
         default:
           console.log(`No specific extractor for module type: ${terminal.moduleType}`);
+          // For unknown module types, try to extract any available data
+          if (resultData.result.output && resultData.result.output.analysis) {
+            moduleData.suggestions = extractGrammarSuggestions(resultData.result, terminal.nodeId);
+            console.log(`Extracted ${moduleData.suggestions.length} suggestions using fallback grammar extractor`);
+          }
       }
     } catch (error) {
       console.error(`Error extracting data from ${terminal.moduleType}:`, error);
     }
     
     terminalData.push(moduleData);
-    console.log(`Terminal data processed: ${moduleData.suggestions.length} suggestions`);
+    console.log(`Terminal data processed: ${moduleData.suggestions.length} suggestions, originalContent: ${moduleData.originalContent?.length || 0} chars`);
   });
   
   console.log(`Total terminal data collected: ${terminalData.length} modules`);
