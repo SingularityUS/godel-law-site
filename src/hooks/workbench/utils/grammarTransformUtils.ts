@@ -1,8 +1,7 @@
-
 /**
  * Grammar Transformation Utilities
  * 
- * Purpose: Direct grammar analysis to redline conversion without React hook dependencies
+ * Purpose: Direct grammar analysis to redline conversion with improved position handling
  */
 
 import { RedlineSuggestion } from "@/types/redlining";
@@ -15,13 +14,13 @@ export interface GrammarAnalysisItem {
 }
 
 /**
- * Convert grammar analysis data directly to redline suggestions
+ * Convert grammar analysis data directly to redline suggestions with enhanced position support
  */
 export const convertGrammarDataToRedlineSuggestions = (
   grammarResult: any, 
   sourceId: string
 ): RedlineSuggestion[] => {
-  console.log('=== DIRECT GRAMMAR CONVERSION START ===');
+  console.log('=== DIRECT GRAMMAR CONVERSION (Enhanced Position Support) ===');
   console.log('Grammar result structure:', {
     hasOutput: !!grammarResult?.output,
     hasAnalysis: !!grammarResult?.output?.analysis,
@@ -45,10 +44,16 @@ export const convertGrammarDataToRedlineSuggestions = (
 
     // Process each paragraph/analysis item
     analysisData.forEach((item: GrammarAnalysisItem, index: number) => {
-      console.log(`Processing analysis item ${index}:`, item);
+      console.log(`Processing analysis item ${index}:`, {
+        hasSuggestions: !!item.suggestions,
+        suggestionsCount: item.suggestions?.length || 0,
+        itemKeys: Object.keys(item || {})
+      });
       
       // Extract suggestions from various possible properties
       const itemSuggestions = extractSuggestionsFromItem(item);
+      
+      console.log(`Found ${itemSuggestions.length} suggestions in item ${index}`);
       
       itemSuggestions.forEach((suggestion: any, suggestionIndex: number) => {
         const redlineSuggestion = createRedlineSuggestion(
@@ -61,11 +66,12 @@ export const convertGrammarDataToRedlineSuggestions = (
         
         if (redlineSuggestion) {
           suggestions.push(redlineSuggestion);
+          console.log(`Added suggestion ${suggestions.length}: ${redlineSuggestion.id}`);
         }
       });
     });
 
-    console.log(`Created ${suggestions.length} redline suggestions from grammar data`);
+    console.log(`✅ CONVERSION COMPLETE: Created ${suggestions.length} redline suggestions from grammar data`);
     return suggestions;
 
   } catch (error) {
@@ -98,7 +104,7 @@ function extractAnalysisData(grammarResult: any): any[] | null {
 }
 
 /**
- * Extract suggestions from analysis item
+ * Extract suggestions from analysis item with improved detection
  */
 function extractSuggestionsFromItem(item: GrammarAnalysisItem): any[] {
   if (item.suggestions && Array.isArray(item.suggestions)) {
@@ -113,7 +119,7 @@ function extractSuggestionsFromItem(item: GrammarAnalysisItem): any[] {
 }
 
 /**
- * Create a redline suggestion from grammar suggestion data
+ * Create a redline suggestion from grammar suggestion data with enhanced position handling
  */
 function createRedlineSuggestion(
   suggestion: any,
@@ -137,6 +143,25 @@ function createRedlineSuggestion(
     return null;
   }
 
+  // Enhanced position handling - support both formats
+  let startPos = 0;
+  let endPos = originalText.length;
+
+  // Try position object first (user's data format)
+  if (suggestion.position && typeof suggestion.position === 'object') {
+    if (typeof suggestion.position.start === 'number') {
+      startPos = suggestion.position.start;
+    }
+    if (typeof suggestion.position.end === 'number') {
+      endPos = suggestion.position.end;
+    }
+  }
+  // Fallback to direct properties
+  else if (suggestion.startPos !== undefined || suggestion.endPos !== undefined) {
+    startPos = suggestion.startPos || 0;
+    endPos = suggestion.endPos || originalText.length;
+  }
+
   return {
     id: `${sourceId}-${itemIndex}-${suggestionIndex}`,
     type: (suggestion.type || suggestion.category || 'grammar') as 'grammar' | 'style' | 'legal' | 'clarity',
@@ -147,8 +172,8 @@ function createRedlineSuggestion(
                 suggestion.description || 
                 suggestion.reason || 
                 'Grammar improvement suggestion',
-    startPos: suggestion.startPos || 0,
-    endPos: suggestion.endPos || originalText.length,
+    startPos,
+    endPos,
     paragraphId: item.paragraphId || `paragraph-${itemIndex}`,
     status: 'pending' as const,
     confidence: suggestion.confidence || suggestion.score || 0.8
