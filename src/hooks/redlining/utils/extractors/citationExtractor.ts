@@ -15,7 +15,7 @@ export const extractCitationSuggestions = (
   moduleResult: any,
   sourceId: string
 ): RedlineSuggestion[] => {
-  console.log('=== EXTRACTING CITATION SUGGESTIONS ===');
+  console.log('=== EXTRACTING CITATION SUGGESTIONS (ENHANCED DEBUG) ===');
   console.log('Module result structure:', {
     hasOutput: !!moduleResult.output,
     hasResult: !!moduleResult.result,
@@ -42,41 +42,52 @@ export const extractCitationSuggestions = (
   
   if (!citationData || !Array.isArray(citationData)) {
     console.warn('No citation data found or data is not an array');
-    console.log('Available data paths checked:', {
-      'moduleResult.output?.citations': moduleResult.output?.citations ? 'exists' : 'missing',
-      'moduleResult.result?.output?.citations': moduleResult.result?.output?.citations ? 'exists' : 'missing',
-      'moduleResult.citations': moduleResult.citations ? 'exists' : 'missing'
-    });
     return suggestions;
   }
   
-  console.log(`Processing ${citationData.length} citation findings`);
+  console.log(`🔍 CITATION POSITION DEBUG: Processing ${citationData.length} citation findings`);
   
   citationData.forEach((citation: CitationFinding, index: number) => {
-    console.log(`Processing citation ${index + 1}:`, {
+    console.log(`📍 CITATION ${index + 1} POSITION ANALYSIS:`, {
       id: citation.id,
       type: citation.type,
-      originalText: citation.originalText?.substring(0, 50) + '...',
+      originalText: citation.originalText,
+      originalTextLength: citation.originalText?.length || 0,
       startPos: citation.startPos,
       endPos: citation.endPos,
+      positionRange: citation.endPos - citation.startPos,
+      textLengthVsRange: (citation.originalText?.length || 0) === (citation.endPos - citation.startPos),
       isComplete: citation.isComplete,
       needsVerification: citation.needsVerification
     });
 
-    // Validate position bounds
+    // Validate position bounds - CRITICAL DEBUG
     const hasValidPositions = typeof citation.startPos === 'number' && 
                              typeof citation.endPos === 'number' && 
                              citation.startPos >= 0 && 
                              citation.endPos > citation.startPos;
 
     if (!hasValidPositions) {
-      console.warn(`Citation ${index + 1} has invalid positions:`, {
+      console.error(`❌ CITATION ${index + 1} INVALID POSITIONS:`, {
         startPos: citation.startPos,
-        endPos: citation.endPos
+        endPos: citation.endPos,
+        startPosType: typeof citation.startPos,
+        endPosType: typeof citation.endPos
       });
-      // Use fallback positions
-      citation.startPos = 0;
-      citation.endPos = citation.originalText?.length || 0;
+      return; // Skip this citation
+    }
+
+    // Validate text length matches position range
+    const expectedLength = citation.endPos - citation.startPos;
+    const actualLength = citation.originalText?.length || 0;
+    
+    if (expectedLength !== actualLength) {
+      console.warn(`⚠️ CITATION ${index + 1} LENGTH MISMATCH:`, {
+        expectedLength,
+        actualLength,
+        difference: expectedLength - actualLength,
+        text: citation.originalText
+      });
     }
 
     // Determine severity based on citation completeness and verification needs
@@ -121,26 +132,26 @@ export const extractCitationSuggestions = (
       confidence: citation.isComplete ? 0.9 : 0.7
     };
     
-    console.log(`Created redline suggestion for citation ${index + 1}:`, {
+    console.log(`✅ CREATED REDLINE SUGGESTION ${index + 1}:`, {
       id: redlineSuggestion.id,
       type: redlineSuggestion.type,
       severity: redlineSuggestion.severity,
       startPos: redlineSuggestion.startPos,
       endPos: redlineSuggestion.endPos,
+      positionRange: redlineSuggestion.endPos - redlineSuggestion.startPos,
       originalTextLength: redlineSuggestion.originalText.length,
-      actualOriginalText: redlineSuggestion.originalText.substring(0, 30) + '...'
+      textPreview: redlineSuggestion.originalText.substring(0, 30) + '...'
     });
     
     suggestions.push(redlineSuggestion);
   });
   
-  console.log(`Extracted ${suggestions.length} citation suggestions`);
-  console.log('Position summary:', suggestions.map(s => ({
-    id: s.id,
-    start: s.startPos,
-    end: s.endPos,
-    text: s.originalText.substring(0, 20) + '...'
-  })));
+  console.log(`📊 CITATION EXTRACTION SUMMARY:`, {
+    totalCitations: citationData.length,
+    extractedSuggestions: suggestions.length,
+    positionRanges: suggestions.map(s => `${s.startPos}-${s.endPos}`),
+    textLengths: suggestions.map(s => s.originalText.length)
+  });
   
   return suggestions;
 };

@@ -1,8 +1,7 @@
-
 /**
  * Position Mapping Utilities
  * 
- * Purpose: Enhanced position mapping between plain text and HTML content
+ * Purpose: Enhanced position mapping with comprehensive debugging
  */
 
 export interface PositionMap {
@@ -21,7 +20,11 @@ export const createPositionMapping = (htmlContent: string): PositionMap[] => {
   let insideTag = false;
   let insideEntity = false;
   
-  console.log('Creating position mapping for HTML content of length:', htmlContent.length);
+  console.log('🗺️ CREATING POSITION MAPPING:', {
+    htmlContentLength: htmlContent.length,
+    hasHtmlTags: htmlContent.includes('<'),
+    preview: htmlContent.substring(0, 100) + '...'
+  });
   
   while (htmlPos < htmlContent.length) {
     const char = htmlContent[htmlPos];
@@ -74,8 +77,119 @@ export const createPositionMapping = (htmlContent: string): PositionMap[] => {
     htmlPos++;
   }
   
-  console.log(`Created position mapping with ${mapping.length} entries for ${plainTextPos} plain text characters`);
+  console.log('✅ Position mapping created:', {
+    mappingEntries: mapping.length,
+    plainTextLength: plainTextPos,
+    htmlLength: htmlContent.length,
+    compressionRatio: plainTextPos / htmlContent.length
+  });
+  
   return mapping;
+};
+
+/**
+ * Finds text in HTML content with enhanced debugging and position validation
+ */
+export const findTextInHtml = (
+  htmlContent: string, 
+  searchText: string, 
+  startFromPos: number = 0
+): { start: number; end: number } | null => {
+  const cleanSearchText = searchText.trim();
+  if (!cleanSearchText) return null;
+  
+  console.log(`🔍 FINDING TEXT IN HTML:`, {
+    searchText: cleanSearchText,
+    searchLength: cleanSearchText.length,
+    htmlLength: htmlContent.length,
+    startFromPos,
+    htmlPreview: htmlContent.substring(startFromPos, startFromPos + 100) + '...'
+  });
+  
+  // Try direct HTML search first
+  const directIndex = htmlContent.indexOf(cleanSearchText, startFromPos);
+  if (directIndex !== -1) {
+    console.log('✅ Found text directly:', {
+      position: directIndex,
+      actualText: htmlContent.substring(directIndex, directIndex + cleanSearchText.length),
+      matchesExpected: htmlContent.substring(directIndex, directIndex + cleanSearchText.length) === cleanSearchText
+    });
+    return { start: directIndex, end: directIndex + cleanSearchText.length };
+  }
+  
+  // Try case-insensitive search
+  const lowerHtml = htmlContent.toLowerCase();
+  const lowerSearch = cleanSearchText.toLowerCase();
+  const caseInsensitiveIndex = lowerHtml.indexOf(lowerSearch, startFromPos);
+  if (caseInsensitiveIndex !== -1) {
+    console.log('✅ Found text case-insensitively:', {
+      position: caseInsensitiveIndex,
+      actualText: htmlContent.substring(caseInsensitiveIndex, caseInsensitiveIndex + cleanSearchText.length)
+    });
+    return { start: caseInsensitiveIndex, end: caseInsensitiveIndex + cleanSearchText.length };
+  }
+  
+  // Try partial matching for citations that might span elements
+  const words = cleanSearchText.split(/\s+/).filter(word => word.length > 2);
+  if (words.length >= 2) {
+    console.log('🔍 Trying partial word matching:', words);
+    for (const word of words) {
+      const wordIndex = htmlContent.indexOf(word, startFromPos);
+      if (wordIndex !== -1) {
+        console.log(`Found partial match for word "${word}" at position ${wordIndex}`);
+        // Look for the full text around this position
+        const contextStart = Math.max(0, wordIndex - 50);
+        const contextEnd = Math.min(htmlContent.length, wordIndex + cleanSearchText.length + 50);
+        const context = htmlContent.substring(contextStart, contextEnd);
+        const contextIndex = context.indexOf(cleanSearchText);
+        if (contextIndex !== -1) {
+          const actualStart = contextStart + contextIndex;
+          console.log('✅ Found full text in context:', {
+            position: actualStart,
+            actualText: htmlContent.substring(actualStart, actualStart + cleanSearchText.length)
+          });
+          return { start: actualStart, end: actualStart + cleanSearchText.length };
+        }
+      }
+    }
+  }
+  
+  // Try mapping approach as last resort
+  try {
+    const plainText = extractPlainText(htmlContent);
+    console.log('🔍 Trying position mapping approach:', {
+      plainTextLength: plainText.length,
+      plainTextPreview: plainText.substring(0, 100) + '...'
+    });
+    
+    const textIndex = plainText.indexOf(cleanSearchText);
+    
+    if (textIndex !== -1) {
+      const mapping = createPositionMapping(htmlContent);
+      const htmlStart = mapPlainTextToHtml(textIndex, mapping);
+      const htmlEnd = mapPlainTextToHtml(textIndex + cleanSearchText.length, mapping);
+      
+      if (htmlStart < htmlContent.length && htmlEnd <= htmlContent.length) {
+        console.log('✅ Found text via position mapping:', {
+          plainTextIndex: textIndex,
+          htmlStart,
+          htmlEnd,
+          actualText: htmlContent.substring(htmlStart, htmlEnd)
+        });
+        return { start: htmlStart, end: htmlEnd };
+      }
+    }
+  } catch (error) {
+    console.warn('Position mapping failed for text search:', error);
+  }
+  
+  console.error('❌ Could not find text:', {
+    searchText: cleanSearchText,
+    searchLength: cleanSearchText.length,
+    htmlLength: htmlContent.length,
+    startPos: startFromPos
+  });
+  return null;
 };
 
 /**
@@ -117,79 +231,6 @@ export const extractPlainText = (htmlContent: string): string => {
 };
 
 /**
- * Finds text in HTML content using improved text-based matching with position validation
- */
-export const findTextInHtml = (
-  htmlContent: string, 
-  searchText: string, 
-  startFromPos: number = 0
-): { start: number; end: number } | null => {
-  const cleanSearchText = searchText.trim();
-  if (!cleanSearchText) return null;
-  
-  console.log(`Finding text in HTML: "${cleanSearchText}" starting from position ${startFromPos}`);
-  
-  // Try direct HTML search first
-  const directIndex = htmlContent.indexOf(cleanSearchText, startFromPos);
-  if (directIndex !== -1) {
-    console.log(`Found text directly at position ${directIndex}`);
-    return { start: directIndex, end: directIndex + cleanSearchText.length };
-  }
-  
-  // Try case-insensitive search
-  const lowerHtml = htmlContent.toLowerCase();
-  const lowerSearch = cleanSearchText.toLowerCase();
-  const caseInsensitiveIndex = lowerHtml.indexOf(lowerSearch, startFromPos);
-  if (caseInsensitiveIndex !== -1) {
-    console.log(`Found text case-insensitively at position ${caseInsensitiveIndex}`);
-    return { start: caseInsensitiveIndex, end: caseInsensitiveIndex + cleanSearchText.length };
-  }
-  
-  // Try partial matching for citations that might span elements
-  const words = cleanSearchText.split(/\s+/).filter(word => word.length > 2);
-  if (words.length >= 2) {
-    for (const word of words) {
-      const wordIndex = htmlContent.indexOf(word, startFromPos);
-      if (wordIndex !== -1) {
-        console.log(`Found partial match for word "${word}" at position ${wordIndex}`);
-        // Look for the full text around this position
-        const contextStart = Math.max(0, wordIndex - 50);
-        const contextEnd = Math.min(htmlContent.length, wordIndex + cleanSearchText.length + 50);
-        const context = htmlContent.substring(contextStart, contextEnd);
-        const contextIndex = context.indexOf(cleanSearchText);
-        if (contextIndex !== -1) {
-          const actualStart = contextStart + contextIndex;
-          console.log(`Found full text in context at position ${actualStart}`);
-          return { start: actualStart, end: actualStart + cleanSearchText.length };
-        }
-      }
-    }
-  }
-  
-  // Try mapping approach as last resort
-  try {
-    const plainText = extractPlainText(htmlContent);
-    const textIndex = plainText.indexOf(cleanSearchText);
-    
-    if (textIndex !== -1) {
-      const mapping = createPositionMapping(htmlContent);
-      const htmlStart = mapPlainTextToHtml(textIndex, mapping);
-      const htmlEnd = mapPlainTextToHtml(textIndex + cleanSearchText.length, mapping);
-      
-      if (htmlStart < htmlContent.length && htmlEnd <= htmlContent.length) {
-        console.log(`Found text via position mapping at ${htmlStart}-${htmlEnd}`);
-        return { start: htmlStart, end: htmlEnd };
-      }
-    }
-  } catch (error) {
-    console.warn('Position mapping failed for text search:', error);
-  }
-  
-  console.warn(`Could not find text: "${cleanSearchText}"`);
-  return null;
-};
-
-/**
  * Validates that a position range contains the expected text
  */
 export const validatePositionRange = (
@@ -199,7 +240,12 @@ export const validatePositionRange = (
   expectedText: string
 ): boolean => {
   if (startPos < 0 || endPos > content.length || startPos >= endPos) {
-    console.warn(`Invalid position range: ${startPos}-${endPos} for content length ${content.length}`);
+    console.warn('❌ Invalid position range:', {
+      startPos,
+      endPos,
+      contentLength: content.length,
+      rangeLength: endPos - startPos
+    });
     return false;
   }
   
@@ -207,9 +253,17 @@ export const validatePositionRange = (
   const matches = actualText === expectedText;
   
   if (!matches) {
-    console.warn(`Position validation failed:`, {
+    console.warn('❌ Position validation failed:', {
       expected: expectedText,
       actual: actualText,
+      startPos,
+      endPos,
+      expectedLength: expectedText.length,
+      actualLength: actualText.length
+    });
+  } else {
+    console.log('✅ Position validation passed:', {
+      text: expectedText,
       startPos,
       endPos
     });
