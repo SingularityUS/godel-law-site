@@ -106,6 +106,7 @@ export const processCitationFinder = async (
     
     console.log(`Analyzing paragraph ${i + 1}/${paragraphs.length} for citations`);
     console.log(`Paragraph content preview: "${paragraphContent.substring(0, 100)}..."`);
+    console.log(`Current global position: ${globalPosition}`);
     
     try {
       // Enhanced prompt with specific Bluebook citation examples
@@ -203,6 +204,14 @@ ${paragraphContent}`;
             endPos = startPos + citation.originalText.length;
           }
           
+          console.log(`Citation ${index + 1} in paragraph ${i + 1}:`, {
+            originalText: citation.originalText,
+            paragraphIndex: citationIndex,
+            globalStart: startPos,
+            globalEnd: endPos,
+            actualText: paragraphContent.substring(citationIndex, citationIndex + citation.originalText.length)
+          });
+          
           return {
             id: `cite-${i}-${index}`,
             type: citation.type || 'case',
@@ -227,8 +236,9 @@ ${paragraphContent}`;
       console.error(`Error processing paragraph ${i + 1} for citations:`, error);
     }
     
-    // Update global position for next paragraph
-    globalPosition += paragraphContent.length + 1; // +1 for paragraph break
+    // Update global position for next paragraph - FIXED: Use double newlines to match content reconstruction
+    globalPosition += paragraphContent.length + 2; // +2 for double newline paragraph separator
+    console.log(`Updated global position to: ${globalPosition} after paragraph ${i + 1}`);
   }
   
   if (onProgress) {
@@ -246,7 +256,12 @@ ${paragraphContent}`;
   };
   
   console.log(`Citation finder complete: ${allCitations.length} citations found in ${paragraphs.length} paragraphs`);
-  console.log('Final citations:', allCitations);
+  console.log('Final citations with positions:', allCitations.map(c => ({
+    id: c.id,
+    text: c.originalText,
+    start: c.startPos,
+    end: c.endPos
+  })));
   
   return {
     output: result,

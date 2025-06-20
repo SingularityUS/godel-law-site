@@ -63,6 +63,22 @@ export const extractCitationSuggestions = (
       needsVerification: citation.needsVerification
     });
 
+    // Validate position bounds
+    const hasValidPositions = typeof citation.startPos === 'number' && 
+                             typeof citation.endPos === 'number' && 
+                             citation.startPos >= 0 && 
+                             citation.endPos > citation.startPos;
+
+    if (!hasValidPositions) {
+      console.warn(`Citation ${index + 1} has invalid positions:`, {
+        startPos: citation.startPos,
+        endPos: citation.endPos
+      });
+      // Use fallback positions
+      citation.startPos = 0;
+      citation.endPos = citation.originalText?.length || 0;
+    }
+
     // Determine severity based on citation completeness and verification needs
     let severity: 'low' | 'medium' | 'high' = 'low';
     if (citation.needsVerification) {
@@ -98,8 +114,8 @@ export const extractCitationSuggestions = (
       originalText: citation.originalText || '',
       suggestedText: suggestedText || citation.originalText || '',
       explanation: explanation,
-      startPos: citation.startPos || 0,
-      endPos: citation.endPos || (citation.originalText?.length || 0),
+      startPos: citation.startPos,
+      endPos: citation.endPos,
       paragraphId: citation.paragraphId || `citation-${index}`,
       status: 'pending',
       confidence: citation.isComplete ? 0.9 : 0.7
@@ -111,12 +127,20 @@ export const extractCitationSuggestions = (
       severity: redlineSuggestion.severity,
       startPos: redlineSuggestion.startPos,
       endPos: redlineSuggestion.endPos,
-      originalTextLength: redlineSuggestion.originalText.length
+      originalTextLength: redlineSuggestion.originalText.length,
+      actualOriginalText: redlineSuggestion.originalText.substring(0, 30) + '...'
     });
     
     suggestions.push(redlineSuggestion);
   });
   
   console.log(`Extracted ${suggestions.length} citation suggestions`);
+  console.log('Position summary:', suggestions.map(s => ({
+    id: s.id,
+    start: s.startPos,
+    end: s.endPos,
+    text: s.originalText.substring(0, 20) + '...'
+  })));
+  
   return suggestions;
 };
