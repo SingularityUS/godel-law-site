@@ -34,10 +34,17 @@ const IndexContent = () => {
       setFinalOutput(event.detail);
     };
 
+    // Listen for document library open events from workspace
+    const handleLibraryOpen = () => {
+      setIsLibraryOpen(true);
+    };
+
     window.addEventListener('pipelineCompleted', handlePipelineOutput as EventListener);
+    window.addEventListener('openDocumentLibrary', handleLibraryOpen);
     
     return () => {
       window.removeEventListener('pipelineCompleted', handlePipelineOutput as EventListener);
+      window.removeEventListener('openDocumentLibrary', handleLibraryOpen);
     };
   }, []);
 
