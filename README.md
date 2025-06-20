@@ -2,7 +2,7 @@
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/4a2a0f77-091f-4690-88c7-1777b22b4964
+**URL**: [https://lovable.dev/projects/4a2a0f77-091f-4690-88c7-1777b22b4964](https://www.wtchcrft.ai/)
 
 ## How can I edit this code?
 
