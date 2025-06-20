@@ -1,21 +1,24 @@
+
 /**
  * Module Execution Coordinator
  * 
- * Purpose: Coordinates execution flow for different module types
+ * Purpose: Coordinates execution of different module types with their specific processors
  */
 
 import { HelperNode } from "@/types/workbench";
 import { ModuleKind } from "@/data/modules";
 import { useChatGPTApi } from "../useChatGPTApi";
-import { processWithBatching, shouldUseBatchProcessing, shouldProcessParagraphsIndividually } from "./batchProcessor";
-import { DocumentChunk } from "./documentChunker";
 import { ModuleProgress } from "./moduleProgress";
-import { createCoreProcessor } from "./coreNodeProcessor";
-import { prepareModuleInput, extractCleanContent } from "./inputPreparation";
 
-export const createModuleExecutionCoordinator = (callChatGPT: ReturnType<typeof useChatGPTApi>['callChatGPT']) => {
-  const coreProcessor = createCoreProcessor(callChatGPT);
+// Import all processors
+import { processParagraphSplitter } from "./moduleProcessors/paragraphSplitterProcessor";
+import { processGrammarAnalysis } from "./moduleProcessors/grammarAnalysisProcessor";
+import { processCitationFinder } from "./moduleProcessors/citationFinderProcessor";
+import { processCitationVerifier } from "./moduleProcessors/citationVerifierProcessor";
 
+export const createModuleExecutionCoordinator = (
+  callChatGPT: ReturnType<typeof useChatGPTApi>['callChatGPT']
+) => {
   return async (
     node: HelperNode,
     inputData: any,
@@ -24,185 +27,140 @@ export const createModuleExecutionCoordinator = (callChatGPT: ReturnType<typeof 
     systemPrompt: string,
     onProgress?: (progress: ModuleProgress) => void
   ) => {
-    const startTime = Date.now();
-    
     console.log(`=== MODULE EXECUTION COORDINATOR: ${moduleType} ===`);
-    console.log('Input data structure:', typeof inputData, inputData ? Object.keys(inputData) : 'null');
-    
-    // Log if we have position tracking data
-    if (inputData && inputData.positionMap) {
-      console.log('Position tracking available:', {
-        characterMappings: inputData.positionMap.characterMap?.length || 0,
-        paragraphBoundaries: inputData.positionMap.paragraphBoundaries?.length || 0
-      });
-    }
-    
-    // Special handling for citation finder - it needs structured data
-    if (moduleType === 'citation-finder') {
-      console.log('Processing citation finder with structured data');
-      
-      // Create a simple progress callback for citation finder
-      const citationProgress = onProgress ? (completed: number, total: number) => {
-        onProgress({
-          completed,
-          total,
-          moduleType,
-          inputType: 'paragraphs'
-        });
-      } : undefined;
-      
-      // Use the specialized citation finder processor directly
-      const { processCitationFinder } = await import('./moduleProcessors/citationFinderProcessor');
-      return await processCitationFinder(inputData, callChatGPT, citationProgress);
-    }
-    
-    // Prepare clean input data for other modules
-    const cleanInputData = prepareModuleInput(inputData, moduleType);
-    console.log('Prepared input type:', typeof cleanInputData);
+    console.log('Module configuration:', {
+      supportsChatGPT: moduleDef.supportsChatGPT,
+      outputFormat: moduleDef.outputFormat,
+      hasInputData: !!inputData
+    });
 
-    // Check if we need batch processing
-    if (shouldUseBatchProcessing(cleanInputData) || shouldProcessParagraphsIndividually(cleanInputData, moduleType)) {
-      return await handleBatchProcessing(
-        node, cleanInputData, moduleType, systemPrompt, 
-        coreProcessor, onProgress, startTime, inputData
-      );
-    } else {
-      return await handleSingleDocumentProcessing(
-        node, cleanInputData, moduleType, systemPrompt, 
-        coreProcessor, onProgress, startTime, inputData
-      );
+    // Create progress callback wrapper
+    const progressCallback = onProgress ? (completed: number, total: number) => {
+      onProgress({
+        completed,
+        total,
+        inputType: 'items',
+        outputType: 'processed items',
+        outputGenerated: completed
+      });
+    } : undefined;
+
+    // Route to appropriate processor based on module type
+    switch (moduleType) {
+      case 'paragraph-splitter':
+        console.log('🔄 Routing to paragraph splitter processor');
+        return await processParagraphSplitter(inputData, callChatGPT, progressCallback);
+
+      case 'grammar-checker':
+        console.log('🔄 Routing to grammar analysis processor');
+        return await processGrammarAnalysis(inputData, callChatGPT, progressCallback);
+
+      case 'citation-finder':
+        console.log('🔄 Routing to citation finder processor');
+        return await processCitationFinder(inputData, callChatGPT, progressCallback);
+
+      case 'citation-verifier':
+        console.log('🔄 Routing to citation verifier processor');
+        return await processCitationVerifier(inputData, callChatGPT, progressCallback);
+
+      case 'text-extractor':
+        console.log('🔄 Text extractor - pass through mode');
+        // Text extractor is now a pass-through module
+        return {
+          output: inputData,
+          metadata: {
+            processingTime: Date.now(),
+            method: 'text-extractor-passthrough',
+            passThrough: true
+          }
+        };
+
+      case 'document-input':
+        console.log('🔄 Document input - pass through mode');
+        // Document input is always pass-through
+        return {
+          output: inputData,
+          metadata: {
+            processingTime: Date.now(),
+            method: 'document-input-passthrough',
+            passThrough: true
+          }
+        };
+
+      case 'chatgpt-assistant':
+      case 'style-guide-enforcer':
+      case 'custom':
+        console.log(`🔄 Generic ChatGPT processing for ${moduleType}`);
+        // For other modules that use ChatGPT, use generic processing
+        if (moduleDef.supportsChatGPT) {
+          try {
+            const response = await callChatGPT(systemPrompt, '', 'gpt-4o-mini', 3000);
+            
+            let responseText: string;
+            if (typeof response === 'string') {
+              responseText = response;
+            } else if (response && typeof response === 'object' && response.response) {
+              responseText = response.response;
+            } else if (response && typeof response === 'object' && response.data) {
+              responseText = response.data;
+            } else {
+              throw new Error('Invalid response format from ChatGPT');
+            }
+
+            // Try to parse as JSON if outputFormat is json
+            let output = responseText;
+            if (moduleDef.outputFormat === 'json') {
+              try {
+                output = JSON.parse(responseText);
+              } catch (parseError) {
+                console.warn(`Failed to parse JSON response for ${moduleType}, using raw text`);
+              }
+            }
+
+            return {
+              output,
+              metadata: {
+                processingTime: Date.now(),
+                method: `${moduleType}-chatgpt`,
+                outputFormat: moduleDef.outputFormat,
+                rawResponse: responseText
+              }
+            };
+          } catch (error) {
+            console.error(`Error processing ${moduleType}:`, error);
+            return {
+              output: null,
+              metadata: {
+                processingTime: Date.now(),
+                method: `${moduleType}-error`,
+                error: error.message || 'Processing failed'
+              }
+            };
+          }
+        } else {
+          console.warn(`Module ${moduleType} does not support ChatGPT processing`);
+          return {
+            output: inputData,
+            metadata: {
+              processingTime: Date.now(),
+              method: `${moduleType}-passthrough`,
+              passThrough: true,
+              reason: 'No ChatGPT support configured'
+            }
+          };
+        }
+
+      default:
+        console.warn(`Unknown module type: ${moduleType}`);
+        return {
+          output: inputData,
+          metadata: {
+            processingTime: Date.now(),
+            method: 'unknown-passthrough',
+            passThrough: true,
+            moduleType
+          }
+        };
     }
   };
 };
-
-async function handleBatchProcessing(
-  node: HelperNode,
-  cleanInputData: any,
-  moduleType: ModuleKind,
-  systemPrompt: string,
-  coreProcessor: any,
-  onProgress?: (progress: ModuleProgress) => void,
-  startTime?: number,
-  originalInputData?: any
-) {
-  console.log(`Using batch processing for module ${moduleType} with position preservation`);
-  
-  // Define processing function for individual chunks with position awareness
-  const processChunk = async (chunkContent: string, chunkInfo?: DocumentChunk) => {
-    const cleanChunkContent = extractCleanContent(chunkContent, moduleType);
-    
-    let promptData = cleanChunkContent;
-    if (chunkInfo) {
-      promptData = `[Chunk ${chunkInfo.chunkIndex + 1} of ${chunkInfo.totalChunks}]\n\n${cleanChunkContent}`;
-      console.log(`Processing chunk ${chunkInfo.chunkIndex + 1}/${chunkInfo.totalChunks} for ${moduleType}`);
-    }
-    
-    const result = await coreProcessor(node, promptData, systemPrompt, moduleType);
-    
-    return {
-      ...result,
-      metadata: {
-        ...result.metadata,
-        chunkProcessed: true,
-        chunkInfo: chunkInfo ? {
-          index: chunkInfo.chunkIndex,
-          total: chunkInfo.totalChunks
-        } : undefined,
-        preservesPositions: true
-      }
-    };
-  };
-  
-  // Enhanced progress callback
-  const moduleProgressCallback = (completed: number, total: number, outputCount?: number) => {
-    if (onProgress) {
-      const inputType = shouldProcessParagraphsIndividually(cleanInputData, moduleType) ? 'paragraphs' : 
-                       moduleType === 'paragraph-splitter' ? 'chunks' : 'paragraphs';
-      const progress: ModuleProgress = {
-        completed,
-        total,
-        moduleType,
-        inputType,
-        outputGenerated: outputCount
-      };
-      
-      if (moduleType === 'paragraph-splitter') {
-        progress.outputType = 'paragraphs';
-      } else if (moduleType === 'grammar-checker') {
-        progress.outputType = 'errors';
-      }
-      
-      onProgress(progress);
-    }
-  };
-  
-  const result = await processWithBatching(cleanInputData, processChunk, moduleProgressCallback, moduleType);
-  
-  const processingTime = Date.now() - (startTime || 0);
-  
-  return {
-    ...result,
-    metadata: {
-      ...result.metadata,
-      processingTime,
-      batchProcessed: true,
-      totalProcessingTime: processingTime,
-      preservesPositions: true,
-      originalPositionMap: originalInputData?.positionMap
-    }
-  };
-}
-
-async function handleSingleDocumentProcessing(
-  node: HelperNode,
-  cleanInputData: any,
-  moduleType: ModuleKind,
-  systemPrompt: string,
-  coreProcessor: any,
-  onProgress?: (progress: ModuleProgress) => void,
-  startTime?: number,
-  originalInputData?: any
-) {
-  console.log(`Processing single document for ${moduleType} with position tracking`);
-  
-  const cleanContent = extractCleanContent(cleanInputData, moduleType);
-  
-  // Report progress for single document processing
-  if (onProgress) {
-    const progress: ModuleProgress = {
-      completed: 0,
-      total: 1,
-      moduleType,
-      inputType: 'documents'
-    };
-    onProgress(progress);
-  }
-  
-  const result = await coreProcessor(node, cleanContent, systemPrompt, moduleType);
-
-  // Report completion
-  if (onProgress) {
-    const progress: ModuleProgress = {
-      completed: 1,
-      total: 1,
-      moduleType,
-      inputType: 'documents',
-      outputGenerated: Array.isArray(result.output.paragraphs) ? result.output.paragraphs.length : 
-                      Array.isArray(result.output.analysis) ? result.output.analysis.length : 1
-    };
-    onProgress(progress);
-  }
-
-  const processingTime = Date.now() - (startTime || 0);
-  
-  return {
-    ...result,
-    metadata: {
-      ...result.metadata,
-      processingTime,
-      timestamp: new Date().toISOString(),
-      preservesPositions: true,
-      originalPositionMap: originalInputData?.positionMap
-    }
-  };
-}

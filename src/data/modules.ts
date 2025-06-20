@@ -1,5 +1,4 @@
-
-import { ArrowDown, ArrowUp, Divide, BookOpen, MessageSquare, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, Divide, BookOpen, MessageSquare, Search, CheckCircle } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export type ModuleKind =
@@ -215,44 +214,59 @@ The positions will be used to highlight citations in the document for legal revi
   {
     type: "citation-verifier",
     label: "Citation Verifier",
-    color: "bg-slate-600",
-    icon: ArrowDown,
-    defaultPrompt: `You are a legal citation verification specialist. Verify the accuracy and format compliance of legal citations:
+    color: "bg-green-600",
+    icon: CheckCircle,
+    defaultPrompt: `You are a legal citation verification specialist with web search capabilities. Use web search to verify the accuracy and authenticity of legal citations by finding them online.
 
-VERIFICATION TASKS:
-- Check Bluebook format compliance
-- Verify case name accuracy
-- Confirm court and jurisdiction
-- Check year and reporter accuracy
-- Validate parallel citations
-- Flag potentially outdated authorities
+VERIFICATION PROCESS:
+1. Search the web for each citation to find authoritative sources
+2. Look for citations on court websites, legal databases, and official sources
+3. Verify case names, court information, dates, and citation formats
+4. Find direct links to the source documents when possible
+5. Assess the reliability and currency of each citation
 
-Return verification results:
+For EACH citation provided, search the web and return:
 {
   "verificationResults": [
     {
-      "citationId": "cite1",
-      "originalCitation": "original text",
-      "status": "verified|needs_correction|cannot_verify|outdated",
-      "issues": [
-        {
-          "type": "format|accuracy|currency|completeness",
-          "description": "specific issue found",
-          "correction": "suggested correction"
-        }
-      ],
-      "correctedCitation": "properly formatted citation",
-      "confidence": number (1-10),
-      "lastVerified": "current date"
+      "citationId": "cite-id",
+      "originalCitation": "citation text as provided",
+      "verificationStatus": "verified|partially_verified|not_found|error",
+      "sourceUrl": "direct link to the source document or case",
+      "alternativeUrls": ["array of additional relevant links"],
+      "verificationConfidence": number (0.0-1.0),
+      "verificationDetails": {
+        "foundOnOfficialSite": boolean,
+        "caseNameMatch": boolean,
+        "courtMatch": boolean,
+        "dateMatch": boolean,
+        "citationFormatCorrect": boolean
+      },
+      "suggestedCorrections": {
+        "correctedCitation": "if format issues found",
+        "notes": "explanation of any corrections"
+      },
+      "lastVerified": "current timestamp",
+      "searchSummary": "brief summary of what was found during web search"
     }
   ],
   "overallReport": {
-    "totalVerified": number,
-    "needsCorrection": number,
-    "cannotVerify": number,
-    "recommendManualReview": ["list of citations needing human review"]
+    "totalCitations": number,
+    "verifiedCount": number,
+    "notFoundCount": number,
+    "errorCount": number,
+    "averageConfidence": number,
+    "recommendationsForReview": ["citations that need manual review"]
   }
-}`,
+}
+
+IMPORTANT: Use web search to find actual sources. Look for:
+- Official court websites and decisions
+- Legal databases (Justia, Google Scholar, etc.)
+- Government websites for statutes and regulations
+- Law school databases and repositories
+
+If a citation cannot be found online, indicate this clearly and suggest possible reasons (obsolete citation, formatting errors, etc.).`,
     supportsChatGPT: true,
     outputFormat: 'json'
   },

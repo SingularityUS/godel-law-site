@@ -17,6 +17,19 @@ export interface RedlineSuggestion {
   paragraphId: string;
   status: 'pending' | 'accepted' | 'rejected' | 'modified';
   confidence?: number;
+  // Citation verification fields
+  sourceUrl?: string;
+  verificationStatus?: 'verified' | 'partially_verified' | 'not_found' | 'error';
+  verificationConfidence?: number;
+  lastVerified?: string;
+  alternativeUrls?: string[];
+  verificationDetails?: {
+    foundOnOfficialSite: boolean;
+    caseNameMatch: boolean;
+    courtMatch: boolean;
+    dateMatch: boolean;
+    citationFormatCorrect: boolean;
+  };
 }
 
 export interface RedlineDocument {
@@ -32,6 +45,13 @@ export interface RedlineDocument {
     acceptedSuggestions: number;
     rejectedSuggestions: number;
     sourceModules?: string[];
+    verificationStats?: {
+      totalCitationsVerified: number;
+      verifiedCitations: number;
+      notFoundCitations: number;
+      errorCitations: number;
+      averageVerificationConfidence: number;
+    };
   };
   positionMap?: any;
 }

@@ -1,4 +1,3 @@
-
 /**
  * Terminal Data Collector
  * 
@@ -7,6 +6,7 @@
 
 import { extractGrammarSuggestions } from "./extractors/grammarExtractor";
 import { extractCitationSuggestions } from "./extractors/citationExtractor";
+import { extractCitationVerificationData, mergeCitationVerificationData } from "./extractors/citationVerifierExtractor";
 import { extractOriginalContent } from "./extractors/contentExtractor";
 import { RedlineSuggestion } from "@/types/redlining";
 
@@ -87,7 +87,7 @@ export const collectTerminalData = (
   pipelineOutput: any,
   terminalModules: Array<{ moduleType: string; nodeId: string }>
 ): TerminalModuleData[] => {
-  console.log('=== COLLECTING TERMINAL DATA (FORGIVING VALIDATION) ===');
+  console.log('=== COLLECTING TERMINAL DATA (FORGIVING VALIDATION + VERIFICATION) ===');
   console.log('Terminal modules to process:', terminalModules);
   
   const terminalData: TerminalModuleData[] = [];
@@ -95,6 +95,11 @@ export const collectTerminalData = (
   // Get pipeline results
   const pipelineResults = pipelineOutput.pipelineResults || pipelineOutput.results || [];
   console.log(`Found ${pipelineResults.length} pipeline results`);
+  
+  // First pass: collect citation and verification data
+  let citationSuggestions: RedlineSuggestion[] = [];
+  let verificationResults: any[] = [];
+  let verificationStats: any = null;
   
   terminalModules.forEach(terminalModule => {
     console.log(`\n🔍 Processing terminal module: ${terminalModule.moduleType} (${terminalModule.nodeId})`);
@@ -138,8 +143,10 @@ export const collectTerminalData = (
       suggestions = extractCitationSuggestions(moduleResult.result, terminalModule.nodeId);
       console.log(`Extracted ${suggestions.length} citation suggestions`);
       
-      // ENHANCED: Forgiving citation position validation
-      console.log(`\n🔍 CITATION POSITION VALIDATION (FORGIVING):`);
+      // Store citation suggestions for potential verification merging
+      citationSuggestions = [...citationSuggestions, ...suggestions];
+      
+      // Apply forgiving validation logic (existing code)
       const contentLength = originalContent.length;
       const validSuggestions: RedlineSuggestion[] = [];
       const originalSuggestionsCount = suggestions.length;
@@ -251,27 +258,62 @@ export const collectTerminalData = (
       console.log(`  - Valid citations: ${validSuggestions.length}`);
       console.log(`  - Filtered out: ${originalSuggestionsCount - validSuggestions.length}`);
       console.log(`  - Acceptance rate: ${((validSuggestions.length / originalSuggestionsCount) * 100).toFixed(1)}%`);
+    } else if (terminalModule.moduleType === 'citation-verifier') {
+      console.log('🎯 PROCESSING CITATION VERIFIER MODULE');
+      const extractedData = extractCitationVerificationData(moduleResult.result, terminalModule.nodeId);
+      verificationResults = extractedData.verificationResults;
+      verificationStats = extractedData.verificationStats;
+      console.log(`Extracted ${verificationResults.length} verification results`);
+      
+      // Don't create separate suggestions for verifier - it will be merged with citations
+      suggestions = [];
     } else {
       console.log(`Unknown terminal module type: ${terminalModule.moduleType}`);
     }
     
-    const moduleData: TerminalModuleData = {
-      moduleType: terminalModule.moduleType,
-      nodeId: terminalModule.nodeId,
-      originalContent,
-      suggestions,
-      metadata: {
-        processingTime: moduleResult.result?.metadata?.processingTime,
-        totalSuggestions: suggestions.length,
-        sourceModule: terminalModule.moduleType,
-        contentLength: originalContent.length,
-        contentSource: 'traced-from-pipeline',
-        positionValidationMode: 'forgiving',
-        validationTimestamp: Date.now()
-      }
-    };
+    if (suggestions.length > 0) {
+      const moduleData: TerminalModuleData = {
+        moduleType: terminalModule.moduleType,
+        nodeId: terminalModule.nodeId,
+        originalContent,
+        suggestions,
+        metadata: {
+          processingTime: moduleResult.result?.metadata?.processingTime,
+          totalSuggestions: suggestions.length,
+          sourceModule: terminalModule.moduleType,
+          contentLength: originalContent.length,
+          contentSource: 'traced-from-pipeline',
+          positionValidationMode: 'forgiving',
+          validationTimestamp: Date.now()
+        }
+      };
+      
+      terminalData.push(moduleData);
+    }
+  });
+  
+  // Second pass: merge verification data with citation suggestions
+  if (verificationResults.length > 0 && citationSuggestions.length > 0) {
+    console.log(`\n🔗 MERGING VERIFICATION DATA WITH CITATIONS`);
+    console.log(`Found ${verificationResults.length} verification results for ${citationSuggestions.length} citations`);
     
-    console.log(`✅ CREATED TERMINAL DATA FOR ${terminalModule.nodeId}:`, {
+    // Find citation terminal data and merge verification
+    terminalData.forEach(moduleData => {
+      if (moduleData.moduleType === 'citation-finder') {
+        console.log(`Merging verification data for citation finder module ${moduleData.nodeId}`);
+        moduleData.suggestions = mergeCitationVerificationData(moduleData.suggestions, verificationResults);
+        
+        // Add verification stats to metadata
+        moduleData.metadata.verificationStats = verificationStats;
+        moduleData.metadata.verificationMerged = true;
+        
+        console.log(`✅ Merged verification data: ${moduleData.suggestions.filter(s => s.verificationStatus).length} citations have verification status`);
+      }
+    });
+  }
+  
+  terminalData.forEach(moduleData => {
+    console.log(`✅ CREATED TERMINAL DATA FOR ${moduleData.nodeId}:`, {
       moduleType: moduleData.moduleType,
       contentLength: moduleData.originalContent.length,
       suggestionsCount: moduleData.suggestions.length,
@@ -279,22 +321,24 @@ export const collectTerminalData = (
       contentPreview: moduleData.originalContent.substring(0, 100) + '...',
       basicPositionValidation: moduleData.suggestions.every(s => 
         s.startPos >= 0 && s.endPos <= moduleData.originalContent.length && s.startPos < s.endPos
-      )
+      ),
+      hasVerificationData: moduleData.suggestions.some(s => s.verificationStatus)
     });
-    
-    terminalData.push(moduleData);
   });
   
-  console.log(`\n📊 TERMINAL DATA COLLECTION SUMMARY (FORGIVING):`, {
+  console.log(`\n📊 TERMINAL DATA COLLECTION SUMMARY (FORGIVING + VERIFICATION):`, {
     totalModules: terminalData.length,
     contentLengths: terminalData.map(d => d.originalContent.length),
     totalSuggestions: terminalData.reduce((sum, d) => sum + d.suggestions.length, 0),
+    citationsWithVerification: terminalData.reduce((sum, d) => 
+      sum + d.suggestions.filter(s => s.verificationStatus).length, 0
+    ),
     basicValidationPassed: terminalData.every(module => 
       module.suggestions.every(s => 
         s.startPos >= 0 && s.endPos <= module.originalContent.length && s.startPos < s.endPos
       )
     ),
-    validationMode: 'forgiving - allows minor text differences'
+    validationMode: 'forgiving - allows minor text differences + citation verification'
   });
   
   return terminalData;
