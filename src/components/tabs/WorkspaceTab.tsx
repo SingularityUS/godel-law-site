@@ -1,6 +1,6 @@
 
 import React, { useCallback, useState, useRef } from "react";
-import { LayoutGrid, FileText, BarChart3, Settings, Plus, Clock, Folder } from "lucide-react";
+import { LayoutGrid, FileText, BarChart3, Settings, Plus, Clock, Folder, Trash2 } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import WorkspaceSidebar from "@/components/workbench/WorkspaceSidebar";
 import DocumentControls from "@/components/layout/DocumentControls";
@@ -28,7 +28,13 @@ const WorkspaceTab: React.FC = () => {
   const { extractDocumentFromNodes } = useDocumentContext();
 
   const handleFilesAccepted = useCallback((files: UploadedFile[]) => {
-    setUploadedFiles(prev => [...prev, ...files]);
+    console.log('Files accepted in workspace:', files);
+    // Ensure preview URLs are properly set
+    const filesWithPreviews = files.map(file => ({
+      ...file,
+      preview: file.preview || (file instanceof File ? URL.createObjectURL(file) : undefined)
+    }));
+    setUploadedFiles(prev => [...prev, ...filesWithPreviews]);
   }, []);
 
   const handleUploadComplete = useCallback(() => {
@@ -46,6 +52,7 @@ const WorkspaceTab: React.FC = () => {
   }, []);
 
   const handleDocumentClick = useCallback((file: UploadedFile) => {
+    console.log('Document clicked:', file);
     setSelectedDocument(file);
     
     // Show document in sidebar
@@ -70,19 +77,36 @@ const WorkspaceTab: React.FC = () => {
     });
   }, [openOutput]);
 
+  const handleRemoveDocument = useCallback((fileToRemove: UploadedFile, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent document click
+    console.log('Removing document:', fileToRemove.name);
+    
+    setUploadedFiles(prev => prev.filter(file => file !== fileToRemove));
+    
+    // If the removed document was selected, close the sidebar
+    if (selectedDocument === fileToRemove) {
+      setSelectedDocument(null);
+      closeOutput();
+    }
+  }, [selectedDocument, closeOutput]);
+
   const handleDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     
     // Handle document drops from library
     const docData = event.dataTransfer.getData("application/lovable-document");
     if (docData) {
+      console.log('Document dropped from library:', docData);
       const fileData = JSON.parse(docData);
+      
+      // Ensure preview URL is properly mapped
       const file = {
         ...fileData,
-        preview: fileData.preview,
-        extractedText: fileData.extractedText
+        preview: fileData.preview_url || fileData.preview, // Handle both database and local previews
+        extractedText: fileData.extractedText || fileData.extracted_text
       } as UploadedFile;
       
+      console.log('Processed file data:', file);
       setUploadedFiles(prev => [...prev, file]);
     }
   }, []);
@@ -97,10 +121,17 @@ const WorkspaceTab: React.FC = () => {
     setSelectedDocument(null);
   };
 
+  const getFileTypeIcon = (fileType: string) => {
+    if (fileType.includes('pdf')) return '📄';
+    if (fileType.includes('word') || fileType.includes('docx')) return '📝';
+    if (fileType.includes('text')) return '📃';
+    return '📄';
+  };
+
   return (
     <div className="flex-1 overflow-hidden">
       <ResizablePanelGroup direction="horizontal" className="h-full">
-        <ResizablePanel defaultSize={isOutputOpen ? 70 : 100} minSize={40}>
+        <ResizablePanel defaultSize={isOutputOpen ? 50 : 100} minSize={30}>
           <div className="h-full bg-gradient-to-br from-gray-50 to-blue-50">
             <div className="h-full p-8 flex flex-col">
               {/* Header Section */}
@@ -144,9 +175,18 @@ const WorkspaceTab: React.FC = () => {
                       {uploadedFiles.map((file, index) => (
                         <div
                           key={index}
-                          className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer group"
+                          className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer group relative"
                           onClick={() => handleDocumentClick(file)}
                         >
+                          {/* Remove button */}
+                          <button
+                            onClick={(e) => handleRemoveDocument(file, e)}
+                            className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 text-white rounded-full p-1"
+                            title="Remove document"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+
                           <div className="aspect-square p-4 flex flex-col items-center justify-center">
                             {file.preview ? (
                               <div className="w-full h-full flex items-center justify-center overflow-hidden rounded">
@@ -154,11 +194,22 @@ const WorkspaceTab: React.FC = () => {
                                   src={file.preview} 
                                   alt={file.name}
                                   className="max-w-full max-h-full object-contain"
+                                  onError={(e) => {
+                                    console.log('Image failed to load:', file.preview);
+                                    // Replace with fallback
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    target.parentElement!.innerHTML = `
+                                      <div class="w-full h-full flex items-center justify-center bg-gray-100 rounded text-2xl">
+                                        ${getFileTypeIcon(file.type)}
+                                      </div>
+                                    `;
+                                  }}
                                 />
                               </div>
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded">
-                                <FileText size={32} className="text-gray-400" />
+                              <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded text-2xl">
+                                {getFileTypeIcon(file.type)}
                               </div>
                             )}
                           </div>
@@ -212,7 +263,7 @@ const WorkspaceTab: React.FC = () => {
         {isOutputOpen && (
           <>
             <ResizableHandle />
-            <ResizablePanel defaultSize={30} minSize={25}>
+            <ResizablePanel defaultSize={50} minSize={25}>
               <WorkspaceSidebar 
                 output={output}
                 isOpen={isOutputOpen}
