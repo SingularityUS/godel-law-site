@@ -7,7 +7,7 @@
 
 import { extractGrammarSuggestions } from "./extractors/grammarExtractor";
 import { extractCitationSuggestions } from "./extractors/citationExtractor";
-import { extractContentFromModule } from "./extractors/contentExtractor";
+import { extractOriginalContent } from "./extractors/contentExtractor";
 import { RedlineSuggestion } from "@/types/redlining";
 
 export interface TerminalModuleData {
@@ -51,8 +51,8 @@ export const collectTerminalData = (
       outputKeys: moduleResult.result?.output ? Object.keys(moduleResult.result.output) : []
     });
     
-    // Extract original content
-    const originalContent = extractContentFromModule(moduleResult);
+    // Extract original content using the correct function
+    const originalContent = extractOriginalContent(moduleResult.result || moduleResult);
     console.log(`Extracted content length: ${originalContent.length}`);
     
     // Extract suggestions based on module type
