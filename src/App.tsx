@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AuthPage from "./pages/Auth";
+import EmailVerified from "./pages/EmailVerified";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 
 const queryClient = new QueryClient();
@@ -42,6 +43,7 @@ const App = () => (
               }
             />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/email-verified" element={<EmailVerified />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
