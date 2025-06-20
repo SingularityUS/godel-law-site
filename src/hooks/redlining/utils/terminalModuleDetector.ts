@@ -1,80 +1,95 @@
 
 /**
- * Terminal Module Detection Utility
+ * Terminal Module Detector
  * 
- * Purpose: Identifies terminal modules (endpoints) in pipeline output
+ * Purpose: Detects terminal modules that can generate redline suggestions
  */
 
 export interface TerminalModule {
-  nodeId: string;
   moduleType: string;
-  hasOutput: boolean;
+  nodeId: string;
 }
 
 /**
- * Detect terminal modules from pipeline output with enhanced robustness
+ * List of module types that can generate redline suggestions
  */
+const REDLINE_CAPABLE_MODULES = [
+  'grammar-analysis',
+  'citation-finder',
+  'legal-analysis',
+  'style-checker'
+];
+
 export const detectTerminalModules = (pipelineOutput: any): TerminalModule[] => {
-  console.log('=== DETECTING TERMINAL MODULES (Enhanced) ===');
+  console.log('=== DETECTING TERMINAL MODULES ===');
   console.log('Pipeline output structure:', {
     hasResults: !!pipelineOutput.results,
-    resultsLength: pipelineOutput.results?.length || 0,
-    hasEndpointResults: !!pipelineOutput.endpointResults,
-    endpointResultsLength: pipelineOutput.endpointResults?.length || 0,
     hasPipelineResults: !!pipelineOutput.pipelineResults,
-    pipelineResultsLength: pipelineOutput.pipelineResults?.length || 0,
-    outputKeys: Object.keys(pipelineOutput || {})
+    hasEndpointResults: !!pipelineOutput.endpointResults,
+    keys: Object.keys(pipelineOutput)
   });
   
   const terminalModules: TerminalModule[] = [];
   
-  // Try multiple data sources in order of preference
-  const dataSources = [
-    { name: 'endpointResults', data: pipelineOutput.endpointResults },
-    { name: 'results', data: pipelineOutput.results },
-    { name: 'pipelineResults', data: pipelineOutput.pipelineResults }
-  ];
+  // Check pipeline results for redline-capable modules
+  const pipelineResults = pipelineOutput.pipelineResults || pipelineOutput.results || [];
+  console.log(`Checking ${pipelineResults.length} pipeline results`);
   
-  for (const source of dataSources) {
-    if (source.data && Array.isArray(source.data) && source.data.length > 0) {
-      console.log(`Using ${source.name} for terminal module detection (${source.data.length} items)`);
+  pipelineResults.forEach((result: any) => {
+    console.log(`Checking result:`, {
+      nodeId: result.nodeId,
+      moduleType: result.moduleType,
+      hasResult: !!result.result,
+      hasOutput: !!result.result?.output
+    });
+    
+    if (REDLINE_CAPABLE_MODULES.includes(result.moduleType)) {
+      console.log(`Found redline-capable module: ${result.moduleType} (${result.nodeId})`);
       
-      // Filter out document-input modules and find processing endpoints
-      const processingModules = source.data.filter((result: any) => 
-        result.moduleType && 
-        result.moduleType !== 'document-input' && 
-        result.nodeId &&
-        result.result // Must have actual result data
-      );
+      // Verify the module has actual data to process
+      let hasData = false;
       
-      if (processingModules.length > 0) {
-        // For 'results' array, take the last processing module (terminal)
-        if (source.name === 'results') {
-          const lastModule = processingModules[processingModules.length - 1];
-          terminalModules.push({
-            nodeId: lastModule.nodeId,
-            moduleType: lastModule.moduleType,
-            hasOutput: !!lastModule.result
-          });
-          console.log(`Terminal module from ${source.name}: ${lastModule.moduleType} (${lastModule.nodeId})`);
-        }
-        // For endpoint arrays, take all modules
-        else {
-          processingModules.forEach((result: any) => {
-            terminalModules.push({
-              nodeId: result.nodeId,
-              moduleType: result.moduleType,
-              hasOutput: !!result.result
-            });
-            console.log(`Terminal module from ${source.name}: ${result.moduleType} (${result.nodeId})`);
-          });
-        }
-        
-        break; // Use first successful source
+      if (result.moduleType === 'grammar-analysis') {
+        hasData = !!(result.result?.output?.issues && result.result.output.issues.length > 0);
+      } else if (result.moduleType === 'citation-finder') {
+        hasData = !!(result.result?.output?.citations && result.result.output.citations.length > 0);
+      } else {
+        // For other modules, check if result exists
+        hasData = !!(result.result && result.result.output);
+      }
+      
+      if (hasData) {
+        terminalModules.push({
+          moduleType: result.moduleType,
+          nodeId: result.nodeId
+        });
+        console.log(`Added terminal module: ${result.moduleType} (${result.nodeId})`);
+      } else {
+        console.log(`Module ${result.moduleType} has no data to process`);
+      }
+    } else {
+      console.log(`Module ${result.moduleType} is not redline-capable`);
+    }
+  });
+  
+  // Also check endpoint results if available
+  const endpointResults = pipelineOutput.endpointResults || [];
+  console.log(`Checking ${endpointResults.length} endpoint results`);
+  
+  endpointResults.forEach((result: any) => {
+    if (REDLINE_CAPABLE_MODULES.includes(result.moduleType)) {
+      // Check if we haven't already added this module
+      const alreadyExists = terminalModules.some(tm => tm.nodeId === result.nodeId);
+      if (!alreadyExists) {
+        console.log(`Found additional terminal module in endpoints: ${result.moduleType} (${result.nodeId})`);
+        terminalModules.push({
+          moduleType: result.moduleType,
+          nodeId: result.nodeId
+        });
       }
     }
-  }
+  });
   
-  console.log(`Total terminal modules detected: ${terminalModules.length}`);
+  console.log(`Detected ${terminalModules.length} terminal modules:`, terminalModules);
   return terminalModules;
 };
