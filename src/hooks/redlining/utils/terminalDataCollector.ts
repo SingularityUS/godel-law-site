@@ -77,6 +77,7 @@ export const collectTerminalData = (
       console.log(`\n🔍 CITATION POSITION VALIDATION (ENHANCED):`);
       const contentLength = originalContent.length;
       const validSuggestions: RedlineSuggestion[] = [];
+      const originalSuggestionsCount = suggestions.length;
       
       suggestions.forEach((suggestion, index) => {
         console.log(`\n📍 VALIDATING CITATION ${index + 1}:`);
@@ -158,9 +159,9 @@ export const collectTerminalData = (
       
       suggestions = validSuggestions;
       console.log(`\n📊 CITATION VALIDATION SUMMARY:`);
-      console.log(`  - Original citations: ${suggestions.length + (allOriginalSuggestions.length - validSuggestions.length)}`);
+      console.log(`  - Original citations: ${originalSuggestionsCount}`);
       console.log(`  - Valid citations: ${validSuggestions.length}`);
-      console.log(`  - Filtered out: ${(suggestions.length + (validSuggestions.length === suggestions.length ? 0 : suggestions.length - validSuggestions.length))}`);
+      console.log(`  - Filtered out: ${originalSuggestionsCount - validSuggestions.length}`);
     } else {
       console.log(`Unknown terminal module type: ${terminalModule.moduleType}`);
     }
