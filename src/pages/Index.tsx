@@ -1,7 +1,9 @@
+
 import { useCallback, useState, useRef } from "react";
 import ModuleSettingsDrawer from "@/components/ModuleSettingsDrawer";
 import DocumentLibrary from "@/components/DocumentLibrary";
 import AppHeader from "@/components/layout/AppHeader";
+import WorkspaceTab from "@/components/tabs/WorkspaceTab";
 import DocumentAnalyzerTab from "@/components/tabs/DocumentAnalyzerTab";
 import DocumentBuilderTab from "@/components/tabs/DocumentBuilderTab";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -15,7 +17,7 @@ const getModuleDef = (type: ModuleKind) =>
 export type UploadedFile = File & { preview?: string; extractedText?: string };
 
 const IndexContent = () => {
-  const [activeTab, setActiveTab] = useState<string>('document-analyzer');
+  const [activeTab, setActiveTab] = useState<string>('workspace');
   const [editingNodeId, setEditingNodeId] = useState<string | undefined>();
   const [editingNode, setEditingNode] = useState<any>();
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -87,6 +89,8 @@ const IndexContent = () => {
 
   const renderTabContent = () => {
     switch (activeTab) {
+      case 'workspace':
+        return <WorkspaceTab />;
       case 'document-analyzer':
         return (
           <DocumentAnalyzerTab
@@ -101,16 +105,7 @@ const IndexContent = () => {
       case 'document-builder':
         return <DocumentBuilderTab />;
       default:
-        return (
-          <DocumentAnalyzerTab
-            onModuleEdit={handleModuleEdit}
-            editingPromptNodeId={editingNodeId}
-            uploadedFiles={uploadedFiles}
-            workbenchRef={workbenchRef}
-            finalOutput={finalOutput}
-            onCloseFinalOutput={handleCloseFinalOutput}
-          />
-        );
+        return <WorkspaceTab />;
     }
   };
 
