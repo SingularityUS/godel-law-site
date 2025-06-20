@@ -17,11 +17,25 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const location = useLocation();
   
+  console.log('ProtectedRoute check:', { user: !!user, loading, pathname: location.pathname });
+  
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <img 
+            src="/lovable-uploads/2450f682-9da7-405e-8c7d-ef5b072c1a0a.png" 
+            alt="Godel Logo" 
+            className="w-16 h-16 mx-auto mb-4 animate-pulse"
+          />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
   
   if (!user) {
+    console.log('No user, redirecting to /auth');
     // Redirect unauthenticated users to /auth
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
@@ -31,6 +45,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 // App routes component - inside AuthProvider context
 function AppRoutes() {
+  const { user, loading } = useAuth();
+  
   return (
     <Routes>
       <Route
@@ -41,7 +57,12 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      <Route path="/auth" element={<AuthPage />} />
+      <Route 
+        path="/auth" 
+        element={
+          !loading && user ? <Navigate to="/" replace /> : <AuthPage />
+        } 
+      />
       <Route path="/email-verified" element={<EmailVerified />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
