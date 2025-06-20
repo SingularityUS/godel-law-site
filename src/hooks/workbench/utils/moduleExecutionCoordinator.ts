@@ -39,8 +39,8 @@ export const createModuleExecutionCoordinator = (
       onProgress({
         completed,
         total,
-        inputType: 'items',
-        outputType: 'processed items',
+        moduleType,
+        inputType: 'documents', // Fix: Use valid inputType
         outputGenerated: completed
       });
     } : undefined;
@@ -94,7 +94,7 @@ export const createModuleExecutionCoordinator = (
         // For other modules that use ChatGPT, use generic processing
         if (moduleDef.supportsChatGPT) {
           try {
-            const response = await callChatGPT(systemPrompt, '', 'gpt-4o-mini', 3000);
+            const response = await callChatGPT(systemPrompt, ''); // Fix: Remove extra arguments
             
             let responseText: string;
             if (typeof response === 'string') {
