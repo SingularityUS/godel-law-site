@@ -12,18 +12,41 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 
 const queryClient = new QueryClient();
 
-// Protected route wrapper
+// Protected route wrapper - now properly inside AuthProvider
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const location = useLocation();
+  
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
+  
   if (!user) {
     // Redirect unauthenticated users to /auth
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
+  
   return <>{children}</>;
+}
+
+// App routes component - inside AuthProvider context
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <Index />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/auth" element={<AuthPage />} />
+      <Route path="/email-verified" element={<EmailVerified />} />
+      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
 }
 
 const App = () => (
@@ -33,20 +56,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="/auth" element={<AuthPage />} />
-            <Route path="/email-verified" element={<EmailVerified />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <AppRoutes />
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
