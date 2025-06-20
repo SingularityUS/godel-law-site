@@ -156,6 +156,7 @@ Return ONLY a valid JSON object with this EXACT structure (no additional text):
 IMPORTANT: Use web search to find actual sources. If the citation cannot be found, set verificationStatus to "not_found" and explain why in searchSummary.`;
 
       console.log(`Sending verification request for citation ${i + 1}`);
+      // Fix: Use correct function signature - callChatGPT(prompt, systemPrompt, model, maxTokens)
       const response = await callChatGPT(verificationPrompt, '', 'gpt-4o-mini', 3000);
       
       // Extract response content
