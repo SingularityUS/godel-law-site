@@ -18,11 +18,76 @@ export interface TerminalModuleData {
   metadata: any;
 }
 
+/**
+ * Normalize text for comparison by trimming whitespace and normalizing line endings
+ */
+const normalizeText = (text: string): string => {
+  return text.trim().replace(/\r\n/g, '\n').replace(/\s+/g, ' ');
+};
+
+/**
+ * Check if two texts are similar enough (allowing for minor whitespace differences)
+ */
+const areTextsCompatible = (expected: string, actual: string): boolean => {
+  const normalizedExpected = normalizeText(expected);
+  const normalizedActual = normalizeText(actual);
+  
+  // Exact match after normalization
+  if (normalizedExpected === normalizedActual) {
+    return true;
+  }
+  
+  // Check if one contains the other (for cases where content has extra spaces)
+  if (normalizedExpected.includes(normalizedActual) || normalizedActual.includes(normalizedExpected)) {
+    return true;
+  }
+  
+  // Check similarity ratio for minor differences
+  const similarity = calculateSimilarity(normalizedExpected, normalizedActual);
+  return similarity > 0.8; // 80% similarity threshold
+};
+
+/**
+ * Calculate text similarity ratio
+ */
+const calculateSimilarity = (str1: string, str2: string): number => {
+  const longer = str1.length > str2.length ? str1 : str2;
+  const shorter = str1.length > str2.length ? str2 : str1;
+  
+  if (longer.length === 0) return 1.0;
+  
+  const editDistance = levenshteinDistance(longer, shorter);
+  return (longer.length - editDistance) / longer.length;
+};
+
+/**
+ * Calculate Levenshtein distance between two strings
+ */
+const levenshteinDistance = (str1: string, str2: string): number => {
+  const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+  
+  for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
+  for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
+  
+  for (let j = 1; j <= str2.length; j++) {
+    for (let i = 1; i <= str1.length; i++) {
+      const substitutionCost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+      matrix[j][i] = Math.min(
+        matrix[j][i - 1] + 1, // insertion
+        matrix[j - 1][i] + 1, // deletion
+        matrix[j - 1][i - 1] + substitutionCost // substitution
+      );
+    }
+  }
+  
+  return matrix[str2.length][str1.length];
+};
+
 export const collectTerminalData = (
   pipelineOutput: any,
   terminalModules: Array<{ moduleType: string; nodeId: string }>
 ): TerminalModuleData[] => {
-  console.log('=== COLLECTING TERMINAL DATA (ENHANCED POSITION VALIDATION) ===');
+  console.log('=== COLLECTING TERMINAL DATA (FORGIVING VALIDATION) ===');
   console.log('Terminal modules to process:', terminalModules);
   
   const terminalData: TerminalModuleData[] = [];
@@ -69,12 +134,12 @@ export const collectTerminalData = (
       suggestions = extractGrammarSuggestions(moduleResult.result, terminalModule.nodeId);
       console.log(`Extracted ${suggestions.length} grammar suggestions`);
     } else if (terminalModule.moduleType === 'citation-finder') {
-      console.log('🎯 PROCESSING CITATION FINDER MODULE WITH ENHANCED VALIDATION');
+      console.log('🎯 PROCESSING CITATION FINDER MODULE WITH FORGIVING VALIDATION');
       suggestions = extractCitationSuggestions(moduleResult.result, terminalModule.nodeId);
       console.log(`Extracted ${suggestions.length} citation suggestions`);
       
-      // ENHANCED: Comprehensive citation position validation
-      console.log(`\n🔍 CITATION POSITION VALIDATION (ENHANCED):`);
+      // ENHANCED: Forgiving citation position validation
+      console.log(`\n🔍 CITATION POSITION VALIDATION (FORGIVING):`);
       const contentLength = originalContent.length;
       const validSuggestions: RedlineSuggestion[] = [];
       const originalSuggestionsCount = suggestions.length;
@@ -95,73 +160,97 @@ export const collectTerminalData = (
                               suggestion.startPos < suggestion.endPos;
         
         if (!isWithinBounds) {
-          console.error(`❌ CITATION ${index + 1} OUT OF BOUNDS:`);
+          console.error(`❌ CITATION ${index + 1} OUT OF BOUNDS - DISCARDING:`);
           console.error(`  - Start: ${suggestion.startPos} (valid: >= 0)`);
           console.error(`  - End: ${suggestion.endPos} (valid: <= ${contentLength})`);
           console.error(`  - Range valid: ${suggestion.startPos < suggestion.endPos}`);
-          return; // Skip this citation
+          return; // Skip this citation - bounds check must be strict
         }
         
-        // Length consistency checking
+        // Length consistency checking (WARNING only - not blocking)
         const expectedLength = suggestion.originalText.length;
         const calculatedLength = suggestion.endPos - suggestion.startPos;
         
         if (expectedLength !== calculatedLength) {
-          console.warn(`⚠️ CITATION ${index + 1} LENGTH MISMATCH:`);
+          console.warn(`⚠️ CITATION ${index + 1} LENGTH MISMATCH (non-blocking):`);
           console.warn(`  - Expected: ${expectedLength}`);
           console.warn(`  - Calculated: ${calculatedLength}`);
           console.warn(`  - Difference: ${Math.abs(expectedLength - calculatedLength)}`);
         }
         
-        // CRITICAL: Text content validation
+        // FORGIVING: Text content validation with similarity matching
         const actualText = originalContent.substring(suggestion.startPos, suggestion.endPos);
-        console.log(`🔍 TEXT VALIDATION:`);
+        console.log(`🔍 TEXT VALIDATION (FORGIVING):`);
         console.log(`  - Expected: "${suggestion.originalText}"`);
         console.log(`  - Actual: "${actualText}"`);
-        console.log(`  - Match: ${actualText === suggestion.originalText}`);
         
-        if (actualText === suggestion.originalText) {
-          console.log(`✅ CITATION ${index + 1} VALIDATION PASSED`);
+        const textsAreCompatible = areTextsCompatible(suggestion.originalText, actualText);
+        console.log(`  - Compatible: ${textsAreCompatible}`);
+        
+        if (textsAreCompatible) {
+          console.log(`✅ CITATION ${index + 1} VALIDATION PASSED (compatible text)`);
           validSuggestions.push(suggestion);
         } else {
-          console.error(`❌ CITATION ${index + 1} TEXT MISMATCH:`);
-          console.error(`  - This citation will be filtered out to prevent highlighting errors`);
-          
-          // Try to find the citation in nearby positions (fuzzy matching)
-          const searchRadius = 50;
+          // FORGIVING: Try to find the citation in nearby positions (fuzzy matching)
+          console.log(`🔧 ATTEMPTING POSITION CORRECTION FOR CITATION ${index + 1}`);
+          const searchRadius = 100; // Increased search radius
           const searchStart = Math.max(0, suggestion.startPos - searchRadius);
           const searchEnd = Math.min(contentLength, suggestion.endPos + searchRadius);
           const searchArea = originalContent.substring(searchStart, searchEnd);
-          const foundIndex = searchArea.indexOf(suggestion.originalText);
+          
+          // Try exact match first
+          let foundIndex = searchArea.indexOf(suggestion.originalText);
+          
+          // If exact match fails, try normalized matching
+          if (foundIndex === -1) {
+            const normalizedTarget = normalizeText(suggestion.originalText);
+            const words = normalizedTarget.split(' ');
+            
+            // Try to find the first few words of the citation
+            if (words.length > 2) {
+              const partialTarget = words.slice(0, Math.min(3, words.length)).join(' ');
+              foundIndex = searchArea.indexOf(partialTarget);
+              console.log(`  - Partial match attempt: "${partialTarget}" found at ${foundIndex}`);
+            }
+          }
           
           if (foundIndex !== -1) {
             const correctedStart = searchStart + foundIndex;
             const correctedEnd = correctedStart + suggestion.originalText.length;
-            console.log(`🔧 FOUND CITATION IN NEARBY POSITION:`);
-            console.log(`  - Corrected start: ${correctedStart} (was ${suggestion.startPos})`);
-            console.log(`  - Corrected end: ${correctedEnd} (was ${suggestion.endPos})`);
-            console.log(`  - Offset: ${correctedStart - suggestion.startPos}`);
             
-            // Create corrected suggestion
-            const correctedSuggestion = {
-              ...suggestion,
-              startPos: correctedStart,
-              endPos: correctedEnd
-            };
-            
-            validSuggestions.push(correctedSuggestion);
-            console.log(`✅ CITATION ${index + 1} CORRECTED AND VALIDATED`);
+            // Verify corrected position is within bounds
+            if (correctedStart >= 0 && correctedEnd <= contentLength) {
+              console.log(`🔧 FOUND CITATION IN NEARBY POSITION:`);
+              console.log(`  - Corrected start: ${correctedStart} (was ${suggestion.startPos})`);
+              console.log(`  - Corrected end: ${correctedEnd} (was ${suggestion.endPos})`);
+              console.log(`  - Offset: ${correctedStart - suggestion.startPos}`);
+              
+              // Create corrected suggestion
+              const correctedSuggestion = {
+                ...suggestion,
+                startPos: correctedStart,
+                endPos: correctedEnd
+              };
+              
+              validSuggestions.push(correctedSuggestion);
+              console.log(`✅ CITATION ${index + 1} CORRECTED AND ACCEPTED`);
+            } else {
+              console.warn(`⚠️ CORRECTED POSITION OUT OF BOUNDS - ACCEPTING ORIGINAL (forgiving mode)`);
+              validSuggestions.push(suggestion); // Accept anyway in forgiving mode
+            }
           } else {
-            console.error(`❌ CITATION ${index + 1} NOT FOUND IN NEARBY POSITIONS - DISCARDING`);
+            console.warn(`⚠️ CITATION ${index + 1} NOT FOUND NEARBY - ACCEPTING ANYWAY (forgiving mode)`);
+            validSuggestions.push(suggestion); // Accept anyway in forgiving mode
           }
         }
       });
       
       suggestions = validSuggestions;
-      console.log(`\n📊 CITATION VALIDATION SUMMARY:`);
+      console.log(`\n📊 CITATION VALIDATION SUMMARY (FORGIVING):`);
       console.log(`  - Original citations: ${originalSuggestionsCount}`);
       console.log(`  - Valid citations: ${validSuggestions.length}`);
       console.log(`  - Filtered out: ${originalSuggestionsCount - validSuggestions.length}`);
+      console.log(`  - Acceptance rate: ${((validSuggestions.length / originalSuggestionsCount) * 100).toFixed(1)}%`);
     } else {
       console.log(`Unknown terminal module type: ${terminalModule.moduleType}`);
     }
@@ -177,7 +266,7 @@ export const collectTerminalData = (
         sourceModule: terminalModule.moduleType,
         contentLength: originalContent.length,
         contentSource: 'traced-from-pipeline',
-        positionValidationEnhanced: true,
+        positionValidationMode: 'forgiving',
         validationTimestamp: Date.now()
       }
     };
@@ -188,7 +277,7 @@ export const collectTerminalData = (
       suggestionsCount: moduleData.suggestions.length,
       suggestionTypes: moduleData.suggestions.map(s => s.type),
       contentPreview: moduleData.originalContent.substring(0, 100) + '...',
-      allPositionsValid: moduleData.suggestions.every(s => 
+      basicPositionValidation: moduleData.suggestions.every(s => 
         s.startPos >= 0 && s.endPos <= moduleData.originalContent.length && s.startPos < s.endPos
       )
     });
@@ -196,15 +285,16 @@ export const collectTerminalData = (
     terminalData.push(moduleData);
   });
   
-  console.log(`\n📊 TERMINAL DATA COLLECTION SUMMARY (ENHANCED):`, {
+  console.log(`\n📊 TERMINAL DATA COLLECTION SUMMARY (FORGIVING):`, {
     totalModules: terminalData.length,
     contentLengths: terminalData.map(d => d.originalContent.length),
     totalSuggestions: terminalData.reduce((sum, d) => sum + d.suggestions.length, 0),
-    allSuggestionsValid: terminalData.every(module => 
+    basicValidationPassed: terminalData.every(module => 
       module.suggestions.every(s => 
         s.startPos >= 0 && s.endPos <= module.originalContent.length && s.startPos < s.endPos
       )
-    )
+    ),
+    validationMode: 'forgiving - allows minor text differences'
   });
   
   return terminalData;
