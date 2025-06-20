@@ -2,11 +2,11 @@
 /**
  * Content Extractor
  * 
- * Purpose: Enhanced content extraction with comprehensive position debugging
+ * Purpose: Enhanced content extraction that correctly sources original document content
  */
 
-export const extractOriginalContent = (moduleResult: any): string => {
-  console.log('=== EXTRACTING ORIGINAL CONTENT (POSITION DEBUG) ===');
+export const extractOriginalContent = (moduleResult: any, pipelineResults?: any[]): string => {
+  console.log('=== EXTRACTING ORIGINAL CONTENT (CORRECTED SOURCING) ===');
   console.log('Module result structure:', {
     hasMetadata: !!moduleResult.metadata,
     hasOriginalContent: !!moduleResult.originalContent,
@@ -16,16 +16,43 @@ export const extractOriginalContent = (moduleResult: any): string => {
     resultKeys: Object.keys(moduleResult || {})
   });
   
-  // Direct content checks
+  // For citation-finder and other analysis modules, we need to get content from source modules
+  // Check if we have pipeline results to trace back to the source
+  if (pipelineResults && Array.isArray(pipelineResults)) {
+    console.log('🔍 TRACING BACK TO SOURCE MODULES:', {
+      totalResults: pipelineResults.length,
+      moduleTypes: pipelineResults.map(r => r.moduleType)
+    });
+    
+    // Look for source modules that contain the original document content
+    const sourceModules = ['document-input', 'paragraph-splitter'];
+    
+    for (const sourceType of sourceModules) {
+      const sourceResult = pipelineResults.find(r => r.moduleType === sourceType);
+      if (sourceResult && sourceResult.result) {
+        console.log(`📄 CHECKING ${sourceType.toUpperCase()} FOR ORIGINAL CONTENT`);
+        
+        // Try to extract content from source module
+        const sourceContent = extractContentFromSourceModule(sourceResult.result, sourceType);
+        if (sourceContent && sourceContent.length > 0) {
+          console.log(`✅ FOUND ORIGINAL CONTENT FROM ${sourceType.toUpperCase()}:`, {
+            length: sourceContent.length,
+            preview: sourceContent.substring(0, 100) + '...',
+            doubleNewlineCount: (sourceContent.match(/\n\n/g) || []).length
+          });
+          return sourceContent;
+        }
+      }
+    }
+  }
+  
+  // Fallback to direct content checks if no pipeline results available
   if (moduleResult.originalContent && typeof moduleResult.originalContent === 'string') {
     const content = moduleResult.originalContent.trim();
     if (content.length > 0) {
       console.log('✅ Found direct originalContent:', {
         length: content.length,
-        preview: content.substring(0, 100) + '...',
-        startsWithNewline: content.startsWith('\n'),
-        endsWithNewline: content.endsWith('\n'),
-        doubleNewlineCount: (content.match(/\n\n/g) || []).length
+        preview: content.substring(0, 100) + '...'
       });
       return content;
     }
@@ -37,8 +64,7 @@ export const extractOriginalContent = (moduleResult: any): string => {
     if (content.length > 0) {
       console.log('✅ Found metadata originalContent:', {
         length: content.length,
-        preview: content.substring(0, 100) + '...',
-        doubleNewlineCount: (content.match(/\n\n/g) || []).length
+        preview: content.substring(0, 100) + '...'
       });
       return content;
     }
@@ -48,7 +74,6 @@ export const extractOriginalContent = (moduleResult: any): string => {
   if (moduleResult.input) {
     console.log('🔍 CHECKING INPUT STRUCTURES:', Object.keys(moduleResult.input));
     
-    // Check for content in input
     if (moduleResult.input.content && typeof moduleResult.input.content === 'string') {
       const content = moduleResult.input.content.trim();
       if (content.length > 0) {
@@ -71,24 +96,19 @@ export const extractOriginalContent = (moduleResult: any): string => {
         console.log('✅ Reconstructed from input paragraphs:', {
           paragraphCount: moduleResult.input.paragraphs.length,
           reconstructedLength: reconstructed.length,
-          preview: reconstructed.substring(0, 100) + '...',
-          doubleNewlineCount: (reconstructed.match(/\n\n/g) || []).length
+          preview: reconstructed.substring(0, 100) + '...'
         });
         return reconstructed;
       }
     }
   }
   
-  // Check for analysis results that might contain content
-  console.log('🔍 CHECKING ANALYSIS STRUCTURES');
-  
   // Check output for content
   if (moduleResult.output) {
     const outputKeys = Object.keys(moduleResult.output);
     console.log('Output keys:', outputKeys);
     
-    // Look for content in various output structures
-    const contentKeys = ['content', 'originalContent', 'text', 'originalText', 'input'];
+    const contentKeys = ['content', 'originalContent', 'text', 'originalText'];
     for (const key of contentKeys) {
       if (moduleResult.output[key] && typeof moduleResult.output[key] === 'string') {
         const content = moduleResult.output[key].trim();
@@ -120,22 +140,61 @@ export const extractOriginalContent = (moduleResult: any): string => {
     }
   }
   
-  // Fallback: deep search for any content
-  console.log('🔍 DEEP SEARCH FOR CONTENT');
-  const fallbackContent = findContentInObject(moduleResult);
-  
-  if (fallbackContent) {
-    console.log('✅ Found fallback content:', {
-      length: fallbackContent.length,
-      preview: fallbackContent.substring(0, 100) + '...',
-      doubleNewlineCount: (fallbackContent.match(/\n\n/g) || []).length
-    });
-    return fallbackContent;
-  }
-  
   console.error('❌ NO CONTENT FOUND - This will cause position mapping issues');
   return '';
 };
+
+/**
+ * Extract content from source modules (document-input, paragraph-splitter)
+ */
+function extractContentFromSourceModule(sourceResult: any, moduleType: string): string | null {
+  console.log(`🔍 EXTRACTING FROM ${moduleType.toUpperCase()}:`, {
+    hasOutput: !!sourceResult.output,
+    hasContent: !!sourceResult.content,
+    hasOriginalContent: !!sourceResult.originalContent,
+    outputKeys: sourceResult.output ? Object.keys(sourceResult.output) : []
+  });
+  
+  if (moduleType === 'document-input') {
+    // Document input should have the original content
+    if (sourceResult.content && typeof sourceResult.content === 'string') {
+      return sourceResult.content.trim();
+    }
+    if (sourceResult.originalContent && typeof sourceResult.originalContent === 'string') {
+      return sourceResult.originalContent.trim();
+    }
+    if (sourceResult.output?.content && typeof sourceResult.output.content === 'string') {
+      return sourceResult.output.content.trim();
+    }
+  }
+  
+  if (moduleType === 'paragraph-splitter') {
+    // Paragraph splitter should have paragraphs we can reconstruct
+    if (sourceResult.output?.paragraphs && Array.isArray(sourceResult.output.paragraphs)) {
+      const reconstructed = sourceResult.output.paragraphs
+        .map((p: any) => p.content || '')
+        .filter((content: string) => content.trim().length > 0)
+        .join('\n\n');
+      
+      if (reconstructed.length > 0) {
+        console.log(`📝 RECONSTRUCTED FROM ${moduleType.toUpperCase()} PARAGRAPHS:`, {
+          paragraphCount: sourceResult.output.paragraphs.length,
+          totalLength: reconstructed.length,
+          doubleNewlineCount: (reconstructed.match(/\n\n/g) || []).length
+        });
+        return reconstructed;
+      }
+    }
+    
+    // Fallback to input content if available
+    if (sourceResult.input?.content && typeof sourceResult.input.content === 'string') {
+      return sourceResult.input.content.trim();
+    }
+  }
+  
+  console.warn(`❌ Could not extract content from ${moduleType}`);
+  return null;
+}
 
 /**
  * Deep search for content in nested objects

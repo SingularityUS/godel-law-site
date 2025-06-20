@@ -2,7 +2,7 @@
 /**
  * Terminal Data Collector
  * 
- * Purpose: Collects data from terminal modules for redline processing
+ * Purpose: Collects data from terminal modules with correct content sourcing
  */
 
 import { extractGrammarSuggestions } from "./extractors/grammarExtractor";
@@ -22,7 +22,7 @@ export const collectTerminalData = (
   pipelineOutput: any,
   terminalModules: Array<{ moduleType: string; nodeId: string }>
 ): TerminalModuleData[] => {
-  console.log('=== COLLECTING TERMINAL DATA ===');
+  console.log('=== COLLECTING TERMINAL DATA (CORRECTED CONTENT SOURCING) ===');
   console.log('Terminal modules to process:', terminalModules);
   
   const terminalData: TerminalModuleData[] = [];
@@ -51,9 +51,14 @@ export const collectTerminalData = (
       outputKeys: moduleResult.result?.output ? Object.keys(moduleResult.result.output) : []
     });
     
-    // Extract original content using the correct function
-    const originalContent = extractOriginalContent(moduleResult.result || moduleResult);
+    // Extract original content using corrected sourcing - pass pipeline results for tracing
+    console.log(`🎯 EXTRACTING CONTENT FOR ${terminalModule.moduleType.toUpperCase()}`);
+    const originalContent = extractOriginalContent(moduleResult.result || moduleResult, pipelineResults);
     console.log(`Extracted content length: ${originalContent.length}`);
+    
+    if (originalContent.length === 0) {
+      console.error(`❌ NO CONTENT EXTRACTED FOR ${terminalModule.moduleType} - WILL CAUSE POSITION ISSUES`);
+    }
     
     // Extract suggestions based on module type
     let suggestions: RedlineSuggestion[] = [];
@@ -66,6 +71,50 @@ export const collectTerminalData = (
       console.log('Processing citation finder module');
       suggestions = extractCitationSuggestions(moduleResult.result, terminalModule.nodeId);
       console.log(`Extracted ${suggestions.length} citation suggestions`);
+      
+      // CRITICAL: Validate that citation positions are within content bounds
+      const contentLength = originalContent.length;
+      const validSuggestions = suggestions.filter(suggestion => {
+        const isValid = suggestion.startPos >= 0 && 
+                       suggestion.endPos <= contentLength && 
+                       suggestion.startPos < suggestion.endPos;
+        
+        if (!isValid) {
+          console.error(`❌ INVALID CITATION POSITION:`, {
+            id: suggestion.id,
+            startPos: suggestion.startPos,
+            endPos: suggestion.endPos,
+            contentLength,
+            originalText: suggestion.originalText
+          });
+        } else {
+          // Validate the text at those positions
+          const actualText = originalContent.substring(suggestion.startPos, suggestion.endPos);
+          if (actualText !== suggestion.originalText) {
+            console.warn(`⚠️ CITATION TEXT MISMATCH:`, {
+              id: suggestion.id,
+              expected: suggestion.originalText,
+              actual: actualText,
+              startPos: suggestion.startPos,
+              endPos: suggestion.endPos
+            });
+          } else {
+            console.log(`✅ CITATION POSITION VALIDATED:`, {
+              id: suggestion.id,
+              text: suggestion.originalText,
+              positions: `${suggestion.startPos}-${suggestion.endPos}`
+            });
+          }
+        }
+        
+        return isValid;
+      });
+      
+      if (validSuggestions.length !== suggestions.length) {
+        console.error(`❌ FILTERED OUT ${suggestions.length - validSuggestions.length} INVALID CITATIONS`);
+      }
+      
+      suggestions = validSuggestions;
     } else {
       console.log(`Unknown terminal module type: ${terminalModule.moduleType}`);
     }
@@ -78,20 +127,28 @@ export const collectTerminalData = (
       metadata: {
         processingTime: moduleResult.result?.metadata?.processingTime,
         totalSuggestions: suggestions.length,
-        sourceModule: terminalModule.moduleType
+        sourceModule: terminalModule.moduleType,
+        contentLength: originalContent.length,
+        contentSource: 'traced-from-pipeline'
       }
     };
     
-    console.log(`Created terminal data for ${terminalModule.nodeId}:`, {
+    console.log(`✅ CREATED TERMINAL DATA FOR ${terminalModule.nodeId}:`, {
       moduleType: moduleData.moduleType,
       contentLength: moduleData.originalContent.length,
       suggestionsCount: moduleData.suggestions.length,
-      suggestionTypes: moduleData.suggestions.map(s => s.type)
+      suggestionTypes: moduleData.suggestions.map(s => s.type),
+      contentPreview: moduleData.originalContent.substring(0, 100) + '...'
     });
     
     terminalData.push(moduleData);
   });
   
-  console.log(`Collected data from ${terminalData.length} terminal modules`);
+  console.log(`📊 TERMINAL DATA COLLECTION SUMMARY:`, {
+    totalModules: terminalData.length,
+    contentLengths: terminalData.map(d => d.originalContent.length),
+    totalSuggestions: terminalData.reduce((sum, d) => sum + d.suggestions.length, 0)
+  });
+  
   return terminalData;
 };

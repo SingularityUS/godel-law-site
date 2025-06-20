@@ -1,7 +1,8 @@
+
 /**
  * Position Mapping Utilities
  * 
- * Purpose: Enhanced position mapping with comprehensive debugging
+ * Purpose: Enhanced position mapping with content source validation
  */
 
 export interface PositionMap {
@@ -88,23 +89,49 @@ export const createPositionMapping = (htmlContent: string): PositionMap[] => {
 };
 
 /**
- * Finds text in HTML content with enhanced debugging and position validation
+ * Finds text in HTML content with enhanced content source validation
  */
 export const findTextInHtml = (
   htmlContent: string, 
   searchText: string, 
-  startFromPos: number = 0
+  startFromPos: number = 0,
+  expectedStartPos?: number
 ): { start: number; end: number } | null => {
   const cleanSearchText = searchText.trim();
   if (!cleanSearchText) return null;
   
-  console.log(`🔍 FINDING TEXT IN HTML:`, {
+  console.log(`🔍 FINDING TEXT IN HTML (CONTENT SOURCE VALIDATION):`, {
     searchText: cleanSearchText,
     searchLength: cleanSearchText.length,
     htmlLength: htmlContent.length,
     startFromPos,
+    expectedStartPos,
     htmlPreview: htmlContent.substring(startFromPos, startFromPos + 100) + '...'
   });
+  
+  // If we have an expected position, validate it first
+  if (typeof expectedStartPos === 'number' && expectedStartPos >= 0) {
+    const expectedEnd = expectedStartPos + cleanSearchText.length;
+    if (expectedEnd <= htmlContent.length) {
+      const textAtExpectedPos = htmlContent.substring(expectedStartPos, expectedEnd);
+      if (textAtExpectedPos === cleanSearchText) {
+        console.log('✅ VALIDATED EXPECTED POSITION:', {
+          expectedStartPos,
+          expectedEnd,
+          actualText: textAtExpectedPos,
+          matches: true
+        });
+        return { start: expectedStartPos, end: expectedEnd };
+      } else {
+        console.warn('⚠️ EXPECTED POSITION MISMATCH:', {
+          expectedStartPos,
+          expectedEnd,
+          expectedText: cleanSearchText,
+          actualText: textAtExpectedPos
+        });
+      }
+    }
+  }
   
   // Try direct HTML search first
   const directIndex = htmlContent.indexOf(cleanSearchText, startFromPos);
@@ -187,7 +214,8 @@ export const findTextInHtml = (
     searchText: cleanSearchText,
     searchLength: cleanSearchText.length,
     htmlLength: htmlContent.length,
-    startPos: startFromPos
+    startPos: startFromPos,
+    expectedPos: expectedStartPos
   });
   return null;
 };
@@ -231,20 +259,23 @@ export const extractPlainText = (htmlContent: string): string => {
 };
 
 /**
- * Validates that a position range contains the expected text
+ * Validates that a position range contains the expected text with content source info
  */
 export const validatePositionRange = (
   content: string,
   startPos: number,
   endPos: number,
-  expectedText: string
+  expectedText: string,
+  contentSource?: string
 ): boolean => {
   if (startPos < 0 || endPos > content.length || startPos >= endPos) {
-    console.warn('❌ Invalid position range:', {
+    console.error('❌ INVALID POSITION RANGE:', {
       startPos,
       endPos,
       contentLength: content.length,
-      rangeLength: endPos - startPos
+      rangeLength: endPos - startPos,
+      contentSource: contentSource || 'unknown',
+      contentPreview: content.substring(Math.max(0, startPos - 20), Math.min(content.length, endPos + 20))
     });
     return false;
   }
@@ -253,19 +284,22 @@ export const validatePositionRange = (
   const matches = actualText === expectedText;
   
   if (!matches) {
-    console.warn('❌ Position validation failed:', {
+    console.error('❌ POSITION VALIDATION FAILED:', {
       expected: expectedText,
       actual: actualText,
       startPos,
       endPos,
       expectedLength: expectedText.length,
-      actualLength: actualText.length
+      actualLength: actualText.length,
+      contentSource: contentSource || 'unknown',
+      contentPreview: content.substring(Math.max(0, startPos - 20), Math.min(content.length, endPos + 20))
     });
   } else {
-    console.log('✅ Position validation passed:', {
+    console.log('✅ POSITION VALIDATION PASSED:', {
       text: expectedText,
       startPos,
-      endPos
+      endPos,
+      contentSource: contentSource || 'unknown'
     });
   }
   
