@@ -40,7 +40,7 @@ export const createModuleExecutionCoordinator = (
         completed,
         total,
         moduleType,
-        inputType: 'documents', // Fix: Use valid inputType
+        inputType: 'documents',
         outputGenerated: completed
       });
     } : undefined;
@@ -94,7 +94,8 @@ export const createModuleExecutionCoordinator = (
         // For other modules that use ChatGPT, use generic processing
         if (moduleDef.supportsChatGPT) {
           try {
-            const response = await callChatGPT(systemPrompt, ''); // Fix: Remove extra arguments
+            // Fix: Use correct function signature - callChatGPT(prompt, systemPrompt, model, maxTokens)
+            const response = await callChatGPT(systemPrompt, '', 'gpt-4o-mini', 2000);
             
             let responseText: string;
             if (typeof response === 'string') {
