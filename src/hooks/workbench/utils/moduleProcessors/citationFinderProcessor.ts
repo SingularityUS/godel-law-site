@@ -42,7 +42,7 @@ export const processCitationFinder = async (
   callChatGPT: ReturnType<typeof useChatGPTApi>['callChatGPT'],
   onProgress?: (completed: number, total: number) => void
 ): Promise<{ output: CitationFinderResult; metadata: any }> => {
-  console.log('=== CITATION FINDER PROCESSOR ===');
+  console.log('=== CITATION FINDER PROCESSOR (FIXED POSITION CALCULATION) ===');
   console.log('Input data type:', typeof inputData);
   console.log('Input data keys:', inputData ? Object.keys(inputData) : 'null');
   
@@ -95,6 +95,9 @@ export const processCitationFinder = async (
   const allCitations: CitationFinding[] = [];
   let globalPosition = 0;
   
+  console.log('🎯 CITATION POSITION DEBUG: Starting global position calculation');
+  console.log(`Processing ${paragraphs.length} paragraphs for citations`);
+  
   // Process each paragraph for citations
   for (let i = 0; i < paragraphs.length; i++) {
     const paragraph = paragraphs[i];
@@ -104,9 +107,10 @@ export const processCitationFinder = async (
       onProgress(i, paragraphs.length);
     }
     
-    console.log(`Analyzing paragraph ${i + 1}/${paragraphs.length} for citations`);
-    console.log(`Paragraph content preview: "${paragraphContent.substring(0, 100)}..."`);
+    console.log(`\n📍 PARAGRAPH ${i + 1}/${paragraphs.length} POSITION ANALYSIS:`);
     console.log(`Current global position: ${globalPosition}`);
+    console.log(`Paragraph content length: ${paragraphContent.length}`);
+    console.log(`Paragraph content preview: "${paragraphContent.substring(0, 100)}..."`);
     
     try {
       // Enhanced prompt with specific Bluebook citation examples
@@ -189,45 +193,63 @@ ${paragraphContent}`;
       }
       
       if (citationData.citations && Array.isArray(citationData.citations)) {
-        console.log(`Found ${citationData.citations.length} citations in paragraph ${i + 1}`);
+        console.log(`🔍 PROCESSING ${citationData.citations.length} citations in paragraph ${i + 1}`);
         
-        // Convert paragraph-relative positions to document-wide positions
-        const paragraphCitations = citationData.citations.map((citation: any, index: number) => {
-          // Calculate actual positions within the paragraph
-          let startPos = globalPosition;
-          let endPos = globalPosition + (citation.originalText?.length || 0);
-          
-          // Try to find the actual position of the citation in the paragraph
-          const citationIndex = paragraphContent.indexOf(citation.originalText);
-          if (citationIndex !== -1) {
-            startPos = globalPosition + citationIndex;
-            endPos = startPos + citation.originalText.length;
-          }
-          
-          console.log(`Citation ${index + 1} in paragraph ${i + 1}:`, {
-            originalText: citation.originalText,
-            paragraphIndex: citationIndex,
-            globalStart: startPos,
-            globalEnd: endPos,
-            actualText: paragraphContent.substring(citationIndex, citationIndex + citation.originalText.length)
-          });
-          
-          return {
-            id: `cite-${i}-${index}`,
-            type: citation.type || 'case',
-            originalText: citation.originalText || '',
-            startPos: startPos,
-            endPos: endPos,
-            paragraphId: paragraph.id || `p${i}`,
-            isComplete: citation.isComplete !== false, // Default to true if not specified
-            needsVerification: citation.needsVerification === true, // Default to false if not specified
-            bluebookFormat: citation.bluebookFormat,
-            parsed: citation.parsed
-          };
-        });
+        // Convert paragraph-relative positions to document-wide positions with FIXED logic
+        const paragraphCitations = citationData.citations
+          .map((citation: any, index: number) => {
+            console.log(`\n⚡ CITATION ${index + 1} POSITION CALCULATION:`);
+            console.log(`Looking for citation text: "${citation.originalText}"`);
+            console.log(`Citation text length: ${citation.originalText?.length || 0}`);
+            
+            // CRITICAL FIX: Find the actual position of the citation within the paragraph
+            const citationIndex = paragraphContent.indexOf(citation.originalText);
+            console.log(`Citation index in paragraph: ${citationIndex}`);
+            
+            if (citationIndex === -1) {
+              console.warn(`❌ CITATION NOT FOUND IN PARAGRAPH: "${citation.originalText}"`);
+              console.warn(`Paragraph content: "${paragraphContent}"`);
+              return null; // Skip this citation
+            }
+            
+            // Calculate CORRECT global positions
+            const actualGlobalStart = globalPosition + citationIndex;
+            const actualGlobalEnd = actualGlobalStart + citation.originalText.length;
+            
+            console.log(`✅ CITATION POSITION CALCULATION COMPLETE:`);
+            console.log(`  - Paragraph global start: ${globalPosition}`);
+            console.log(`  - Citation index in paragraph: ${citationIndex}`);
+            console.log(`  - Final global start: ${actualGlobalStart}`);
+            console.log(`  - Final global end: ${actualGlobalEnd}`);
+            console.log(`  - Citation text length: ${citation.originalText.length}`);
+            console.log(`  - Calculated length: ${actualGlobalEnd - actualGlobalStart}`);
+            
+            // Validate the calculation by checking the text at the calculated position
+            const expectedText = citation.originalText;
+            console.log(`🔍 POSITION VALIDATION:`);
+            console.log(`  - Expected text: "${expectedText}"`);
+            console.log(`  - Text at calculated position would be checked during redline processing`);
+            
+            return {
+              id: `cite-${i}-${index}`,
+              type: citation.type || 'case',
+              originalText: citation.originalText || '',
+              startPos: actualGlobalStart,
+              endPos: actualGlobalEnd,
+              paragraphId: paragraph.id || `p${i}`,
+              isComplete: citation.isComplete !== false, // Default to true if not specified
+              needsVerification: citation.needsVerification === true, // Default to false if not specified
+              bluebookFormat: citation.bluebookFormat,
+              parsed: citation.parsed
+            };
+          })
+          .filter(citation => citation !== null); // Remove invalid citations
         
         allCitations.push(...paragraphCitations);
-        console.log(`Added ${paragraphCitations.length} citations from paragraph ${i + 1}, total now: ${allCitations.length}`);
+        console.log(`📊 PARAGRAPH ${i + 1} SUMMARY:`);
+        console.log(`  - Citations found: ${citationData.citations.length}`);
+        console.log(`  - Valid citations: ${paragraphCitations.length}`);
+        console.log(`  - Total citations so far: ${allCitations.length}`);
       } else {
         console.log(`No citations found in paragraph ${i + 1}`);
       }
@@ -236,7 +258,7 @@ ${paragraphContent}`;
       console.error(`Error processing paragraph ${i + 1} for citations:`, error);
     }
     
-    // Update global position for next paragraph - FIXED: Use double newlines to match content reconstruction
+    // CRITICAL: Update global position for next paragraph - CONSISTENT with content reconstruction
     globalPosition += paragraphContent.length + 2; // +2 for double newline paragraph separator
     console.log(`Updated global position to: ${globalPosition} after paragraph ${i + 1}`);
   }
@@ -244,6 +266,17 @@ ${paragraphContent}`;
   if (onProgress) {
     onProgress(paragraphs.length, paragraphs.length);
   }
+  
+  // Final validation of all citation positions
+  console.log(`\n🎯 FINAL CITATION POSITION SUMMARY:`);
+  allCitations.forEach((citation, index) => {
+    console.log(`Citation ${index + 1}:`);
+    console.log(`  - ID: ${citation.id}`);
+    console.log(`  - Text: "${citation.originalText}"`);
+    console.log(`  - Global position: ${citation.startPos} - ${citation.endPos}`);
+    console.log(`  - Length: ${citation.endPos - citation.startPos} (expected: ${citation.originalText.length})`);
+    console.log(`  - Length match: ${(citation.endPos - citation.startPos) === citation.originalText.length}`);
+  });
   
   const result: CitationFinderResult = {
     citations: allCitations,
@@ -255,13 +288,10 @@ ${paragraphContent}`;
     }
   };
   
-  console.log(`Citation finder complete: ${allCitations.length} citations found in ${paragraphs.length} paragraphs`);
-  console.log('Final citations with positions:', allCitations.map(c => ({
-    id: c.id,
-    text: c.originalText,
-    start: c.startPos,
-    end: c.endPos
-  })));
+  console.log(`\n✅ CITATION FINDER COMPLETE:`);
+  console.log(`  - Total citations found: ${allCitations.length}`);
+  console.log(`  - Paragraphs processed: ${paragraphs.length}`);
+  console.log(`  - Position calculation method: FIXED - using actual indexOf results`);
   
   return {
     output: result,
@@ -271,7 +301,8 @@ ${paragraphContent}`;
       paragraphsProcessed: paragraphs.length,
       citationsFound: allCitations.length,
       citationAware: true,
-      redliningReady: true
+      redliningReady: true,
+      positionCalculationFixed: true
     }
   };
 };

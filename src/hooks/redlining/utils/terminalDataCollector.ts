@@ -2,7 +2,7 @@
 /**
  * Terminal Data Collector
  * 
- * Purpose: Collects data from terminal modules with correct content sourcing
+ * Purpose: Collects data from terminal modules with correct content sourcing and enhanced position validation
  */
 
 import { extractGrammarSuggestions } from "./extractors/grammarExtractor";
@@ -22,7 +22,7 @@ export const collectTerminalData = (
   pipelineOutput: any,
   terminalModules: Array<{ moduleType: string; nodeId: string }>
 ): TerminalModuleData[] => {
-  console.log('=== COLLECTING TERMINAL DATA (CORRECTED CONTENT SOURCING) ===');
+  console.log('=== COLLECTING TERMINAL DATA (ENHANCED POSITION VALIDATION) ===');
   console.log('Terminal modules to process:', terminalModules);
   
   const terminalData: TerminalModuleData[] = [];
@@ -32,7 +32,7 @@ export const collectTerminalData = (
   console.log(`Found ${pipelineResults.length} pipeline results`);
   
   terminalModules.forEach(terminalModule => {
-    console.log(`Processing terminal module: ${terminalModule.moduleType} (${terminalModule.nodeId})`);
+    console.log(`\n🔍 Processing terminal module: ${terminalModule.moduleType} (${terminalModule.nodeId})`);
     
     // Find the result for this terminal module
     const moduleResult = pipelineResults.find((result: any) => 
@@ -55,6 +55,7 @@ export const collectTerminalData = (
     console.log(`🎯 EXTRACTING CONTENT FOR ${terminalModule.moduleType.toUpperCase()}`);
     const originalContent = extractOriginalContent(moduleResult.result || moduleResult, pipelineResults);
     console.log(`Extracted content length: ${originalContent.length}`);
+    console.log(`Content preview: "${originalContent.substring(0, 150)}..."`);
     
     if (originalContent.length === 0) {
       console.error(`❌ NO CONTENT EXTRACTED FOR ${terminalModule.moduleType} - WILL CAUSE POSITION ISSUES`);
@@ -68,53 +69,98 @@ export const collectTerminalData = (
       suggestions = extractGrammarSuggestions(moduleResult.result, terminalModule.nodeId);
       console.log(`Extracted ${suggestions.length} grammar suggestions`);
     } else if (terminalModule.moduleType === 'citation-finder') {
-      console.log('Processing citation finder module');
+      console.log('🎯 PROCESSING CITATION FINDER MODULE WITH ENHANCED VALIDATION');
       suggestions = extractCitationSuggestions(moduleResult.result, terminalModule.nodeId);
       console.log(`Extracted ${suggestions.length} citation suggestions`);
       
-      // CRITICAL: Validate that citation positions are within content bounds
+      // ENHANCED: Comprehensive citation position validation
+      console.log(`\n🔍 CITATION POSITION VALIDATION (ENHANCED):`);
       const contentLength = originalContent.length;
-      const validSuggestions = suggestions.filter(suggestion => {
-        const isValid = suggestion.startPos >= 0 && 
-                       suggestion.endPos <= contentLength && 
-                       suggestion.startPos < suggestion.endPos;
+      const validSuggestions: RedlineSuggestion[] = [];
+      
+      suggestions.forEach((suggestion, index) => {
+        console.log(`\n📍 VALIDATING CITATION ${index + 1}:`);
+        console.log(`  - ID: ${suggestion.id}`);
+        console.log(`  - Original text: "${suggestion.originalText}"`);
+        console.log(`  - Start position: ${suggestion.startPos}`);
+        console.log(`  - End position: ${suggestion.endPos}`);
+        console.log(`  - Text length: ${suggestion.originalText.length}`);
+        console.log(`  - Position range: ${suggestion.endPos - suggestion.startPos}`);
+        console.log(`  - Content length: ${contentLength}`);
         
-        if (!isValid) {
-          console.error(`❌ INVALID CITATION POSITION:`, {
-            id: suggestion.id,
-            startPos: suggestion.startPos,
-            endPos: suggestion.endPos,
-            contentLength,
-            originalText: suggestion.originalText
-          });
-        } else {
-          // Validate the text at those positions
-          const actualText = originalContent.substring(suggestion.startPos, suggestion.endPos);
-          if (actualText !== suggestion.originalText) {
-            console.warn(`⚠️ CITATION TEXT MISMATCH:`, {
-              id: suggestion.id,
-              expected: suggestion.originalText,
-              actual: actualText,
-              startPos: suggestion.startPos,
-              endPos: suggestion.endPos
-            });
-          } else {
-            console.log(`✅ CITATION POSITION VALIDATED:`, {
-              id: suggestion.id,
-              text: suggestion.originalText,
-              positions: `${suggestion.startPos}-${suggestion.endPos}`
-            });
-          }
+        // Basic bounds checking
+        const isWithinBounds = suggestion.startPos >= 0 && 
+                              suggestion.endPos <= contentLength && 
+                              suggestion.startPos < suggestion.endPos;
+        
+        if (!isWithinBounds) {
+          console.error(`❌ CITATION ${index + 1} OUT OF BOUNDS:`);
+          console.error(`  - Start: ${suggestion.startPos} (valid: >= 0)`);
+          console.error(`  - End: ${suggestion.endPos} (valid: <= ${contentLength})`);
+          console.error(`  - Range valid: ${suggestion.startPos < suggestion.endPos}`);
+          return; // Skip this citation
         }
         
-        return isValid;
+        // Length consistency checking
+        const expectedLength = suggestion.originalText.length;
+        const calculatedLength = suggestion.endPos - suggestion.startPos;
+        
+        if (expectedLength !== calculatedLength) {
+          console.warn(`⚠️ CITATION ${index + 1} LENGTH MISMATCH:`);
+          console.warn(`  - Expected: ${expectedLength}`);
+          console.warn(`  - Calculated: ${calculatedLength}`);
+          console.warn(`  - Difference: ${Math.abs(expectedLength - calculatedLength)}`);
+        }
+        
+        // CRITICAL: Text content validation
+        const actualText = originalContent.substring(suggestion.startPos, suggestion.endPos);
+        console.log(`🔍 TEXT VALIDATION:`);
+        console.log(`  - Expected: "${suggestion.originalText}"`);
+        console.log(`  - Actual: "${actualText}"`);
+        console.log(`  - Match: ${actualText === suggestion.originalText}`);
+        
+        if (actualText === suggestion.originalText) {
+          console.log(`✅ CITATION ${index + 1} VALIDATION PASSED`);
+          validSuggestions.push(suggestion);
+        } else {
+          console.error(`❌ CITATION ${index + 1} TEXT MISMATCH:`);
+          console.error(`  - This citation will be filtered out to prevent highlighting errors`);
+          
+          // Try to find the citation in nearby positions (fuzzy matching)
+          const searchRadius = 50;
+          const searchStart = Math.max(0, suggestion.startPos - searchRadius);
+          const searchEnd = Math.min(contentLength, suggestion.endPos + searchRadius);
+          const searchArea = originalContent.substring(searchStart, searchEnd);
+          const foundIndex = searchArea.indexOf(suggestion.originalText);
+          
+          if (foundIndex !== -1) {
+            const correctedStart = searchStart + foundIndex;
+            const correctedEnd = correctedStart + suggestion.originalText.length;
+            console.log(`🔧 FOUND CITATION IN NEARBY POSITION:`);
+            console.log(`  - Corrected start: ${correctedStart} (was ${suggestion.startPos})`);
+            console.log(`  - Corrected end: ${correctedEnd} (was ${suggestion.endPos})`);
+            console.log(`  - Offset: ${correctedStart - suggestion.startPos}`);
+            
+            // Create corrected suggestion
+            const correctedSuggestion = {
+              ...suggestion,
+              startPos: correctedStart,
+              endPos: correctedEnd
+            };
+            
+            validSuggestions.push(correctedSuggestion);
+            console.log(`✅ CITATION ${index + 1} CORRECTED AND VALIDATED`);
+          } else {
+            console.error(`❌ CITATION ${index + 1} NOT FOUND IN NEARBY POSITIONS - DISCARDING`);
+          }
+        }
       });
       
-      if (validSuggestions.length !== suggestions.length) {
-        console.error(`❌ FILTERED OUT ${suggestions.length - validSuggestions.length} INVALID CITATIONS`);
-      }
-      
       suggestions = validSuggestions;
+      console.log(`\n📊 CITATION VALIDATION SUMMARY:`);
+      console.log(`  - Original citations: ${suggestions.length + (allOriginalSuggestions.length - validSuggestions.length)}`);
+      console.log(`  - Valid citations: ${validSuggestions.length}`);
+      console.log(`  - Filtered out: ${(suggestions.length + (validSuggestions.length === suggestions.length ? 0 : suggestions.length - validSuggestions.length))}`);
     } else {
       console.log(`Unknown terminal module type: ${terminalModule.moduleType}`);
     }
@@ -129,7 +175,9 @@ export const collectTerminalData = (
         totalSuggestions: suggestions.length,
         sourceModule: terminalModule.moduleType,
         contentLength: originalContent.length,
-        contentSource: 'traced-from-pipeline'
+        contentSource: 'traced-from-pipeline',
+        positionValidationEnhanced: true,
+        validationTimestamp: Date.now()
       }
     };
     
@@ -138,16 +186,24 @@ export const collectTerminalData = (
       contentLength: moduleData.originalContent.length,
       suggestionsCount: moduleData.suggestions.length,
       suggestionTypes: moduleData.suggestions.map(s => s.type),
-      contentPreview: moduleData.originalContent.substring(0, 100) + '...'
+      contentPreview: moduleData.originalContent.substring(0, 100) + '...',
+      allPositionsValid: moduleData.suggestions.every(s => 
+        s.startPos >= 0 && s.endPos <= moduleData.originalContent.length && s.startPos < s.endPos
+      )
     });
     
     terminalData.push(moduleData);
   });
   
-  console.log(`📊 TERMINAL DATA COLLECTION SUMMARY:`, {
+  console.log(`\n📊 TERMINAL DATA COLLECTION SUMMARY (ENHANCED):`, {
     totalModules: terminalData.length,
     contentLengths: terminalData.map(d => d.originalContent.length),
-    totalSuggestions: terminalData.reduce((sum, d) => sum + d.suggestions.length, 0)
+    totalSuggestions: terminalData.reduce((sum, d) => sum + d.suggestions.length, 0),
+    allSuggestionsValid: terminalData.every(module => 
+      module.suggestions.every(s => 
+        s.startPos >= 0 && s.endPos <= module.originalContent.length && s.startPos < s.endPos
+      )
+    )
   });
   
   return terminalData;
