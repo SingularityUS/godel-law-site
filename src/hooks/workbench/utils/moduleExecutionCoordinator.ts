@@ -1,4 +1,3 @@
-
 /**
  * Module Execution Coordinator
  * 
@@ -49,7 +48,7 @@ export const createModuleExecutionCoordinator = (
     switch (moduleType) {
       case 'paragraph-splitter':
         console.log('🔄 Routing to paragraph splitter processor');
-        return await processParagraphSplitter(inputData, callChatGPT, progressCallback);
+        return await processParagraphSplitter(inputData);
 
       case 'grammar-checker':
         console.log('🔄 Routing to grammar analysis processor');
