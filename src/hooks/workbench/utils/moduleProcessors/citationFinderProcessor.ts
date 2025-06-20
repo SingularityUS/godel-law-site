@@ -105,63 +105,122 @@ export const processCitationFinder = async (
     }
     
     console.log(`Analyzing paragraph ${i + 1}/${paragraphs.length} for citations`);
+    console.log(`Paragraph content preview: "${paragraphContent.substring(0, 100)}..."`);
     
     try {
-      // Create a specific prompt for citation detection
-      const citationPrompt = `Analyze the following legal text and identify ALL Bluebook citations. Return ONLY a JSON object with this exact structure:
+      // Enhanced prompt with specific Bluebook citation examples
+      const citationPrompt = `You are a legal citation expert. Analyze the following legal text and identify ALL Bluebook citations. Look for:
+
+CASE CITATIONS: Brown v. Board of Educ., 347 U.S. 483 (1954)
+STATUTE CITATIONS: 42 U.S.C. § 1983 (2018)
+REGULATION CITATIONS: 29 C.F.R. § 1630.2(g) (2019)
+SECONDARY SOURCES: Charles Alan Wright & Arthur R. Miller, Federal Practice and Procedure § 1057 (4th ed. 2008)
+INTERNAL REFERENCES: See supra Part II.A; see infra note 45
+
+Return ONLY a valid JSON object with this EXACT structure (no additional text before or after):
 
 {
   "citations": [
     {
-      "type": "case|statute|regulation|secondary|internal",
-      "originalText": "exact citation text as it appears",
-      "startPos": number (character position within this paragraph),
-      "endPos": number (character position within this paragraph),
-      "isComplete": boolean,
-      "needsVerification": boolean,
+      "type": "case",
+      "originalText": "exact citation text as it appears in the document",
+      "startPos": 0,
+      "endPos": 50,
+      "isComplete": true,
+      "needsVerification": false,
       "bluebookFormat": "properly formatted Bluebook citation",
       "parsed": {
-        "caseName": "if applicable",
-        "court": "if applicable",
-        "year": "if applicable",
-        "volume": "if applicable",
-        "reporter": "if applicable",
-        "page": "if applicable"
+        "caseName": "Brown v. Board of Education",
+        "court": "U.S.",
+        "year": "1954",
+        "volume": "347",
+        "reporter": "U.S.",
+        "page": "483"
       }
     }
   ]
 }
 
+If no citations are found, return: {"citations": []}
+
 Text to analyze:
 ${paragraphContent}`;
 
+      console.log(`Sending citation analysis request for paragraph ${i + 1}`);
       const response = await callChatGPT(citationPrompt, '');
       
-      let citationData;
-      try {
-        citationData = JSON.parse(response);
-      } catch (parseError) {
-        console.warn(`Failed to parse citation response for paragraph ${i + 1}:`, parseError);
+      // Fix: Extract the actual response content from the ChatGPT API result
+      let responseText: string;
+      if (typeof response === 'string') {
+        responseText = response;
+      } else if (response && typeof response === 'object' && response.response) {
+        responseText = response.response;
+      } else if (response && typeof response === 'object' && response.data) {
+        responseText = response.data;
+      } else {
+        console.warn(`Invalid response format for paragraph ${i + 1}:`, response);
         continue;
       }
       
+      console.log(`ChatGPT response for paragraph ${i + 1}:`, responseText.substring(0, 200) + '...');
+      
+      let citationData;
+      try {
+        citationData = JSON.parse(responseText);
+        console.log(`Parsed citation data for paragraph ${i + 1}:`, citationData);
+      } catch (parseError) {
+        console.warn(`Failed to parse citation response for paragraph ${i + 1}:`, parseError);
+        console.warn(`Raw response was:`, responseText);
+        
+        // Try to extract JSON from response if it's wrapped in other text
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            citationData = JSON.parse(jsonMatch[0]);
+            console.log(`Successfully extracted JSON from wrapped response for paragraph ${i + 1}`);
+          } catch (secondParseError) {
+            console.warn(`Second parse attempt failed for paragraph ${i + 1}:`, secondParseError);
+            continue;
+          }
+        } else {
+          continue;
+        }
+      }
+      
       if (citationData.citations && Array.isArray(citationData.citations)) {
+        console.log(`Found ${citationData.citations.length} citations in paragraph ${i + 1}`);
+        
         // Convert paragraph-relative positions to document-wide positions
-        const paragraphCitations = citationData.citations.map((citation: any, index: number) => ({
-          id: `cite-${i}-${index}`,
-          type: citation.type,
-          originalText: citation.originalText,
-          startPos: globalPosition + citation.startPos,
-          endPos: globalPosition + citation.endPos,
-          paragraphId: paragraph.id || `p${i}`,
-          isComplete: citation.isComplete,
-          needsVerification: citation.needsVerification,
-          bluebookFormat: citation.bluebookFormat,
-          parsed: citation.parsed
-        }));
+        const paragraphCitations = citationData.citations.map((citation: any, index: number) => {
+          // Calculate actual positions within the paragraph
+          let startPos = globalPosition;
+          let endPos = globalPosition + (citation.originalText?.length || 0);
+          
+          // Try to find the actual position of the citation in the paragraph
+          const citationIndex = paragraphContent.indexOf(citation.originalText);
+          if (citationIndex !== -1) {
+            startPos = globalPosition + citationIndex;
+            endPos = startPos + citation.originalText.length;
+          }
+          
+          return {
+            id: `cite-${i}-${index}`,
+            type: citation.type || 'case',
+            originalText: citation.originalText || '',
+            startPos: startPos,
+            endPos: endPos,
+            paragraphId: paragraph.id || `p${i}`,
+            isComplete: citation.isComplete !== false, // Default to true if not specified
+            needsVerification: citation.needsVerification === true, // Default to false if not specified
+            bluebookFormat: citation.bluebookFormat,
+            parsed: citation.parsed
+          };
+        });
         
         allCitations.push(...paragraphCitations);
-        console.log(`Found ${paragraphCitations.length} citations in paragraph ${i + 1}`);
+        console.log(`Added ${paragraphCitations.length} citations from paragraph ${i + 1}, total now: ${allCitations.length}`);
+      } else {
+        console.log(`No citations found in paragraph ${i + 1}`);
       }
       
     } catch (error) {
@@ -187,6 +246,7 @@ ${paragraphContent}`;
   };
   
   console.log(`Citation finder complete: ${allCitations.length} citations found in ${paragraphs.length} paragraphs`);
+  console.log('Final citations:', allCitations);
   
   return {
     output: result,
