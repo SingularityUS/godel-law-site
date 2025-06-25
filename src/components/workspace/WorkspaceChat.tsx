@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { Send, Bot, FileCheck, Code } from "lucide-react";
+import { Send, Bot, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -12,7 +12,7 @@ import DocumentSelector from "./DocumentSelector";
 import ChatOutputPanel from "./ChatOutputPanel";
 import DocumentGrid from "./DocumentGrid";
 import DocumentPreviewModal from "./DocumentPreviewModal";
-import ContextDebugPanel from "./ContextDebugPanel"; // NEW
+import ContextDebugPanel from "./ContextDebugPanel";
 import { buildDocumentContext } from "@/utils/contextBuilder";
 
 export type UploadedFile = File & { 
@@ -47,7 +47,7 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDocuments, setSelectedDocuments] = useState<Set<number>>(new Set());
-  const [isContextDebugOpen, setIsContextDebugOpen] = useState(false); // NEW
+  const [isContextDebugOpen, setIsContextDebugOpen] = useState(false);
   
   const { callChatGPT } = useChatGPTApi();
   const { 
@@ -76,7 +76,7 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
         
         setMessages([{
           id: Date.now().toString(),
-          content: `I can see you've uploaded ${uploadedFiles.length} document(s): ${fileNames}.${anchorInfo} I'm now using GPT-4.1 with a 200K token context window for analysis, and I can also process legal documents for Bluebook citation corrections. How can I help you analyze these documents?`,
+          content: `I can see you've uploaded ${uploadedFiles.length} document(s): ${fileNames}.${anchorInfo} I'm now using GPT-4.1 with a 200K token context window for analysis. How can I help you analyze these documents?`,
           role: 'assistant',
           timestamp: new Date()
         }]);
@@ -96,27 +96,6 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
       newSelected.delete(index);
     }
     setSelectedDocuments(newSelected);
-  };
-
-  const handleProcessCitations = async () => {
-    const selectedDocs = getSelectedDocuments();
-    if (selectedDocs.length === 0) {
-      return;
-    }
-
-    // Process the first selected document for citations - use anchored text if available
-    const doc = selectedDocs[0];
-    const textToProcess = doc.anchoredText || doc.extractedText;
-    
-    if (textToProcess) {
-      console.log(`Processing citations for ${doc.name}:`, {
-        hasAnchoredText: !!doc.anchoredText,
-        anchorCount: doc.anchorCount || 0,
-        textLength: textToProcess.length
-      });
-      
-      await processDocument(doc.name, textToProcess, doc.type);
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -251,18 +230,7 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
 
             {/* Action Buttons */}
             {uploadedFiles.length > 0 && (
-              <div className="border-t bg-gray-50 p-3 flex-shrink-0 space-y-2">
-                <Button
-                  onClick={handleProcessCitations}
-                  disabled={isProcessingCitations || getSelectedDocuments().length === 0}
-                  className="w-full flex items-center gap-2"
-                  variant="outline"
-                >
-                  <FileCheck size={16} />
-                  {isProcessingCitations ? 'Processing Citations...' : 'Process Citations (Bluebook)'}
-                </Button>
-                
-                {/* NEW: Context Debug Button */}
+              <div className="border-t bg-gray-50 p-3 flex-shrink-0">
                 <Button
                   onClick={() => setIsContextDebugOpen(true)}
                   disabled={getSelectedDocuments().length === 0 || !inputMessage.trim()}
@@ -336,7 +304,7 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
         document={selectedDocument}
       />
 
-      {/* NEW: Context Debug Modal */}
+      {/* Context Debug Modal */}
       <ContextDebugPanel
         isOpen={isContextDebugOpen}
         onClose={() => setIsContextDebugOpen(false)}
