@@ -8,22 +8,38 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  // Handle CORS preflight requests FIRST, before any authentication
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    console.log('Handling CORS preflight request');
+    return new Response(null, { 
+      headers: corsHeaders,
+      status: 200
+    });
   }
+
+  console.log(`Received ${req.method} request to chat-gpt function`);
 
   try {
     const { prompt, model = 'gpt-4.1-2025-04-14', systemPrompt, maxTokens = 4000 } = await req.json();
     
+    console.log('Request payload:', { 
+      promptLength: prompt?.length, 
+      model, 
+      systemPromptLength: systemPrompt?.length,
+      maxTokens 
+    });
+
     if (!prompt) {
       throw new Error('Prompt is required');
     }
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     if (!OPENAI_API_KEY) {
+      console.error('OpenAI API key not found in environment');
       throw new Error('OpenAI API key not configured');
     }
+
+    console.log('OpenAI API key found, proceeding with request');
 
     // Estimate input tokens and adjust model if needed
     const estimatedInputTokens = Math.ceil(prompt.length / 4);
@@ -56,6 +72,8 @@ serve(async (req) => {
       { role: 'user', content: prompt }
     ];
 
+    console.log('Making request to OpenAI API...');
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -70,16 +88,20 @@ serve(async (req) => {
       }),
     });
 
+    console.log(`OpenAI API response status: ${response.status}`);
+
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error('OpenAI API error:', errorData);
-      throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('OpenAI API error response:', errorText);
+      throw new Error(`OpenAI API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const data = await response.json();
+    console.log('OpenAI API response received successfully');
     
     // Validate response structure
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      console.error('Invalid response structure:', data);
       throw new Error('Invalid response structure from OpenAI API');
     }
     
@@ -95,14 +117,19 @@ serve(async (req) => {
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200
     });
 
   } catch (error) {
     console.error('Error in chat-gpt function:', error);
-    return new Response(JSON.stringify({ 
-      error: error.message,
-      timestamp: new Date().toISOString()
-    }), {
+    
+    const errorResponse = {
+      error: error.message || 'Unknown error occurred',
+      timestamp: new Date().toISOString(),
+      details: error.stack || 'No stack trace available'
+    };
+
+    return new Response(JSON.stringify(errorResponse), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

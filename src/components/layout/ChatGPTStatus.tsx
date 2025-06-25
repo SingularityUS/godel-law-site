@@ -64,7 +64,19 @@ const ChatGPTStatus: React.FC = () => {
       if (error) {
         console.error('ChatGPT connection test error:', error);
         setStatus('error');
-        setErrorMessage(error.message || 'Connection failed');
+        
+        // Provide more specific error messages
+        if (error.message?.includes('CORS')) {
+          setErrorMessage('CORS configuration issue');
+        } else if (error.message?.includes('Failed to send a request')) {
+          setErrorMessage('Function deployment issue');
+        } else if (error.message?.includes('401')) {
+          setErrorMessage('Authentication failed');
+        } else if (error.message?.includes('503')) {
+          setErrorMessage('Service unavailable');
+        } else {
+          setErrorMessage(error.message || 'Connection failed');
+        }
         return;
       }
 
@@ -80,6 +92,10 @@ const ChatGPTStatus: React.FC = () => {
           console.log(`Connection test used ${data.usage.total_tokens} tokens`);
           addTokens(data.usage.total_tokens);
         }
+      } else if (data && data.error) {
+        console.error('ChatGPT API returned error:', data.error);
+        setStatus('error');
+        setErrorMessage(data.error);
       } else {
         console.error('No response received from ChatGPT');
         setStatus('error');
