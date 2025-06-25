@@ -1,4 +1,3 @@
-
 import React, { useCallback, useState, useRef } from "react";
 import { FileText, Trash2 } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -77,34 +76,32 @@ const WorkspaceTab: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex-1 overflow-hidden">
-      <div className="h-full bg-white">
-        <div className="h-full flex flex-col">
-          {/* Header Section */}
-          <div className="p-6 border-b flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-800 mb-2">Workspace</h1>
-                <p className="text-gray-600">Your central hub for document analysis and AI collaboration</p>
-              </div>
-              <DocumentControls
-                onFilesAccepted={handleFilesAccepted}
-                onUploadComplete={handleUploadComplete}
-                onLibraryOpen={handleLibraryOpen}
-                onDocumentAdded={handleDocumentAdded}
-              />
+    <div className="h-screen max-h-screen overflow-hidden">
+      <div className="h-full bg-white flex flex-col">
+        {/* Header Section */}
+        <div className="p-6 border-b flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800 mb-2">Workspace</h1>
+              <p className="text-gray-600">Your central hub for document analysis and AI collaboration</p>
             </div>
-          </div>
-
-          {/* Main Content Area - Chat takes full space */}
-          <div className="flex-1 min-h-0">
-            <WorkspaceChat
-              uploadedFiles={uploadedFiles}
-              onRemoveDocument={handleRemoveDocument}
-              onFileDrop={handleDrop}
-              onDragOver={handleDragOver}
+            <DocumentControls
+              onFilesAccepted={handleFilesAccepted}
+              onUploadComplete={handleUploadComplete}
+              onLibraryOpen={handleLibraryOpen}
+              onDocumentAdded={handleDocumentAdded}
             />
           </div>
+        </div>
+
+        {/* Main Content Area - Chat takes remaining space */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <WorkspaceChat
+            uploadedFiles={uploadedFiles}
+            onRemoveDocument={handleRemoveDocument}
+            onFileDrop={handleDrop}
+            onDragOver={handleDragOver}
+          />
         </div>
       </div>
     </div>

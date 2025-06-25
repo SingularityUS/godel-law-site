@@ -63,7 +63,7 @@ const ChatOutputPanel: React.FC<ChatOutputPanelProps> = ({
   };
 
   return (
-    <div className={`flex flex-col bg-white border rounded-lg ${className}`} style={{ height: '100%', maxHeight: '100%' }}>
+    <div className={`flex flex-col bg-white border rounded-lg h-full max-h-full overflow-hidden ${className}`}>
       {/* Header */}
       <div className="p-3 border-b bg-gray-50 flex items-center justify-between flex-shrink-0">
         <div>
@@ -84,7 +84,7 @@ const ChatOutputPanel: React.FC<ChatOutputPanelProps> = ({
       </div>
 
       {/* Messages - Fixed height with internal scrolling */}
-      <div className="flex-1 overflow-y-auto p-3" style={{ minHeight: 0 }}>
+      <div className="flex-1 min-h-0 overflow-y-auto p-3">
         {messages.length === 0 ? (
           <div className="text-center text-gray-500 mt-8">
             <Bot size={48} className="mx-auto mb-4 text-gray-400" />

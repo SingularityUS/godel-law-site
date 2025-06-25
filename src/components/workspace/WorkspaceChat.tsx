@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Send, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,6 +32,7 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
   onFileDrop,
   onDragOver
 }) => {
+  
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -151,11 +151,11 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
   };
 
   return (
-    <div className="h-full" style={{ height: '100%', maxHeight: '100%', overflow: 'hidden' }}>
+    <div className="h-full overflow-hidden">
       <ResizablePanelGroup direction="horizontal" className="h-full">
         {/* Left Panel - Chat Input and Documents */}
         <ResizablePanel defaultSize={60} minSize={40}>
-          <div className="h-full flex flex-col bg-white" style={{ height: '100%', maxHeight: '100%' }}>
+          <div className="h-full flex flex-col bg-white overflow-hidden">
             {/* Welcome Message or Document Grid */}
             <div className="flex-1 min-h-0 overflow-hidden">
               {uploadedFiles.length === 0 ? (
@@ -224,7 +224,7 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
         {/* Right Panel - Chat Output */}
         <ResizableHandle />
         <ResizablePanel defaultSize={40} minSize={30}>
-          <div style={{ height: '100%', maxHeight: '100%', overflow: 'hidden' }}>
+          <div className="h-full overflow-hidden">
             <ChatOutputPanel 
               messages={messages} 
               isLoading={isLoading}
