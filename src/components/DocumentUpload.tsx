@@ -96,7 +96,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
             file: file,
             documentName: file.name,
             isUploaded: true,
-            moduleType: 'documentInput'
+            moduleType: 'document-input' as const
           }
         };
 

@@ -1,20 +1,7 @@
-
 import React, { useState } from 'react';
 import { FileText, X, Search, RefreshCw } from 'lucide-react';
-import { useDocuments } from '@/hooks/useDocuments';
+import { useDocuments, StoredDocument } from '@/hooks/useDocuments';
 import { toast } from '@/components/ui/use-toast';
-
-interface StoredDocument {
-  id: string;
-  name: string;
-  storage_path: string;
-  mime_type: string;
-  size: number;
-  preview_url: string | null;
-  user_id: string | null;
-  uploaded_at: string | null;
-  extracted_text: string | null;
-}
 
 interface DocumentLibraryProps {
   onDocumentSelect: (document: any) => void;

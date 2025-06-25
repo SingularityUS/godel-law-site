@@ -10,7 +10,9 @@ export interface StoredDocument {
   mime_type: string;
   size: number;
   preview_url: string | null;
-  uploaded_at: string;
+  user_id: string | null;
+  uploaded_at: string | null;
+  extracted_text: string | null;
 }
 
 export const useDocuments = () => {
