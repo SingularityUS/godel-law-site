@@ -24,7 +24,14 @@ serve(async (req) => {
   }
 
   try {
-    const { documentName, documentContent, documentType, customPrompt } = await req.json()
+    console.log('=== EXTRACT CITATIONS FUNCTION INVOKED ===')
+    console.log('Request method:', req.method)
+    console.log('Request headers:', Object.fromEntries(req.headers.entries()))
+
+    const requestBody = await req.json()
+    console.log('Request body keys:', Object.keys(requestBody))
+    
+    const { documentName, documentContent, documentType, customPrompt } = requestBody
 
     console.log('Processing citations for document:', documentName)
     console.log('Document type:', documentType)
@@ -32,29 +39,32 @@ serve(async (req) => {
     console.log('Document content length:', documentContent?.length || 0)
 
     if (!documentContent) {
+      console.error('Missing document content')
       throw new Error('Document content is required')
     }
 
     if (!customPrompt) {
+      console.error('Missing custom prompt')
       throw new Error('Citation extraction prompt is required')
     }
 
-    // Call GPT-4.1 for citation analysis using the user's custom prompt
+    // Call GPT-4.1 for citation analysis using the same model as chat-gpt function
     const openaiKey = Deno.env.get('OPENAI_API_KEY')
     if (!openaiKey) {
+      console.error('OpenAI API key not found in environment')
       throw new Error('OpenAI API key not configured')
     }
 
     console.log('Calling OpenAI GPT-4.1 with custom prompt length:', customPrompt.length)
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openaiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-2024-11-20', // Using the latest GPT-4 model available
+        model: 'gpt-4.1-2025-04-14', // Using the same model as chat-gpt function
         messages: [
           { role: 'system', content: customPrompt },
           { role: 'user', content: documentContent }
@@ -64,16 +74,20 @@ serve(async (req) => {
       }),
     })
 
-    if (!response.ok) {
-      const error = await response.json()
-      console.error('OpenAI API error:', error)
-      throw new Error(`OpenAI API error: ${error.error?.message || 'Unknown error'}`)
+    console.log('OpenAI response status:', openaiResponse.status)
+
+    if (!openaiResponse.ok) {
+      const errorText = await openaiResponse.text()
+      console.error('OpenAI API error response:', errorText)
+      throw new Error(`OpenAI API error: ${openaiResponse.status} - ${errorText}`)
     }
 
-    const data = await response.json()
-    const citationResponse = data.choices[0].message.content
+    const openaiData = await openaiResponse.json()
+    console.log('OpenAI response received, usage:', openaiData.usage)
+    
+    const citationResponse = openaiData.choices[0].message.content
 
-    console.log('GPT-4 citation response length:', citationResponse.length)
+    console.log('GPT-4.1 citation response length:', citationResponse.length)
     console.log('Response preview:', citationResponse.substring(0, 200))
 
     // Parse the JSON response
@@ -92,18 +106,27 @@ serve(async (req) => {
 
     console.log(`Successfully parsed ${citations.length} citations`)
 
+    const result = {
+      citations,
+      documentName,
+      totalCitations: citations.length
+    }
+
+    console.log('=== RETURNING RESULT ===')
+    console.log('Total citations found:', result.totalCitations)
+
     return new Response(
-      JSON.stringify({
-        citations,
-        documentName,
-        totalCitations: citations.length
-      }),
+      JSON.stringify(result),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     )
   } catch (error) {
-    console.error('Citation extraction error:', error)
+    console.error('=== CITATION EXTRACTION ERROR ===')
+    console.error('Error type:', error.constructor.name)
+    console.error('Error message:', error.message)
+    console.error('Error stack:', error.stack)
+    
     return new Response(
       JSON.stringify({ 
         error: error.message || 'Failed to extract citations',

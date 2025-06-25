@@ -30,25 +30,44 @@ export const useCitationExtractor = () => {
     setIsProcessing(true);
     
     try {
-      console.log('Extracting citations from:', documentName);
+      console.log('=== STARTING CITATION EXTRACTION ===');
+      console.log('Document name:', documentName);
       console.log('Content length:', anchoredContent.length);
+      console.log('Document type:', documentType);
       
       // Get the user's custom prompt
       const customPrompt = getCurrentPrompt();
       console.log('Using custom prompt length:', customPrompt.length);
       
+      const payload = {
+        documentName,
+        documentContent: anchoredContent,
+        documentType,
+        customPrompt
+      };
+      
+      console.log('Invoking extract-citations function with payload keys:', Object.keys(payload));
+      
       const { data, error } = await supabase.functions.invoke('extract-citations', {
-        body: {
-          documentName,
-          documentContent: anchoredContent,
-          documentType,
-          customPrompt
-        }
+        body: payload
       });
 
+      console.log('=== SUPABASE FUNCTION RESPONSE ===');
+      console.log('Error:', error);
+      console.log('Data:', data);
+
       if (error) {
-        console.error('Supabase function error:', error);
+        console.error('Supabase function error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
         throw new Error(error.message || 'Failed to invoke citation extraction function');
+      }
+
+      if (!data) {
+        throw new Error('No data returned from citation extraction function');
       }
 
       console.log('Citation extraction result:', data);
@@ -61,10 +80,21 @@ export const useCitationExtractor = () => {
 
       return data;
     } catch (error) {
-      console.error('Citation extraction failed:', error);
+      console.error('=== CITATION EXTRACTION FAILED ===');
+      console.error('Error type:', error.constructor.name);
+      console.error('Error message:', error.message);
+      console.error('Full error:', error);
+      
+      let errorMessage = 'Unknown error occurred';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
       toast({
         title: 'Citation Extraction Failed',
-        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        description: errorMessage,
         variant: 'destructive',
       });
       return null;
