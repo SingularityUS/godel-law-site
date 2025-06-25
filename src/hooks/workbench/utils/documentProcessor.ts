@@ -107,7 +107,7 @@ const validateAndFixEncoding = (text: string): string => {
   ];
   
   let fixedText = text;
-  let appliedFixes = [];
+  const appliedFixes: string[] = [];
   
   for (const [pattern, replacement] of encodingFixes) {
     const originalLength = fixedText.length;
@@ -203,14 +203,14 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
     
     // Log character validation
     const hasSpecialChars = /[§""'']/.test(extractedText);
-    const hasReplacementChars = //.test(extractedText);
+    const hasReplacementChars = /\uFFFD/.test(extractedText);
     
     console.log('Character validation:');
     console.log(`- Contains special legal characters: ${hasSpecialChars}`);
-    console.log(`- Contains replacement characters (): ${hasReplacementChars}`);
+    console.log(`- Contains replacement characters (�): ${hasReplacementChars}`);
     
     if (hasReplacementChars) {
-      console.warn('WARNING: Document contains replacement characters () - encoding may be corrupted');
+      console.warn('WARNING: Document contains replacement characters (�) - encoding may be corrupted');
     }
     
     // Apply minimal cleaning while preserving original
