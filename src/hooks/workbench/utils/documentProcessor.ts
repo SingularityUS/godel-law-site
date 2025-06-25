@@ -1,3 +1,4 @@
+
 /**
  * Document Processor Utility
  * 
@@ -17,8 +18,8 @@ export interface DocumentExtractionResult {
   title: string;
   originalContent: string;
   processableContent: string;
-  anchoredContent: string; // NEW: Content with anchor tokens
-  anchorMap: AnchorMapping[]; // NEW: Mapping of anchors to positions
+  anchoredContent: string;
+  anchorMap: AnchorMapping[];
   positionMap: DocumentPositionMap;
   cleaningResult: CleaningResult;
   chunks?: DocumentChunk[];
@@ -28,8 +29,8 @@ export interface DocumentExtractionResult {
     fileSize: number;
     originalLength: number;
     processableLength: number;
-    anchoredLength: number; // NEW: Length with anchors
-    anchorCount: number; // NEW: Number of anchors inserted
+    anchoredLength: number;
+    anchorCount: number;
     extractedSuccessfully: boolean;
     estimatedTokens: number;
     needsChunking: boolean;
@@ -222,7 +223,7 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
     console.log(`- Cleaning applied: ${cleaningResult.cleaningApplied.join(', ')}`);
     console.log(`- First 200 chars (processable): "${cleaningResult.processableContent.substring(0, 200)}..."`);
     
-    // NEW: Insert anchor tokens for citation processing
+    // Insert anchor tokens for citation processing
     console.log('Inserting anchor tokens for citation processing...');
     const { anchoredContent, anchorMap } = insertAnchorTokens(cleaningResult.processableContent);
     
@@ -256,8 +257,8 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
       title: fileName,
       originalContent: cleaningResult.originalContent,
       processableContent: cleaningResult.processableContent,
-      anchoredContent, // NEW
-      anchorMap, // NEW
+      anchoredContent,
+      anchorMap,
       positionMap,
       cleaningResult,
       chunks: chunks.length > 0 ? chunks : undefined,
@@ -267,8 +268,8 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
         fileSize: file.size,
         originalLength: cleaningResult.originalContent.length,
         processableLength: cleaningResult.processableContent.length,
-        anchoredLength: anchoredContent.length, // NEW
-        anchorCount: anchorMap.length, // NEW
+        anchoredLength: anchoredContent.length,
+        anchorCount: anchorMap.length,
         extractedSuccessfully: true,
         estimatedTokens,
         needsChunking,
@@ -296,14 +297,14 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
   } catch (error) {
     console.error('Error extracting document text:', error);
     
-    // Return error structure that matches the new interface
+    // Return error structure that matches the interface
     const errorResult: DocumentExtractionResult = {
       documentType: "error",
       title: fileName,
       originalContent: '',
       processableContent: `Error extracting text: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
-      anchoredContent: '', // NEW
-      anchorMap: [], // NEW
+      anchoredContent: '',
+      anchorMap: [],
       positionMap: {
         characterMap: [],
         paragraphBoundaries: [],
@@ -322,8 +323,8 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
         fileSize: file.size,
         originalLength: 0,
         processableLength: 0,
-        anchoredLength: 0, // NEW
-        anchorCount: 0, // NEW
+        anchoredLength: 0,
+        anchorCount: 0,
         extractedSuccessfully: false,
         estimatedTokens: 0,
         needsChunking: false,
