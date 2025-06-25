@@ -3,7 +3,7 @@
  * useChatGPTApi Hook
  * 
  * Purpose: Handles ChatGPT API integration through Supabase Edge Function
- * Enhanced with support for large documents and higher token limits
+ * Enhanced for GPT-4.1 with advanced document processing capabilities
  */
 
 import { useCallback } from "react";
@@ -14,43 +14,39 @@ export const useChatGPTApi = () => {
   const { addTokens } = useChatGPTTokens();
 
   /**
-   * Call ChatGPT API through Supabase Edge Function with configurable options
+   * Call ChatGPT API through Supabase Edge Function with GPT-4.1 as default
    */
   const callChatGPT = useCallback(async (
     prompt: string, 
     systemPrompt?: string, 
-    model = 'gpt-4o-mini',
+    model = 'gpt-4.1-2025-04-14',
     maxTokens?: number
   ) => {
     try {
-      // Determine appropriate token limit based on prompt size and model
+      // Use GPT-4.1's enhanced context window (200K tokens)
       const estimatedInputTokens = Math.ceil(prompt.length / 4);
       let responseTokens = maxTokens;
       
       if (!responseTokens) {
-        if (estimatedInputTokens > 10000) {
-          responseTokens = 4000; // Large documents need substantial response space
-        } else if (estimatedInputTokens > 5000) {
-          responseTokens = 3000;
+        // GPT-4.1 can handle much larger responses
+        if (estimatedInputTokens > 50000) {
+          responseTokens = 8000; // Large documents get substantial response space
+        } else if (estimatedInputTokens > 20000) {
+          responseTokens = 6000;
+        } else if (estimatedInputTokens > 10000) {
+          responseTokens = 4000;
         } else {
-          responseTokens = 2000; // Default
+          responseTokens = 3000; // Default for GPT-4.1
         }
       }
       
-      // Upgrade to more capable model for very large inputs (same logic as connection test)
-      let selectedModel = model;
-      if (estimatedInputTokens > 15000 && model === 'gpt-4o-mini') {
-        selectedModel = 'gpt-4o';
-        console.log(`Upgrading to ${selectedModel} for large document processing (${estimatedInputTokens} tokens)`);
-      }
-      
-      console.log(`ChatGPT API call: ${estimatedInputTokens} input tokens, ${responseTokens} max response tokens, model: ${selectedModel}`);
+      console.log(`GPT-4.1 API call: ${estimatedInputTokens} input tokens, ${responseTokens} max response tokens, model: ${model}`);
 
       const { data, error } = await supabase.functions.invoke('chat-gpt', {
         body: {
           prompt,
           systemPrompt,
-          model: selectedModel,
+          model,
           maxTokens: responseTokens
         }
       });
@@ -59,15 +55,15 @@ export const useChatGPTApi = () => {
       
       // Track token usage using centralized hook
       if (data.usage && data.usage.total_tokens) {
-        console.log(`ChatGPT API used ${data.usage.total_tokens} tokens`);
+        console.log(`GPT-4.1 API used ${data.usage.total_tokens} tokens`);
         addTokens(data.usage.total_tokens);
       }
       
       return data;
     } catch (error: any) {
-      console.error('ChatGPT API call failed:', error);
+      console.error('GPT-4.1 API call failed:', error);
       return {
-        error: error.message || 'ChatGPT processing failed',
+        error: error.message || 'GPT-4.1 processing failed',
         timestamp: new Date().toISOString()
       };
     }

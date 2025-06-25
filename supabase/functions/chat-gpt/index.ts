@@ -14,7 +14,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, model = 'gpt-4o-mini', systemPrompt, maxTokens = 1000 } = await req.json();
+    const { prompt, model = 'gpt-4.1-2025-04-14', systemPrompt, maxTokens = 4000 } = await req.json();
     
     if (!prompt) {
       throw new Error('Prompt is required');
@@ -30,19 +30,14 @@ serve(async (req) => {
     let selectedModel = model;
     let adjustedMaxTokens = maxTokens;
     
-    // Auto-upgrade model for large inputs
-    if (estimatedInputTokens > 15000 && model === 'gpt-4o-mini') {
-      selectedModel = 'gpt-4o';
-      console.log(`Auto-upgrading to ${selectedModel} for large input (${estimatedInputTokens} tokens)`);
-    }
-    
-    // Ensure we don't exceed model limits
+    // GPT-4.1 specifications with 200K context window
     const modelLimits = {
-      'gpt-4o-mini': { maxTotal: 128000, maxOutput: 16384 },
-      'gpt-4o': { maxTotal: 128000, maxOutput: 4096 }
+      'gpt-4.1-2025-04-14': { maxTotal: 200000, maxOutput: 16384 },
+      'gpt-4o': { maxTotal: 128000, maxOutput: 4096 },
+      'gpt-4o-mini': { maxTotal: 128000, maxOutput: 16384 }
     };
     
-    const limits = modelLimits[selectedModel as keyof typeof modelLimits] || modelLimits['gpt-4o-mini'];
+    const limits = modelLimits[selectedModel as keyof typeof modelLimits] || modelLimits['gpt-4.1-2025-04-14'];
     const systemTokens = systemPrompt ? Math.ceil(systemPrompt.length / 4) : 0;
     const availableOutputTokens = Math.min(
       adjustedMaxTokens,
@@ -51,10 +46,10 @@ serve(async (req) => {
     );
     
     if (availableOutputTokens < 100) {
-      throw new Error('Input too large for selected model. Consider using document chunking.');
+      throw new Error('Input too large for selected model. Consider reducing document content or using document summaries.');
     }
 
-    console.log(`Processing ChatGPT request: { model: "${selectedModel}", inputTokens: ${estimatedInputTokens}, maxOutputTokens: ${availableOutputTokens} }`);
+    console.log(`Processing ChatGPT request: { model: "${selectedModel}", inputTokens: ${estimatedInputTokens}, maxOutputTokens: ${availableOutputTokens}, contextLimit: ${limits.maxTotal} }`);
 
     const messages = [
       ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
