@@ -1,11 +1,11 @@
-
 import React, { useState, useEffect } from "react";
-import { Send, Bot, Code } from "lucide-react";
+import { Send, Bot, Code, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { useChatGPTApi } from "@/hooks/workbench/useChatGPTApi";
 import { useCitationProcessor } from "@/hooks/useCitationProcessor";
+import { useCitationExtractor } from "@/hooks/useCitationExtractor";
 import { useDocumentPreview } from "@/hooks/useDocumentPreview";
 import TokenMonitor from "./TokenMonitor";
 import DocumentSelector from "./DocumentSelector";
@@ -58,6 +58,12 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
   } = useCitationProcessor();
   
   const { 
+    isProcessing: isExtractingCitations,
+    currentResult: citationResult,
+    extractCitations
+  } = useCitationExtractor();
+  
+  const { 
     isPreviewOpen, 
     selectedDocument, 
     openPreview, 
@@ -96,6 +102,27 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
       newSelected.delete(index);
     }
     setSelectedDocuments(newSelected);
+  };
+
+  const handleExtractCitations = async () => {
+    const selectedDocs = getSelectedDocuments();
+    if (selectedDocs.length === 0) {
+      return;
+    }
+
+    // Process the first selected document for citation extraction
+    const doc = selectedDocs[0];
+    const textToProcess = doc.anchoredText || doc.extractedText;
+    
+    if (textToProcess) {
+      console.log(`Extracting citations from ${doc.name}:`, {
+        hasAnchoredText: !!doc.anchoredText,
+        anchorCount: doc.anchorCount || 0,
+        textLength: textToProcess.length
+      });
+      
+      await extractCitations(doc.name, textToProcess, doc.type);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -230,7 +257,17 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
 
             {/* Action Buttons */}
             {uploadedFiles.length > 0 && (
-              <div className="border-t bg-gray-50 p-3 flex-shrink-0">
+              <div className="border-t bg-gray-50 p-3 flex-shrink-0 space-y-2">
+                <Button
+                  onClick={handleExtractCitations}
+                  disabled={isExtractingCitations || getSelectedDocuments().length === 0}
+                  className="w-full flex items-center gap-2"
+                  variant="outline"
+                >
+                  <Search size={16} />
+                  {isExtractingCitations ? 'Extracting Citations...' : 'Extract Citations (Bluebook)'}
+                </Button>
+                
                 <Button
                   onClick={() => setIsContextDebugOpen(true)}
                   disabled={getSelectedDocuments().length === 0 || !inputMessage.trim()}
