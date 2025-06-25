@@ -1,9 +1,12 @@
+
 import React, { useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Anchor } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { FileText, Anchor, Eye, Copy } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
 
 export type UploadedFile = File & { 
   preview?: string; 
@@ -57,27 +60,55 @@ const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     return (previewAnchoredText.match(/⟦P-\d{5}⟧/g) || []).length;
   }, [document?.anchorCount, previewAnchoredText]);
 
+  const handleCopyToClipboard = async (content: string, type: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      toast({
+        title: "Copied to clipboard",
+        description: `${type} content has been copied to your clipboard.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Copy failed",
+        description: "Failed to copy content to clipboard.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (!document) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] p-0 flex flex-col">
-        <DialogHeader className="p-6 pb-0">
-          <DialogTitle className="flex items-center gap-2">
-            <FileText size={20} />
-            {document.name}
-            {anchorCount > 0 && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <Anchor size={12} />
-                {anchorCount} anchors
+      <DialogContent className="max-w-6xl w-[95vw] h-[90vh] p-0 flex flex-col">
+        <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b">
+          <DialogTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText size={20} />
+              <span className="truncate">{document.name}</span>
+              {anchorCount > 0 && (
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  <Anchor size={12} />
+                  {anchorCount} anchors
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-2 ml-4">
+              <Badge variant="outline" className="text-xs">
+                {document.extractedText?.length || 0} chars
               </Badge>
-            )}
+              {document.size && (
+                <Badge variant="outline" className="text-xs">
+                  {(document.size / 1024).toFixed(1)} KB
+                </Badge>
+              )}
+            </div>
           </DialogTitle>
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-hidden">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-            <div className="px-6">
+            <div className="flex-shrink-0 px-6 pt-2">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="original" className="flex items-center gap-2">
                   <FileText size={16} />
@@ -96,74 +127,102 @@ const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             </div>
 
             {/* Original Document Tab */}
-            <TabsContent value="original" className="flex-1 min-h-0 m-0 p-6">
-              <div className="h-full border rounded-lg bg-white">
-                <div className="p-4 border-b bg-gray-50">
-                  <h4 className="font-medium text-sm">Original Document Content</h4>
-                  <p className="text-xs text-gray-600">
-                    {document.extractedText?.length || 0} characters extracted from {document.type}
-                  </p>
-                </div>
-                <ScrollArea className="h-full">
-                  <div className="p-4">
-                    {document.extractedText ? (
-                      <div className="whitespace-pre-wrap text-sm leading-relaxed font-mono">
-                        {document.extractedText}
-                      </div>
-                    ) : (
-                      <div className="text-center text-gray-500 py-8">
-                        <FileText size={48} className="mx-auto mb-4 text-gray-400" />
-                        <p>No text content available</p>
-                        <p className="text-xs mt-2">Document may not have been processed yet</p>
-                      </div>
-                    )}
+            <TabsContent value="original" className="flex-1 min-h-0 m-0 p-6 pt-4">
+              <div className="h-full flex flex-col border rounded-lg bg-white">
+                <div className="flex-shrink-0 p-4 border-b bg-gray-50 flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium text-sm">Original Document Content</h4>
+                    <p className="text-xs text-gray-600">
+                      {document.extractedText?.length || 0} characters extracted from {document.type}
+                    </p>
                   </div>
-                </ScrollArea>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCopyToClipboard(document.extractedText || '', 'Original document')}
+                    className="flex items-center gap-1"
+                  >
+                    <Copy size={14} />
+                    Copy
+                  </Button>
+                </div>
+                <div className="flex-1 min-h-0">
+                  <ScrollArea className="h-full">
+                    <div className="p-4">
+                      {document.extractedText ? (
+                        <div className="whitespace-pre-wrap text-sm leading-relaxed font-mono break-words">
+                          {document.extractedText}
+                        </div>
+                      ) : (
+                        <div className="text-center text-gray-500 py-8">
+                          <FileText size={48} className="mx-auto mb-4 text-gray-400" />
+                          <p>No text content available</p>
+                          <p className="text-xs mt-2">Document may not have been processed yet</p>
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
               </div>
             </TabsContent>
 
             {/* Anchored Document Tab */}
-            <TabsContent value="anchored" className="flex-1 min-h-0 m-0 p-6">
-              <div className="h-full border rounded-lg bg-white">
-                <div className="p-4 border-b bg-gray-50">
-                  <h4 className="font-medium text-sm">Document with Anchor Tokens</h4>
-                  <p className="text-xs text-gray-600">
-                    {previewAnchoredText.length} characters with {anchorCount} anchor tokens (⟦P-#####⟧)
-                  </p>
-                  <div className="mt-2 text-xs text-blue-600 bg-blue-50 p-2 rounded">
+            <TabsContent value="anchored" className="flex-1 min-h-0 m-0 p-6 pt-4">
+              <div className="h-full flex flex-col border rounded-lg bg-white">
+                <div className="flex-shrink-0 p-4 border-b bg-gray-50">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <h4 className="font-medium text-sm">Document with Anchor Tokens</h4>
+                      <p className="text-xs text-gray-600">
+                        {previewAnchoredText.length} characters with {anchorCount} anchor tokens (⟦P-#####⟧)
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCopyToClipboard(previewAnchoredText, 'Anchored document')}
+                      className="flex items-center gap-1"
+                    >
+                      <Copy size={14} />
+                      Copy
+                    </Button>
+                  </div>
+                  <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
                     <strong>Note:</strong> Anchor tokens (⟦P-#####⟧) mark paragraph positions for citation processing. 
-                    These invisible markers help maintain accurate positions when generating redlined documents.
+                    These markers help maintain accurate positions when generating redlined documents.
                   </div>
                 </div>
-                <ScrollArea className="h-full">
-                  <div className="p-4">
-                    {previewAnchoredText ? (
-                      <div className="whitespace-pre-wrap text-sm leading-relaxed font-mono">
-                        {/* Highlight anchor tokens for visibility */}
-                        {previewAnchoredText.split(/(⟦P-\d{5}⟧)/).map((part, index) => {
-                          if (part.match(/⟦P-\d{5}⟧/)) {
-                            return (
-                              <span 
-                                key={index} 
-                                className="bg-yellow-200 text-yellow-800 px-1 rounded text-xs font-bold"
-                                title="Anchor token - marks paragraph position"
-                              >
-                                {part}
-                              </span>
-                            );
-                          }
-                          return <span key={index}>{part}</span>;
-                        })}
-                      </div>
-                    ) : (
-                      <div className="text-center text-gray-500 py-8">
-                        <Anchor size={48} className="mx-auto mb-4 text-gray-400" />
-                        <p>No anchored content available</p>
-                        <p className="text-xs mt-2">Unable to generate anchor tokens for this document</p>
-                      </div>
-                    )}
-                  </div>
-                </ScrollArea>
+                <div className="flex-1 min-h-0">
+                  <ScrollArea className="h-full">
+                    <div className="p-4">
+                      {previewAnchoredText ? (
+                        <div className="whitespace-pre-wrap text-sm leading-relaxed font-mono break-words">
+                          {/* Highlight anchor tokens for visibility */}
+                          {previewAnchoredText.split(/(⟦P-\d{5}⟧)/).map((part, index) => {
+                            if (part.match(/⟦P-\d{5}⟧/)) {
+                              return (
+                                <span 
+                                  key={index} 
+                                  className="bg-yellow-200 text-yellow-800 px-1 rounded text-xs font-bold border border-yellow-300"
+                                  title="Anchor token - marks paragraph position"
+                                >
+                                  {part}
+                                </span>
+                              );
+                            }
+                            return <span key={index}>{part}</span>;
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-center text-gray-500 py-8">
+                          <Anchor size={48} className="mx-auto mb-4 text-gray-400" />
+                          <p>No anchored content available</p>
+                          <p className="text-xs mt-2">Unable to generate anchor tokens for this document</p>
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
               </div>
             </TabsContent>
           </Tabs>

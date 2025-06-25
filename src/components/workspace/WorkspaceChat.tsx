@@ -1,24 +1,25 @@
 
 import React, { useState, useEffect } from "react";
-import { Send, Bot, FileCheck } from "lucide-react";
+import { Send, Bot, FileCheck, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { useChatGPTApi } from "@/hooks/workbench/useChatGPTApi";
 import { useCitationProcessor } from "@/hooks/useCitationProcessor";
-import { useDocumentPreview } from "@/hooks/useDocumentPreview"; // NEW
+import { useDocumentPreview } from "@/hooks/useDocumentPreview";
 import TokenMonitor from "./TokenMonitor";
 import DocumentSelector from "./DocumentSelector";
 import ChatOutputPanel from "./ChatOutputPanel";
 import DocumentGrid from "./DocumentGrid";
-import DocumentPreviewModal from "./DocumentPreviewModal"; // NEW
+import DocumentPreviewModal from "./DocumentPreviewModal";
+import ContextDebugPanel from "./ContextDebugPanel"; // NEW
 import { buildDocumentContext } from "@/utils/contextBuilder";
 
 export type UploadedFile = File & { 
   preview?: string; 
   extractedText?: string;
-  anchoredText?: string; // NEW
-  anchorCount?: number; // NEW
+  anchoredText?: string;
+  anchorCount?: number;
 };
 
 interface Message {
@@ -46,6 +47,8 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDocuments, setSelectedDocuments] = useState<Set<number>>(new Set());
+  const [isContextDebugOpen, setIsContextDebugOpen] = useState(false); // NEW
+  
   const { callChatGPT } = useChatGPTApi();
   const { 
     isProcessing: isProcessingCitations, 
@@ -54,7 +57,6 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
     downloadRedlinedDocument 
   } = useCitationProcessor();
   
-  // NEW: Document preview functionality
   const { 
     isPreviewOpen, 
     selectedDocument, 
@@ -141,17 +143,25 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
         selectedDocs,
         180000, // Leave 20K tokens for response
         true, // Include metadata
-        true  // NEW: Use anchored text for citation processing
+        true  // Use anchored text for citation processing
       );
 
+      console.log('=== CONTEXT DEBUG INFO ===');
       console.log('Sending to GPT-4.1 with anchored text:', {
         totalTokens: contextResult.totalTokens,
         documentsIncluded: selectedDocs.length,
         usingAnchoredText: contextResult.usingAnchoredText,
         totalAnchors: contextResult.totalAnchors,
         truncated: contextResult.truncated,
-        excludedDocuments: contextResult.excludedDocuments
+        excludedDocuments: contextResult.excludedDocuments,
+        documentDetails: contextResult.documentContexts.map(ctx => ({
+          tokenEstimate: ctx.tokenEstimate,
+          useAnchoredText: ctx.useAnchoredText,
+          anchorCount: ctx.anchorCount
+        }))
       });
+      console.log('Full context preview (first 500 chars):', contextResult.fullContext.substring(0, 500));
+      console.log('=== END CONTEXT DEBUG ===');
 
       const systemPrompt = "You are a helpful AI assistant powered by GPT-4.1 that specializes in analyzing and working with documents. You have access to a 200K token context window, allowing you to process complete documents in detail. When documents contain anchor tokens in the format ⟦P-#####⟧, these mark paragraph positions for citation processing. Provide clear, comprehensive, and actionable insights based on the document content provided. When referencing specific parts of documents, mention the document name for clarity.";
 
@@ -233,15 +243,15 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
                     selectedDocuments={selectedDocuments}
                     onDocumentToggle={handleDocumentToggle}
                     onRemoveDocument={onRemoveDocument}
-                    onDocumentPreview={openPreview} // NEW: Preview handler
+                    onDocumentPreview={openPreview}
                   />
                 </div>
               )}
             </div>
 
-            {/* Citation Processing Button */}
+            {/* Action Buttons */}
             {uploadedFiles.length > 0 && (
-              <div className="border-t bg-gray-50 p-3 flex-shrink-0">
+              <div className="border-t bg-gray-50 p-3 flex-shrink-0 space-y-2">
                 <Button
                   onClick={handleProcessCitations}
                   disabled={isProcessingCitations || getSelectedDocuments().length === 0}
@@ -250,6 +260,18 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
                 >
                   <FileCheck size={16} />
                   {isProcessingCitations ? 'Processing Citations...' : 'Process Citations (Bluebook)'}
+                </Button>
+                
+                {/* NEW: Context Debug Button */}
+                <Button
+                  onClick={() => setIsContextDebugOpen(true)}
+                  disabled={getSelectedDocuments().length === 0 || !inputMessage.trim()}
+                  className="w-full flex items-center gap-2"
+                  variant="outline"
+                  size="sm"
+                >
+                  <Code size={16} />
+                  Preview Context to GPT
                 </Button>
               </div>
             )}
@@ -307,11 +329,20 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
         </ResizablePanel>
       </ResizablePanelGroup>
 
-      {/* NEW: Document Preview Modal */}
+      {/* Document Preview Modal */}
       <DocumentPreviewModal
         isOpen={isPreviewOpen}
         onClose={closePreview}
         document={selectedDocument}
+      />
+
+      {/* NEW: Context Debug Modal */}
+      <ContextDebugPanel
+        isOpen={isContextDebugOpen}
+        onClose={() => setIsContextDebugOpen(false)}
+        prompt={inputMessage}
+        documents={getSelectedDocuments()}
+        model="gpt-4.1-2025-04-14"
       />
     </div>
   );
