@@ -17,29 +17,6 @@ interface CitationResult {
   suggested: string;
 }
 
-const DEFAULT_PROMPT = `You are a legal citation expert specializing in The Bluebook format. Your task is to:
-
-1. Read the full document text including the invisible anchor tags (⟦P-#####⟧).
-2. Identify every legal citation that should conform to The Bluebook.
-3. For each citation, decide whether it needs a correction; if so, propose the corrected form.
-4. Return only a JSON array that follows the exact schema shown below—no extra keys, no commentary, no markdown, no trailing commas.
-
-Schema:
-[
-  {
-    "anchor": "P-00042",         // the anchor that immediately precedes the citation
-    "start_offset": 12,          // # of characters from the anchor to the citation's first char
-    "end_offset": 31,            // first char AFTER the citation
-    "type": "case",              // one of: case, statute-code, session-law, regulation, constitution, rule/procedure, legislative-material, administrative-decision, book, periodical, internet, service, foreign, international, tribal, court-document, other
-    "status": "Error",           // Error, Uncertain, or Correct
-    "errors": [],                // array of concise rule-labelled errors (e.g., Rule 10.1.2 – missing pincite) if uncertain as to if an error exists state "uncertain"
-    "orig": "Roe v. Wade, 410 U.S. 113 (1973)",
-    "suggested": "Roe v. Wade, 410 U.S. 113, 114 (1973)"  // identical to orig if already perfect
-  }
-]
-
-Return ONLY the JSON array. No additional text or explanation.`;
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -57,16 +34,17 @@ serve(async (req) => {
       throw new Error('Document content is required')
     }
 
-    // Use custom prompt if provided, otherwise fall back to default
-    const systemPrompt = customPrompt || DEFAULT_PROMPT;
+    if (!customPrompt) {
+      throw new Error('Citation extraction prompt is required')
+    }
 
-    // Call GPT-4.1 for citation analysis
+    // Call GPT-4.1 for citation analysis using the user's custom prompt
     const openaiKey = Deno.env.get('OPENAI_API_KEY')
     if (!openaiKey) {
       throw new Error('OpenAI API key not configured')
     }
 
-    console.log('Calling OpenAI with prompt length:', systemPrompt.length)
+    console.log('Calling OpenAI with custom prompt length:', customPrompt.length)
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -77,7 +55,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'gpt-4-turbo-preview',
         messages: [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: customPrompt },
           { role: 'user', content: documentContent }
         ],
         max_tokens: 8000,
