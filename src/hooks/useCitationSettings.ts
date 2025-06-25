@@ -13,14 +13,14 @@ Your task:
 
 [
   {
-    "anchor": "P-00042",         // the anchor that immediately precedes the citation
-    "start_offset": 12,          // # of characters from the anchor to the citation's first char
-    "end_offset": 31,            // first char AFTER the citation
-    "type": "case",              // one of: case, statute-code, session-law, regulation, constitution, rule/procedure, legislative-material, administrative-decision, book, periodical, internet, service, foreign, international, tribal, court-document, other.
-    "status": "Error",           // Error, Uncertain, or Correct
-    "errors": [],                // array of concise rule-labelled errors (e.g., Rule 10.1.2 – missing pincite) if uncertain as to if an error exists state "uncertain".
+    "anchor": "P-00042",
+    "start_offset": 12,
+    "end_offset": 31,
+    "type": "case",
+    "status": "Error",
+    "errors": [],
     "orig": "Roe v. Wade, 410 U.S. 113 (1973)",
-    "suggested": "Roe v. Wade, 410 U.S. 113, 114 (1973)"  // identical to orig if already perfect
+    "suggested": "Roe v. Wade, 410 U.S. 113, 114 (1973)"
   }
 ]
 
@@ -183,16 +183,18 @@ export const useCitationSettings = () => {
     
     setIsLoading(true);
     try {
+      // Use a more robust query that orders by created_at to get the most recent
       const { data, error } = await supabase
         .from('citation_settings')
         .select('*')
         .eq('user_id', user.id)
-        .maybeSingle();
+        .order('created_at', { ascending: false })
+        .limit(1);
 
       if (error) throw error;
 
-      if (data) {
-        setSettings(data);
+      if (data && data.length > 0) {
+        setSettings(data[0]);
       } else {
         // Create default settings if none exist
         await createDefaultSettings();

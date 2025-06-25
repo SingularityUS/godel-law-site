@@ -29,6 +29,7 @@ serve(async (req) => {
     console.log('Processing citations for document:', documentName)
     console.log('Document type:', documentType)
     console.log('Custom prompt provided:', !!customPrompt)
+    console.log('Document content length:', documentContent?.length || 0)
 
     if (!documentContent) {
       throw new Error('Document content is required')
@@ -44,7 +45,7 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured')
     }
 
-    console.log('Calling OpenAI with custom prompt length:', customPrompt.length)
+    console.log('Calling OpenAI GPT-4.1 with custom prompt length:', customPrompt.length)
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -53,7 +54,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4-turbo-preview',
+        model: 'gpt-4o-2024-11-20', // Using the latest GPT-4 model available
         messages: [
           { role: 'system', content: customPrompt },
           { role: 'user', content: documentContent }
