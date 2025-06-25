@@ -1,12 +1,14 @@
 
-import React, { useState, useRef, useEffect } from "react";
-import { Send, Bot, AlertCircle } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Send, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { useChatGPTApi } from "@/hooks/workbench/useChatGPTApi";
 import TokenMonitor from "./TokenMonitor";
 import DocumentSelector from "./DocumentSelector";
 import ChatOutputPanel from "./ChatOutputPanel";
+import DocumentGrid from "./DocumentGrid";
 import { buildDocumentContext } from "@/utils/contextBuilder";
 
 export type UploadedFile = File & { preview?: string; extractedText?: string };
@@ -20,12 +22,14 @@ interface Message {
 
 interface WorkspaceChatProps {
   uploadedFiles: UploadedFile[];
+  onRemoveDocument: (file: UploadedFile) => void;
   onFileDrop?: (event: React.DragEvent) => void;
   onDragOver?: (event: React.DragEvent) => void;
 }
 
 const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
   uploadedFiles,
+  onRemoveDocument,
   onFileDrop,
   onDragOver
 }) => {
@@ -147,111 +151,86 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
   };
 
   return (
-    <div className="flex h-full bg-white">
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Welcome Message */}
-        {messages.length === 0 && uploadedFiles.length === 0 && (
-          <div 
-            className="flex-1 flex items-center justify-center text-center"
-            onDrop={onFileDrop}
-            onDragOver={onDragOver}
-          >
-            <div className="text-gray-500">
-              <Bot size={64} className="mx-auto mb-4 text-gray-400" />
-              <h3 className="text-xl font-semibold mb-2">GPT-4.1 Workspace</h3>
-              <p className="text-sm mb-2">Advanced AI with 200K token context window</p>
-              <p className="text-xs">Drop documents here or start a conversation</p>
+    <div className="h-full">
+      <ResizablePanelGroup direction="horizontal" className="h-full">
+        {/* Left Panel - Chat Input and Documents */}
+        <ResizablePanel defaultSize={60} minSize={40}>
+          <div className="h-full flex flex-col bg-white">
+            {/* Welcome Message or Document Grid */}
+            <div className="flex-1 min-h-0 overflow-hidden">
+              {uploadedFiles.length === 0 ? (
+                <div 
+                  className="h-full flex items-center justify-center text-center"
+                  onDrop={onFileDrop}
+                  onDragOver={onDragOver}
+                >
+                  <div className="text-gray-500">
+                    <Bot size={64} className="mx-auto mb-4 text-gray-400" />
+                    <h3 className="text-xl font-semibold mb-2">GPT-4.1 Workspace</h3>
+                    <p className="text-sm mb-2">Advanced AI with 200K token context window</p>
+                    <p className="text-xs">Drop documents here or start a conversation</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full p-4 overflow-auto">
+                  <DocumentGrid 
+                    uploadedFiles={uploadedFiles}
+                    selectedDocuments={selectedDocuments}
+                    onDocumentToggle={handleDocumentToggle}
+                    onRemoveDocument={onRemoveDocument}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Chat Input Area - Fixed at bottom */}
+            <div className="border-t bg-white p-4 flex-shrink-0">
+              <form onSubmit={handleSubmit} className="flex gap-2">
+                <Textarea
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  placeholder={uploadedFiles.length > 0 ? "Ask about your documents..." : "Type your message..."}
+                  className="flex-1 min-h-[44px] max-h-32 resize-none"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmit(e);
+                    }
+                  }}
+                />
+                <Button
+                  type="submit"
+                  disabled={!inputMessage.trim() || isLoading}
+                  className="h-11 px-4"
+                >
+                  <Send size={18} />
+                </Button>
+              </form>
+              
+              {/* Token Monitor below input */}
+              {uploadedFiles.length > 0 && (
+                <div className="mt-3">
+                  <TokenMonitor
+                    prompt={inputMessage}
+                    documents={getSelectedDocuments()}
+                    model="gpt-4.1-2025-04-14"
+                  />
+                </div>
+              )}
             </div>
           </div>
-        )}
+        </ResizablePanel>
 
-        {/* Chat Output when there are messages */}
-        {messages.length > 0 && (
-          <div className="flex-1 min-h-0">
-            <ChatOutputPanel 
-              messages={messages} 
-              isLoading={isLoading}
-              className="h-full"
-            />
-          </div>
-        )}
-
-        {/* Chat Input Area */}
-        <div className="border-t bg-white p-4">
-          <form onSubmit={handleSubmit} className="flex gap-2">
-            <Textarea
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              placeholder={uploadedFiles.length > 0 ? "Ask about your documents..." : "Type your message..."}
-              className="flex-1 min-h-[44px] max-h-32 resize-none"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit(e);
-                }
-              }}
-            />
-            <Button
-              type="submit"
-              disabled={!inputMessage.trim() || isLoading}
-              className="h-11 px-4"
-            >
-              <Send size={18} />
-            </Button>
-          </form>
-        </div>
-      </div>
-
-      {/* Right Sidebar */}
-      <div className="w-80 border-l bg-gray-50 flex flex-col">
-        {/* Document Selection */}
-        <div className="p-4">
-          <DocumentSelector
-            documents={uploadedFiles}
-            selectedDocuments={selectedDocuments}
-            onDocumentToggle={handleDocumentToggle}
+        {/* Right Panel - Chat Output */}
+        <ResizableHandle />
+        <ResizablePanel defaultSize={40} minSize={30}>
+          <ChatOutputPanel 
+            messages={messages} 
+            isLoading={isLoading}
+            className="h-full"
           />
-        </div>
-
-        {/* Token Monitor */}
-        <div className="p-4 border-t">
-          <TokenMonitor
-            prompt={inputMessage}
-            documents={getSelectedDocuments()}
-            model="gpt-4.1-2025-04-14"
-          />
-        </div>
-
-        {/* Workflow Hints */}
-        <div className="p-4 border-t bg-blue-50">
-          <h4 className="text-sm font-medium text-blue-800 mb-2">Workflow</h4>
-          <div className="space-y-1 text-xs text-blue-600">
-            <div className="flex items-center gap-2">
-              <span className={uploadedFiles.length > 0 ? "text-green-600" : "text-gray-400"}>
-                ✓
-              </span>
-              <span>Upload Documents</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={selectedDocuments.size > 0 ? "text-green-600" : "text-gray-400"}>
-                ✓
-              </span>
-              <span>Select Documents</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={inputMessage.trim() ? "text-green-600" : "text-gray-400"}>
-                ✓
-              </span>
-              <span>Write Prompt</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-blue-600">→</span>
-              <span>Send to GPT-4.1</span>
-            </div>
-          </div>
-        </div>
-      </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   );
 };
