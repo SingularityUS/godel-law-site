@@ -14,6 +14,7 @@ import DocumentGrid from "./DocumentGrid";
 import DocumentPreviewModal from "./DocumentPreviewModal";
 import ContextDebugPanel from "./ContextDebugPanel";
 import { buildDocumentContext } from "@/utils/contextBuilder";
+import CitationResultsPanel from "./CitationResultsPanel";
 
 export type UploadedFile = File & { 
   preview?: string; 
@@ -319,17 +320,24 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
           </div>
         </ResizablePanel>
 
-        {/* Right Panel - Chat Output */}
+        {/* Right Panel - Chat Output or Citation Results */}
         <ResizableHandle />
         <ResizablePanel defaultSize={40} minSize={30}>
           <div className="h-full overflow-hidden">
-            <ChatOutputPanel 
-              messages={messages} 
-              isLoading={isLoading}
-              documentResult={documentResult}
-              onDownloadRedlined={downloadRedlinedDocument}
-              className="h-full"
-            />
+            {citationResult ? (
+              <CitationResultsPanel 
+                result={citationResult}
+                documentContent={getSelectedDocuments()[0]?.anchoredText || getSelectedDocuments()[0]?.extractedText || ''}
+              />
+            ) : (
+              <ChatOutputPanel 
+                messages={messages} 
+                isLoading={isLoading}
+                documentResult={documentResult}
+                onDownloadRedlined={downloadRedlinedDocument}
+                className="h-full"
+              />
+            )}
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>

@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
+import { useCitationSettings } from '@/hooks/useCitationSettings';
 
 export interface CitationExtraction {
   anchor: string;
@@ -23,6 +24,7 @@ export interface CitationExtractionResult {
 export const useCitationExtractor = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentResult, setCurrentResult] = useState<CitationExtractionResult | null>(null);
+  const { getCurrentPrompt } = useCitationSettings();
 
   const extractCitations = async (documentName: string, anchoredContent: string, documentType: string) => {
     setIsProcessing(true);
@@ -31,16 +33,22 @@ export const useCitationExtractor = () => {
       console.log('Extracting citations from:', documentName);
       console.log('Content length:', anchoredContent.length);
       
+      // Get the user's custom prompt
+      const customPrompt = getCurrentPrompt();
+      console.log('Using custom prompt length:', customPrompt.length);
+      
       const { data, error } = await supabase.functions.invoke('extract-citations', {
         body: {
           documentName,
           documentContent: anchoredContent,
-          documentType
+          documentType,
+          customPrompt
         }
       });
 
       if (error) {
-        throw error;
+        console.error('Supabase function error:', error);
+        throw new Error(error.message || 'Failed to invoke citation extraction function');
       }
 
       console.log('Citation extraction result:', data);

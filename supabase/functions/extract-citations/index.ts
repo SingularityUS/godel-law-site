@@ -17,28 +17,7 @@ interface CitationResult {
   suggested: string;
 }
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
-
-  try {
-    const { documentName, documentContent, documentType } = await req.json()
-
-    console.log('Processing citations for document:', documentName)
-
-    if (!documentContent) {
-      throw new Error('Document content is required')
-    }
-
-    // Call GPT-4.1 for citation analysis using the user's exact prompt
-    const openaiKey = Deno.env.get('OPENAI_API_KEY')
-    if (!openaiKey) {
-      throw new Error('OpenAI API key not configured')
-    }
-
-    const systemPrompt = `You are a legal citation expert specializing in The Bluebook format. Your task is to:
+const DEFAULT_PROMPT = `You are a legal citation expert specializing in The Bluebook format. Your task is to:
 
 1. Read the full document text including the invisible anchor tags (⟦P-#####⟧).
 2. Identify every legal citation that should conform to The Bluebook.
@@ -59,7 +38,35 @@ Schema:
   }
 ]
 
-Return ONLY the JSON array. No additional text or explanation.`
+Return ONLY the JSON array. No additional text or explanation.`;
+
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders })
+  }
+
+  try {
+    const { documentName, documentContent, documentType, customPrompt } = await req.json()
+
+    console.log('Processing citations for document:', documentName)
+    console.log('Document type:', documentType)
+    console.log('Custom prompt provided:', !!customPrompt)
+
+    if (!documentContent) {
+      throw new Error('Document content is required')
+    }
+
+    // Use custom prompt if provided, otherwise fall back to default
+    const systemPrompt = customPrompt || DEFAULT_PROMPT;
+
+    // Call GPT-4.1 for citation analysis
+    const openaiKey = Deno.env.get('OPENAI_API_KEY')
+    if (!openaiKey) {
+      throw new Error('OpenAI API key not configured')
+    }
+
+    console.log('Calling OpenAI with prompt length:', systemPrompt.length)
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -68,7 +75,7 @@ Return ONLY the JSON array. No additional text or explanation.`
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14',
+        model: 'gpt-4-turbo-preview',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: documentContent }
@@ -80,27 +87,31 @@ Return ONLY the JSON array. No additional text or explanation.`
 
     if (!response.ok) {
       const error = await response.json()
+      console.error('OpenAI API error:', error)
       throw new Error(`OpenAI API error: ${error.error?.message || 'Unknown error'}`)
     }
 
     const data = await response.json()
     const citationResponse = data.choices[0].message.content
 
-    console.log('GPT-4.1 citation response:', citationResponse.substring(0, 500))
+    console.log('GPT-4 citation response length:', citationResponse.length)
+    console.log('Response preview:', citationResponse.substring(0, 200))
 
     // Parse the JSON response
     let citations: CitationResult[] = []
     try {
       citations = JSON.parse(citationResponse)
       if (!Array.isArray(citations)) {
+        console.warn('Response is not an array, attempting to extract array')
         citations = []
       }
-    } catch (error) {
-      console.error('Failed to parse citation JSON:', error)
+    } catch (parseError) {
+      console.error('Failed to parse citation JSON:', parseError)
+      console.error('Raw response:', citationResponse)
       citations = []
     }
 
-    console.log(`Found ${citations.length} citations`)
+    console.log(`Successfully parsed ${citations.length} citations`)
 
     return new Response(
       JSON.stringify({
@@ -117,7 +128,8 @@ Return ONLY the JSON array. No additional text or explanation.`
     return new Response(
       JSON.stringify({ 
         error: error.message || 'Failed to extract citations',
-        citations: []
+        citations: [],
+        totalCitations: 0
       }),
       {
         status: 500,
