@@ -95,8 +95,8 @@ function insertAnchorTokens(content: string): { anchoredContent: string; anchorM
 const validateAndFixEncoding = (text: string): string => {
   // Common character replacements for legal documents
   const encodingFixes: Array<[RegExp, string]> = [
-    // Section symbol
-    [//g, '§'],
+    // Section symbol - fix replacement character
+    [/\uFFFD/g, '§'],
     // Smart quotes
     [/[""]/g, '"'],
     [/['']/g, "'"],
