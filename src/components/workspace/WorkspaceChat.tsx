@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from "react";
-import { Send, Bot } from "lucide-react";
+import { Send, Bot, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { useChatGPTApi } from "@/hooks/workbench/useChatGPTApi";
+import { useCitationProcessor } from "@/hooks/useCitationProcessor";
 import TokenMonitor from "./TokenMonitor";
 import DocumentSelector from "./DocumentSelector";
 import ChatOutputPanel from "./ChatOutputPanel";
@@ -38,6 +40,12 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDocuments, setSelectedDocuments] = useState<Set<number>>(new Set());
   const { callChatGPT } = useChatGPTApi();
+  const { 
+    isProcessing: isProcessingCitations, 
+    currentResult: documentResult, 
+    processDocument, 
+    downloadRedlinedDocument 
+  } = useCitationProcessor();
 
   // Auto-select all documents when they're uploaded
   useEffect(() => {
@@ -48,7 +56,7 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
         const fileNames = uploadedFiles.map(f => f.name).join(", ");
         setMessages([{
           id: Date.now().toString(),
-          content: `I can see you've uploaded ${uploadedFiles.length} document(s): ${fileNames}. I'm now using GPT-4.1 with a 200K token context window, which means I can analyze your complete documents in detail. How can I help you analyze these documents?`,
+          content: `I can see you've uploaded ${uploadedFiles.length} document(s): ${fileNames}. I'm now using GPT-4.1 with a 200K token context window for analysis, and I can also process legal documents for Bluebook citation corrections. How can I help you analyze these documents?`,
           role: 'assistant',
           timestamp: new Date()
         }]);
@@ -68,6 +76,19 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
       newSelected.delete(index);
     }
     setSelectedDocuments(newSelected);
+  };
+
+  const handleProcessCitations = async () => {
+    const selectedDocs = getSelectedDocuments();
+    if (selectedDocs.length === 0) {
+      return;
+    }
+
+    // Process the first selected document for citations
+    const doc = selectedDocs[0];
+    if (doc.extractedText) {
+      await processDocument(doc.name, doc.extractedText, doc.type);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -183,6 +204,21 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
               )}
             </div>
 
+            {/* Citation Processing Button */}
+            {uploadedFiles.length > 0 && (
+              <div className="border-t bg-gray-50 p-3 flex-shrink-0">
+                <Button
+                  onClick={handleProcessCitations}
+                  disabled={isProcessingCitations || getSelectedDocuments().length === 0}
+                  className="w-full flex items-center gap-2"
+                  variant="outline"
+                >
+                  <FileCheck size={16} />
+                  {isProcessingCitations ? 'Processing Citations...' : 'Process Citations (Bluebook)'}
+                </Button>
+              </div>
+            )}
+
             {/* Chat Input Area - Fixed at bottom */}
             <div className="border-t bg-white p-4 flex-shrink-0">
               <form onSubmit={handleSubmit} className="flex gap-2">
@@ -228,6 +264,8 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
             <ChatOutputPanel 
               messages={messages} 
               isLoading={isLoading}
+              documentResult={documentResult}
+              onDownloadRedlined={downloadRedlinedDocument}
               className="h-full"
             />
           </div>
