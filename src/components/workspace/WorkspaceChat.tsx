@@ -15,6 +15,8 @@ import DocumentPreviewModal from "./DocumentPreviewModal";
 import ContextDebugPanel from "./ContextDebugPanel";
 import { buildDocumentContext } from "@/utils/contextBuilder";
 import CitationResultsPanel from "./CitationResultsPanel";
+import { useCitationAnalyzer } from '@/hooks/useCitationAnalyzer';
+import CitationAnalysisTab from './CitationAnalysisTab';
 
 export type UploadedFile = File & { 
   preview?: string; 
@@ -49,6 +51,7 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDocuments, setSelectedDocuments] = useState<Set<number>>(new Set());
   const [isContextDebugOpen, setIsContextDebugOpen] = useState(false);
+  const [activeView, setActiveView] = useState<'chat' | 'citation-analysis'>('chat');
   
   const { callChatGPT } = useChatGPTApi();
   const { 
@@ -63,6 +66,13 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
     currentResult: citationResult,
     extractCitations
   } = useCitationExtractor();
+  
+  const {
+    isAnalyzing,
+    analysisResult,
+    analyzeCitations,
+    clearResult
+  } = useCitationAnalyzer();
   
   const { 
     isPreviewOpen, 
@@ -103,6 +113,25 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
       newSelected.delete(index);
     }
     setSelectedDocuments(newSelected);
+  };
+
+  const handleAnalyzeCitations = async () => {
+    const selectedDocs = getSelectedDocuments();
+    if (selectedDocs.length === 0) return;
+
+    const doc = selectedDocs[0];
+    const textToProcess = doc.anchoredText || doc.extractedText;
+    
+    if (textToProcess) {
+      console.log(`Analyzing citations for ${doc.name}:`, {
+        hasAnchoredText: !!doc.anchoredText,
+        anchorCount: doc.anchorCount || 0,
+        textLength: textToProcess.length
+      });
+      
+      setActiveView('citation-analysis');
+      await analyzeCitations(doc.name, textToProcess);
+    }
   };
 
   const handleExtractCitations = async () => {
@@ -260,13 +289,23 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
             {uploadedFiles.length > 0 && (
               <div className="border-t bg-gray-50 p-3 flex-shrink-0 space-y-2">
                 <Button
+                  onClick={handleAnalyzeCitations}
+                  disabled={isAnalyzing || getSelectedDocuments().length === 0}
+                  className="w-full flex items-center gap-2"
+                  variant="outline"
+                >
+                  <Search size={16} />
+                  {isAnalyzing ? 'Analyzing Citations...' : 'Analyze Citations (New)'}
+                </Button>
+                
+                <Button
                   onClick={handleExtractCitations}
                   disabled={isExtractingCitations || getSelectedDocuments().length === 0}
                   className="w-full flex items-center gap-2"
                   variant="outline"
                 >
                   <Search size={16} />
-                  {isExtractingCitations ? 'Extracting Citations...' : 'Extract Citations (Bluebook)'}
+                  {isExtractingCitations ? 'Extracting Citations...' : 'Extract Citations (Old)'}
                 </Button>
                 
                 <Button
@@ -320,11 +359,39 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
           </div>
         </ResizablePanel>
 
-        {/* Right Panel - Chat Output or Citation Results */}
+        {/* Right Panel - Dynamic Content */}
         <ResizableHandle />
         <ResizablePanel defaultSize={40} minSize={30}>
           <div className="h-full overflow-hidden">
-            {citationResult ? (
+            {/* View Toggle */}
+            {(citationResult || analysisResult) && (
+              <div className="border-b p-2 flex gap-2">
+                <Button
+                  variant={activeView === 'chat' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveView('chat')}
+                >
+                  Chat
+                </Button>
+                <Button
+                  variant={activeView === 'citation-analysis' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveView('citation-analysis')}
+                >
+                  Citation Analysis
+                </Button>
+              </div>
+            )}
+
+            {/* Content based on active view */}
+            {activeView === 'citation-analysis' ? (
+              <CitationAnalysisTab
+                result={analysisResult}
+                isAnalyzing={isAnalyzing}
+                onAnalyze={handleAnalyzeCitations}
+                hasDocument={getSelectedDocuments().length > 0}
+              />
+            ) : citationResult ? (
               <CitationResultsPanel 
                 result={citationResult}
                 documentContent={getSelectedDocuments()[0]?.anchoredText || getSelectedDocuments()[0]?.extractedText || ''}
