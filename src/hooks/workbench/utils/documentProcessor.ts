@@ -1,8 +1,8 @@
-
 /**
  * Document Processor Utility
  * 
  * Purpose: Handles extraction of text content from legal documents with minimal cleaning for redlining support
+ * Now includes anchor token insertion for citation processing
  */
 
 import { DocumentInputNode } from "@/types/workbench";
@@ -17,6 +17,8 @@ export interface DocumentExtractionResult {
   title: string;
   originalContent: string;
   processableContent: string;
+  anchoredContent: string; // NEW: Content with anchor tokens
+  anchorMap: AnchorMapping[]; // NEW: Mapping of anchors to positions
   positionMap: DocumentPositionMap;
   cleaningResult: CleaningResult;
   chunks?: DocumentChunk[];
@@ -26,6 +28,8 @@ export interface DocumentExtractionResult {
     fileSize: number;
     originalLength: number;
     processableLength: number;
+    anchoredLength: number; // NEW: Length with anchors
+    anchorCount: number; // NEW: Number of anchors inserted
     extractedSuccessfully: boolean;
     estimatedTokens: number;
     needsChunking: boolean;
@@ -35,6 +39,55 @@ export interface DocumentExtractionResult {
   };
 }
 
+export interface AnchorMapping {
+  anchor: string;
+  paragraphIndex: number;
+  originalPosition: number;
+  anchoredPosition: number;
+}
+
+/**
+ * Insert anchor tokens before paragraphs for citation processing
+ */
+function insertAnchorTokens(content: string): { anchoredContent: string; anchorMap: AnchorMapping[] } {
+  console.log('Inserting anchor tokens for citation processing...');
+  
+  // Split content into paragraphs (double line breaks or similar)
+  const paragraphs = content.split(/\n\s*\n/);
+  const anchorMap: AnchorMapping[] = [];
+  let anchoredContent = '';
+  let currentPosition = 0;
+  
+  paragraphs.forEach((paragraph, index) => {
+    if (paragraph.trim()) {
+      const anchor = `⟦P-${String(index + 1).padStart(5, '0')}⟧`;
+      
+      // Record mapping
+      anchorMap.push({
+        anchor,
+        paragraphIndex: index,
+        originalPosition: currentPosition,
+        anchoredPosition: anchoredContent.length
+      });
+      
+      // Add anchor before paragraph
+      anchoredContent += anchor + paragraph;
+      
+      // Add paragraph separator if not the last paragraph
+      if (index < paragraphs.length - 1) {
+        anchoredContent += '\n\n';
+      }
+      
+      currentPosition += paragraph.length + 2; // +2 for \n\n
+    }
+  });
+  
+  console.log(`Inserted ${anchorMap.length} anchor tokens`);
+  console.log('Sample anchored content (first 300 chars):', anchoredContent.substring(0, 300));
+  
+  return { anchoredContent, anchorMap };
+}
+
 /**
  * Validates and fixes common character encoding issues in legal documents
  */
@@ -42,7 +95,7 @@ const validateAndFixEncoding = (text: string): string => {
   // Common character replacements for legal documents
   const encodingFixes: Array<[RegExp, string]> = [
     // Section symbol
-    [/�/g, '§'],
+    [//g, '§'],
     // Smart quotes
     [/[""]/g, '"'],
     [/['']/g, "'"],
@@ -71,7 +124,7 @@ const validateAndFixEncoding = (text: string): string => {
 };
 
 export const extractDocumentText = async (docNode: DocumentInputNode): Promise<DocumentExtractionResult> => {
-  console.log('=== DOCUMENT PROCESSOR DEBUG (UTF-8 Character Preservation) ===');
+  console.log('=== DOCUMENT PROCESSOR DEBUG (UTF-8 Character Preservation + Anchor Tokens) ===');
   
   if (!docNode.data?.file) {
     throw new Error('No file attached to document node');
@@ -81,7 +134,7 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
   const fileName = docNode.data.documentName;
   const fileType = file.type;
   
-  console.log(`Extracting text from ${fileName} (${fileType}) with UTF-8 preservation`);
+  console.log(`Extracting text from ${fileName} (${fileType}) with UTF-8 preservation and anchor insertion`);
   console.log('File object:', file);
   
   try {
@@ -149,14 +202,14 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
     
     // Log character validation
     const hasSpecialChars = /[§""'']/.test(extractedText);
-    const hasReplacementChars = /�/.test(extractedText);
+    const hasReplacementChars = //.test(extractedText);
     
     console.log('Character validation:');
     console.log(`- Contains special legal characters: ${hasSpecialChars}`);
-    console.log(`- Contains replacement characters (�): ${hasReplacementChars}`);
+    console.log(`- Contains replacement characters (): ${hasReplacementChars}`);
     
     if (hasReplacementChars) {
-      console.warn('WARNING: Document contains replacement characters (�) - encoding may be corrupted');
+      console.warn('WARNING: Document contains replacement characters () - encoding may be corrupted');
     }
     
     // Apply minimal cleaning while preserving original
@@ -169,20 +222,29 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
     console.log(`- Cleaning applied: ${cleaningResult.cleaningApplied.join(', ')}`);
     console.log(`- First 200 chars (processable): "${cleaningResult.processableContent.substring(0, 200)}..."`);
     
+    // NEW: Insert anchor tokens for citation processing
+    console.log('Inserting anchor tokens for citation processing...');
+    const { anchoredContent, anchorMap } = insertAnchorTokens(cleaningResult.processableContent);
+    
+    console.log('Anchor token insertion results:');
+    console.log(`- Anchored content length: ${anchoredContent.length}`);
+    console.log(`- Number of anchors inserted: ${anchorMap.length}`);
+    console.log(`- First 300 chars (anchored): "${anchoredContent.substring(0, 300)}..."`);
+    
     // Create position mapping for redlining support
     console.log('Creating position mapping for redlining support...');
     const positionMap = createPositionMap(cleaningResult.originalContent, cleaningResult.processableContent);
     console.log(`Position mapping created: ${positionMap.characterMap.length} character mappings, ${positionMap.paragraphBoundaries.length} paragraph boundaries`);
     
-    // Check if document needs chunking (based on processable content)
-    const estimatedTokens = Math.ceil(cleaningResult.processableContent.length / 4);
+    // Check if document needs chunking (based on anchored content for accurate token count)
+    const estimatedTokens = Math.ceil(anchoredContent.length / 4);
     const needsChunking = estimatedTokens > 3000;
     
     let chunks: DocumentChunk[] = [];
     if (needsChunking) {
-      console.log(`Document is large (${estimatedTokens} estimated tokens), creating chunks from processable content...`);
-      // Use processable content for chunking since it will be used for AI processing
-      chunks = chunkDocument(cleaningResult.processableContent, fileName, {
+      console.log(`Document is large (${estimatedTokens} estimated tokens), creating chunks from anchored content...`);
+      // Use anchored content for chunking since it will be used for AI processing
+      chunks = chunkDocument(anchoredContent, fileName, {
         maxTokens: 3000,
         overlapSize: 200,
         preserveParagraphs: true
@@ -194,6 +256,8 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
       title: fileName,
       originalContent: cleaningResult.originalContent,
       processableContent: cleaningResult.processableContent,
+      anchoredContent, // NEW
+      anchorMap, // NEW
       positionMap,
       cleaningResult,
       chunks: chunks.length > 0 ? chunks : undefined,
@@ -203,6 +267,8 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
         fileSize: file.size,
         originalLength: cleaningResult.originalContent.length,
         processableLength: cleaningResult.processableContent.length,
+        anchoredLength: anchoredContent.length, // NEW
+        anchorCount: anchorMap.length, // NEW
         extractedSuccessfully: true,
         estimatedTokens,
         needsChunking,
@@ -211,9 +277,11 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
       }
     };
     
-    console.log('Document extraction result (UTF-8 preserved):', {
+    console.log('Document extraction result (UTF-8 preserved + anchored):', {
       originalLength: result.originalContent.length,
       processableLength: result.processableContent.length,
+      anchoredLength: result.anchoredContent.length,
+      anchorCount: result.anchorMap.length,
       positionMappings: result.positionMap.characterMap.length,
       paragraphBoundaries: result.positionMap.paragraphBoundaries.length,
       chunkCount: result.chunks?.length || 0,
@@ -234,6 +302,8 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
       title: fileName,
       originalContent: '',
       processableContent: `Error extracting text: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
+      anchoredContent: '', // NEW
+      anchorMap: [], // NEW
       positionMap: {
         characterMap: [],
         paragraphBoundaries: [],
@@ -252,6 +322,8 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
         fileSize: file.size,
         originalLength: 0,
         processableLength: 0,
+        anchoredLength: 0, // NEW
+        anchorCount: 0, // NEW
         extractedSuccessfully: false,
         estimatedTokens: 0,
         needsChunking: false,

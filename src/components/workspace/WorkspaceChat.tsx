@@ -6,13 +6,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { useChatGPTApi } from "@/hooks/workbench/useChatGPTApi";
 import { useCitationProcessor } from "@/hooks/useCitationProcessor";
+import { useDocumentPreview } from "@/hooks/useDocumentPreview"; // NEW
 import TokenMonitor from "./TokenMonitor";
 import DocumentSelector from "./DocumentSelector";
 import ChatOutputPanel from "./ChatOutputPanel";
 import DocumentGrid from "./DocumentGrid";
+import DocumentPreviewModal from "./DocumentPreviewModal"; // NEW
 import { buildDocumentContext } from "@/utils/contextBuilder";
 
-export type UploadedFile = File & { preview?: string; extractedText?: string };
+export type UploadedFile = File & { 
+  preview?: string; 
+  extractedText?: string;
+  anchoredText?: string; // NEW
+  anchorCount?: number; // NEW
+};
 
 interface Message {
   id: string;
@@ -46,6 +53,14 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
     processDocument, 
     downloadRedlinedDocument 
   } = useCitationProcessor();
+  
+  // NEW: Document preview functionality
+  const { 
+    isPreviewOpen, 
+    selectedDocument, 
+    openPreview, 
+    closePreview 
+  } = useDocumentPreview();
 
   // Auto-select all documents when they're uploaded
   useEffect(() => {
@@ -54,9 +69,12 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
       
       if (messages.length === 0) {
         const fileNames = uploadedFiles.map(f => f.name).join(", ");
+        const totalAnchors = uploadedFiles.reduce((sum, f) => sum + (f.anchorCount || 0), 0);
+        const anchorInfo = totalAnchors > 0 ? ` I've detected ${totalAnchors} anchor tokens for citation processing.` : '';
+        
         setMessages([{
           id: Date.now().toString(),
-          content: `I can see you've uploaded ${uploadedFiles.length} document(s): ${fileNames}. I'm now using GPT-4.1 with a 200K token context window for analysis, and I can also process legal documents for Bluebook citation corrections. How can I help you analyze these documents?`,
+          content: `I can see you've uploaded ${uploadedFiles.length} document(s): ${fileNames}.${anchorInfo} I'm now using GPT-4.1 with a 200K token context window for analysis, and I can also process legal documents for Bluebook citation corrections. How can I help you analyze these documents?`,
           role: 'assistant',
           timestamp: new Date()
         }]);
@@ -84,10 +102,18 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
       return;
     }
 
-    // Process the first selected document for citations
+    // Process the first selected document for citations - use anchored text if available
     const doc = selectedDocs[0];
-    if (doc.extractedText) {
-      await processDocument(doc.name, doc.extractedText, doc.type);
+    const textToProcess = doc.anchoredText || doc.extractedText;
+    
+    if (textToProcess) {
+      console.log(`Processing citations for ${doc.name}:`, {
+        hasAnchoredText: !!doc.anchoredText,
+        anchorCount: doc.anchorCount || 0,
+        textLength: textToProcess.length
+      });
+      
+      await processDocument(doc.name, textToProcess, doc.type);
     }
   };
 
@@ -109,21 +135,25 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
     try {
       const selectedDocs = getSelectedDocuments();
       
-      // Build comprehensive context using the enhanced context builder
+      // Build comprehensive context using the enhanced context builder with anchored text
       const contextResult = buildDocumentContext(
         inputMessage,
         selectedDocs,
-        180000 // Leave 20K tokens for response
+        180000, // Leave 20K tokens for response
+        true, // Include metadata
+        true  // NEW: Use anchored text for citation processing
       );
 
-      const systemPrompt = "You are a helpful AI assistant powered by GPT-4.1 that specializes in analyzing and working with documents. You have access to a 200K token context window, allowing you to process complete documents in detail. Provide clear, comprehensive, and actionable insights based on the document content provided. When referencing specific parts of documents, mention the document name for clarity.";
-
-      console.log('Sending to GPT-4.1:', {
+      console.log('Sending to GPT-4.1 with anchored text:', {
         totalTokens: contextResult.totalTokens,
         documentsIncluded: selectedDocs.length,
+        usingAnchoredText: contextResult.usingAnchoredText,
+        totalAnchors: contextResult.totalAnchors,
         truncated: contextResult.truncated,
         excludedDocuments: contextResult.excludedDocuments
       });
+
+      const systemPrompt = "You are a helpful AI assistant powered by GPT-4.1 that specializes in analyzing and working with documents. You have access to a 200K token context window, allowing you to process complete documents in detail. When documents contain anchor tokens in the format ⟦P-#####⟧, these mark paragraph positions for citation processing. Provide clear, comprehensive, and actionable insights based on the document content provided. When referencing specific parts of documents, mention the document name for clarity.";
 
       const response = await callChatGPT(
         contextResult.fullContext,
@@ -137,15 +167,19 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
 
       let responseContent = response.response || "I'm sorry, I couldn't generate a response.";
       
-      // Add context information if documents were truncated or excluded
-      if (contextResult.truncated || contextResult.excludedDocuments.length > 0) {
-        const contextInfo = [];
-        if (contextResult.truncated) {
-          contextInfo.push("Note: Some document content was truncated due to length.");
-        }
-        if (contextResult.excludedDocuments.length > 0) {
-          contextInfo.push(`Note: ${contextResult.excludedDocuments.length} document(s) were excluded: ${contextResult.excludedDocuments.join(', ')}`);
-        }
+      // Add context information if documents were truncated or excluded, or if anchored text was used
+      const contextInfo = [];
+      if (contextResult.usingAnchoredText && contextResult.totalAnchors > 0) {
+        contextInfo.push(`Note: Processed ${contextResult.totalAnchors} anchor tokens for citation analysis.`);
+      }
+      if (contextResult.truncated) {
+        contextInfo.push("Note: Some document content was truncated due to length.");
+      }
+      if (contextResult.excludedDocuments.length > 0) {
+        contextInfo.push(`Note: ${contextResult.excludedDocuments.length} document(s) were excluded: ${contextResult.excludedDocuments.join(', ')}`);
+      }
+      
+      if (contextInfo.length > 0) {
         responseContent += `\n\n*${contextInfo.join(' ')}*`;
       }
 
@@ -199,6 +233,7 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
                     selectedDocuments={selectedDocuments}
                     onDocumentToggle={handleDocumentToggle}
                     onRemoveDocument={onRemoveDocument}
+                    onDocumentPreview={openPreview} // NEW: Preview handler
                   />
                 </div>
               )}
@@ -271,6 +306,13 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
+
+      {/* NEW: Document Preview Modal */}
+      <DocumentPreviewModal
+        isOpen={isPreviewOpen}
+        onClose={closePreview}
+        document={selectedDocument}
+      />
     </div>
   );
 };

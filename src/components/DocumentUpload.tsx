@@ -7,7 +7,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { extractDocumentText } from "@/hooks/workbench/utils/documentProcessor";
 
-type UploadedFile = File & { preview?: string; extractedText?: string };
+type UploadedFile = File & { 
+  preview?: string; 
+  extractedText?: string;
+  anchoredText?: string; // NEW: Store anchored version
+  anchorCount?: number; // NEW: Store anchor count for debugging
+};
 
 interface DocumentUploadProps {
   onFilesAccepted: (files: UploadedFile[]) => void;
@@ -86,7 +91,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
         const fileUrl = supabase.storage.from("documents").getPublicUrl(storagePath).data.publicUrl;
 
-        // Extract text content using the existing processor
+        // Extract text content using the existing processor (now with anchor tokens)
         console.log('Extracting text from uploaded document:', file.name);
         const mockNode = {
           id: 'temp',
@@ -102,14 +107,18 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
         const extractionResult = await extractDocumentText(mockNode);
         const extractedText = extractionResult.processableContent;
+        const anchoredText = extractionResult.anchoredContent; // NEW
+        const anchorCount = extractionResult.anchorMap.length; // NEW
 
         console.log('Text extraction result:', {
           originalLength: extractionResult.metadata.originalLength,
           processableLength: extractionResult.metadata.processableLength,
+          anchoredLength: extractionResult.metadata.anchoredLength, // NEW
+          anchorCount: extractionResult.metadata.anchorCount, // NEW
           extractedSuccessfully: extractionResult.metadata.extractedSuccessfully
         });
 
-        // Insert document record with extracted text
+        // Insert document record with extracted text (store both versions)
         const { data: docRow, error: insertError } = await supabase
           .from("documents")
           .insert([
@@ -121,6 +130,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
               preview_url: fileUrl,
               user_id: user.id,
               extracted_text: extractedText || null
+              // Note: If we need to store anchored text in DB, we'd add it here
+              // anchored_text: anchoredText || null
             },
           ])
           .select()
@@ -130,17 +141,19 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           throw new Error(`Database insert failed: ${insertError.message}`);
         }
 
-        // Create file object with extracted text for immediate use
+        // Create file object with both extracted and anchored text for immediate use
         const uploadedFile: UploadedFile = Object.assign(file, { 
           preview: fileUrl,
-          extractedText: extractedText
+          extractedText: extractedText,
+          anchoredText: anchoredText, // NEW: Include anchored version
+          anchorCount: anchorCount // NEW: Include anchor count
         });
         
         onFilesAccepted([uploadedFile]);
         
         toast({
           title: "Upload successful",
-          description: `Document uploaded and ${extractedText ? 'text extracted' : 'processed'} successfully.`,
+          description: `Document uploaded and processed with ${anchorCount} anchor tokens inserted.`,
         });
 
         onUploadComplete?.();

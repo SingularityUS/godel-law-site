@@ -1,126 +1,155 @@
 
 import React from "react";
-import { Trash2, Check, AlertCircle } from "lucide-react";
+import { FileText, X, Eye } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { formatTokenCount } from "@/utils/tokenCalculation";
+import { Badge } from "@/components/ui/badge";
 
-export type UploadedFile = File & { preview?: string; extractedText?: string };
+export type UploadedFile = File & { 
+  preview?: string; 
+  extractedText?: string;
+  anchoredText?: string;
+  anchorCount?: number;
+};
 
 interface DocumentGridProps {
   uploadedFiles: UploadedFile[];
   selectedDocuments: Set<number>;
   onDocumentToggle: (index: number, checked: boolean) => void;
   onRemoveDocument: (file: UploadedFile) => void;
+  onDocumentPreview?: (file: UploadedFile) => void; // NEW: Preview handler
 }
 
 const DocumentGrid: React.FC<DocumentGridProps> = ({
   uploadedFiles,
   selectedDocuments,
   onDocumentToggle,
-  onRemoveDocument
+  onRemoveDocument,
+  onDocumentPreview
 }) => {
-  const getFileTypeIcon = (fileType: string) => {
-    if (fileType.includes('pdf')) return '📄';
-    if (fileType.includes('word') || fileType.includes('docx')) return '📝';
-    if (fileType.includes('text')) return '📃';
-    return '📄';
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const getOCRStatus = (file: UploadedFile) => {
-    const hasExtractedText = !!(file.extractedText && file.extractedText.trim().length > 0);
-    
-    if (hasExtractedText) {
-      const tokenCount = Math.ceil(file.extractedText!.length / 4);
-      return (
-        <div className="flex items-center gap-1 text-green-600">
-          <Check size={12} />
-          <span className="text-xs">
-            Text Ready ({formatTokenCount(tokenCount)} tokens)
-          </span>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="flex items-center gap-1 text-red-600">
-        <AlertCircle size={12} />
-        <span className="text-xs">No Text Content</span>
-      </div>
-    );
+  const getFileTypeIcon = (type: string) => {
+    return <FileText className="w-8 h-8 text-blue-500" />;
   };
 
   return (
     <div>
       <div className="mb-4">
         <h3 className="text-lg font-semibold text-gray-800 mb-2">
-          Documents ({selectedDocuments.size}/{uploadedFiles.length} selected)
+          Document Queue ({uploadedFiles.length})
         </h3>
-        <p className="text-sm text-gray-600">Select documents to include in your GPT-4.1 analysis</p>
+        <p className="text-sm text-gray-600">
+          Click on documents to preview content with anchor tokens
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {uploadedFiles.map((file, index) => (
-          <div
-            key={index}
-            className={`border rounded-lg p-4 relative group transition-all ${
+          <Card 
+            key={index} 
+            className={`relative transition-all duration-200 hover:shadow-md cursor-pointer ${
               selectedDocuments.has(index) 
-                ? 'border-blue-500 bg-blue-50' 
-                : 'border-gray-200 hover:border-gray-300'
+                ? 'ring-2 ring-blue-500 bg-blue-50' 
+                : 'hover:bg-gray-50'
             }`}
+            onClick={() => onDocumentPreview?.(file)} // NEW: Click to preview
           >
-            {/* Remove button */}
-            <button
-              onClick={() => onRemoveDocument(file)}
-              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 text-white rounded-full p-1 z-10"
-              title="Remove document"
-            >
-              <Trash2 size={12} />
-            </button>
-
-            {/* Selection checkbox */}
-            <div className="absolute top-2 left-2">
-              <Checkbox
-                checked={selectedDocuments.has(index)}
-                onCheckedChange={(checked) => onDocumentToggle(index, !!checked)}
-              />
-            </div>
-
-            {/* Document preview */}
-            <div className="mt-6 mb-3">
-              <div className="w-full h-32 bg-gray-100 rounded flex items-center justify-center mb-3">
-                {file.preview ? (
-                  <img 
-                    src={file.preview} 
-                    alt={file.name}
-                    className="w-full h-full object-cover rounded"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                      if (target.nextSibling) return;
-                      const fallback = document.createElement('div');
-                      fallback.className = 'w-full h-full flex items-center justify-center text-3xl';
-                      fallback.textContent = getFileTypeIcon(file.type);
-                      target.parentElement!.appendChild(fallback);
+            <CardContent className="p-4">
+              {/* Header with checkbox and remove button */}
+              <div className="flex items-start justify-between mb-3">
+                <Checkbox
+                  checked={selectedDocuments.has(index)}
+                  onCheckedChange={(checked) => {
+                    // Prevent card click when interacting with checkbox
+                    event?.stopPropagation();
+                    onDocumentToggle(index, !!checked);
+                  }}
+                  className="mt-1"
+                  onClick={(e) => e.stopPropagation()} // Prevent card click
+                />
+                <div className="flex items-center gap-1">
+                  {/* Preview button - visible on hover */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDocumentPreview?.(file);
                     }}
-                  />
-                ) : (
-                  <span className="text-3xl">{getFileTypeIcon(file.type)}</span>
-                )}
+                    title="Preview document"
+                  >
+                    <Eye size={14} />
+                  </Button>
+                  {/* Remove button */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 text-red-500 hover:bg-red-100"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveDocument(file);
+                    }}
+                    title="Remove document"
+                  >
+                    <X size={14} />
+                  </Button>
+                </div>
               </div>
 
-              {/* Document info */}
-              <h4 className="font-medium text-sm text-gray-900 truncate mb-1" title={file.name}>
-                {file.name}
-              </h4>
-              
-              <div className="flex items-center justify-between">
-                {getOCRStatus(file)}
-                <span className="text-xs text-gray-500 capitalize">
-                  {file.type.replace('application/', '').replace('text/', '')}
-                </span>
+              {/* File icon and info */}
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0">
+                  {getFileTypeIcon(file.type)}
+                </div>
+                
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium text-sm text-gray-900 truncate mb-1">
+                    {file.name}
+                  </h4>
+                  
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500">
+                      {formatFileSize(file.size)} • {file.type.split('/')[1]?.toUpperCase()}
+                    </p>
+                    
+                    {/* Text extraction status */}
+                    {file.extractedText && (
+                      <div className="flex items-center gap-1">
+                        <Badge variant="outline" className="text-xs">
+                          {file.extractedText.length.toLocaleString()} chars
+                        </Badge>
+                        {file.anchorCount && file.anchorCount > 0 && (
+                          <Badge variant="secondary" className="text-xs">
+                            {file.anchorCount} anchors
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                    
+                    {!file.extractedText && (
+                      <Badge variant="destructive" className="text-xs">
+                        No text extracted
+                      </Badge>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+
+              {/* Click hint */}
+              <div className="mt-3 text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                Click to preview content
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
     </div>
