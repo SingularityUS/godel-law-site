@@ -1,8 +1,1 @@
-
 project_id = "wnxehbryldbdeixuljmc"
-
-[functions.extract-citations]
-verify_jwt = false
-
-[functions.analyze-citations]
-verify_jwt = false

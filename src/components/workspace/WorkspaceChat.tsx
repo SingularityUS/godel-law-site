@@ -1,11 +1,11 @@
+
 import React, { useState, useEffect } from "react";
-import { Send, Bot, Code, Search } from "lucide-react";
+import { Send, Bot, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { useChatGPTApi } from "@/hooks/workbench/useChatGPTApi";
 import { useCitationProcessor } from "@/hooks/useCitationProcessor";
-import { useCitationExtractor } from "@/hooks/useCitationExtractor";
 import { useDocumentPreview } from "@/hooks/useDocumentPreview";
 import TokenMonitor from "./TokenMonitor";
 import DocumentSelector from "./DocumentSelector";
@@ -14,9 +14,6 @@ import DocumentGrid from "./DocumentGrid";
 import DocumentPreviewModal from "./DocumentPreviewModal";
 import ContextDebugPanel from "./ContextDebugPanel";
 import { buildDocumentContext } from "@/utils/contextBuilder";
-import CitationResultsPanel from "./CitationResultsPanel";
-import { useCitationAnalyzer } from '@/hooks/useCitationAnalyzer';
-import CitationAnalysisTab from './CitationAnalysisTab';
 
 export type UploadedFile = File & { 
   preview?: string; 
@@ -51,7 +48,6 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDocuments, setSelectedDocuments] = useState<Set<number>>(new Set());
   const [isContextDebugOpen, setIsContextDebugOpen] = useState(false);
-  const [activeView, setActiveView] = useState<'chat' | 'citation-analysis'>('chat');
   
   const { callChatGPT } = useChatGPTApi();
   const { 
@@ -60,19 +56,6 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
     processDocument, 
     downloadRedlinedDocument 
   } = useCitationProcessor();
-  
-  const { 
-    isProcessing: isExtractingCitations,
-    currentResult: citationResult,
-    extractCitations
-  } = useCitationExtractor();
-  
-  const {
-    isAnalyzing,
-    analysisResult,
-    analyzeCitations,
-    clearResult
-  } = useCitationAnalyzer();
   
   const { 
     isPreviewOpen, 
@@ -113,46 +96,6 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
       newSelected.delete(index);
     }
     setSelectedDocuments(newSelected);
-  };
-
-  const handleAnalyzeCitations = async () => {
-    const selectedDocs = getSelectedDocuments();
-    if (selectedDocs.length === 0) return;
-
-    const doc = selectedDocs[0];
-    const textToProcess = doc.anchoredText || doc.extractedText;
-    
-    if (textToProcess) {
-      console.log(`Analyzing citations for ${doc.name}:`, {
-        hasAnchoredText: !!doc.anchoredText,
-        anchorCount: doc.anchorCount || 0,
-        textLength: textToProcess.length
-      });
-      
-      setActiveView('citation-analysis');
-      await analyzeCitations(doc.name, textToProcess);
-    }
-  };
-
-  const handleExtractCitations = async () => {
-    const selectedDocs = getSelectedDocuments();
-    if (selectedDocs.length === 0) {
-      return;
-    }
-
-    // Process the first selected document for citation extraction
-    const doc = selectedDocs[0];
-    const textToProcess = doc.anchoredText || doc.extractedText;
-    
-    if (textToProcess) {
-      console.log(`Extracting citations from ${doc.name}:`, {
-        hasAnchoredText: !!doc.anchoredText,
-        anchorCount: doc.anchorCount || 0,
-        textLength: textToProcess.length
-      });
-      
-      await extractCitations(doc.name, textToProcess, doc.type);
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -287,27 +230,7 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
 
             {/* Action Buttons */}
             {uploadedFiles.length > 0 && (
-              <div className="border-t bg-gray-50 p-3 flex-shrink-0 space-y-2">
-                <Button
-                  onClick={handleAnalyzeCitations}
-                  disabled={isAnalyzing || getSelectedDocuments().length === 0}
-                  className="w-full flex items-center gap-2"
-                  variant="outline"
-                >
-                  <Search size={16} />
-                  {isAnalyzing ? 'Analyzing Citations...' : 'Analyze Citations (New)'}
-                </Button>
-                
-                <Button
-                  onClick={handleExtractCitations}
-                  disabled={isExtractingCitations || getSelectedDocuments().length === 0}
-                  className="w-full flex items-center gap-2"
-                  variant="outline"
-                >
-                  <Search size={16} />
-                  {isExtractingCitations ? 'Extracting Citations...' : 'Extract Citations (Old)'}
-                </Button>
-                
+              <div className="border-t bg-gray-50 p-3 flex-shrink-0">
                 <Button
                   onClick={() => setIsContextDebugOpen(true)}
                   disabled={getSelectedDocuments().length === 0 || !inputMessage.trim()}
@@ -359,52 +282,17 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
           </div>
         </ResizablePanel>
 
-        {/* Right Panel - Dynamic Content */}
+        {/* Right Panel - Chat Output */}
         <ResizableHandle />
         <ResizablePanel defaultSize={40} minSize={30}>
           <div className="h-full overflow-hidden">
-            {/* View Toggle */}
-            {(citationResult || analysisResult) && (
-              <div className="border-b p-2 flex gap-2">
-                <Button
-                  variant={activeView === 'chat' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setActiveView('chat')}
-                >
-                  Chat
-                </Button>
-                <Button
-                  variant={activeView === 'citation-analysis' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setActiveView('citation-analysis')}
-                >
-                  Citation Analysis
-                </Button>
-              </div>
-            )}
-
-            {/* Content based on active view */}
-            {activeView === 'citation-analysis' ? (
-              <CitationAnalysisTab
-                result={analysisResult}
-                isAnalyzing={isAnalyzing}
-                onAnalyze={handleAnalyzeCitations}
-                hasDocument={getSelectedDocuments().length > 0}
-              />
-            ) : citationResult ? (
-              <CitationResultsPanel 
-                result={citationResult}
-                documentContent={getSelectedDocuments()[0]?.anchoredText || getSelectedDocuments()[0]?.extractedText || ''}
-              />
-            ) : (
-              <ChatOutputPanel 
-                messages={messages} 
-                isLoading={isLoading}
-                documentResult={documentResult}
-                onDownloadRedlined={downloadRedlinedDocument}
-                className="h-full"
-              />
-            )}
+            <ChatOutputPanel 
+              messages={messages} 
+              isLoading={isLoading}
+              documentResult={documentResult}
+              onDownloadRedlined={downloadRedlinedDocument}
+              className="h-full"
+            />
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>

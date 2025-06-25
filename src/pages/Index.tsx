@@ -52,6 +52,19 @@ const IndexContent = () => {
     setActiveTab(tab);
   };
 
+  const handleFilesAccepted = (files: UploadedFile[]) => {
+    setUploadedFiles(prev => [...prev, ...files]);
+  };
+
+  const handleUploadComplete = () => {
+    refetch();
+  };
+
+  const handleDocumentAdded = () => {
+    // Automatically open the library when a document is added
+    setIsLibraryOpen(true);
+  };
+
   const handleModuleEdit = useCallback((nodeId: string, node: any) => {
     setEditingNodeId(nodeId);
     setEditingNode(node);
@@ -106,8 +119,12 @@ const IndexContent = () => {
   return (
     <div className="flex flex-col w-full min-h-screen bg-white" style={{ fontFamily: 'Courier New, monospace' }}>
       <AppHeader 
-        onToggleLibrary={() => setIsLibraryOpen(true)}
-        showLibraryToggle={activeTab === 'workspace'}
+        onFilesAccepted={handleFilesAccepted}
+        onUploadComplete={handleUploadComplete}
+        onLibraryOpen={() => setIsLibraryOpen(true)}
+        onDocumentAdded={handleDocumentAdded}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
       />
 
       <div className="flex-1 h-full overflow-hidden">
