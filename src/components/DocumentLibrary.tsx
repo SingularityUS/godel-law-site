@@ -40,14 +40,24 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     }
   };
 
-  const handleDocumentClick = (document: any) => {
-    const file = {
+  const createFileFromDocument = (document: any) => {
+    return {
       name: document.name,
       size: document.size,
       type: document.mime_type,
       lastModified: new Date(document.uploaded_at).getTime(),
-      preview: document.preview_url
+      preview: document.preview_url,
+      extractedText: document.extracted_text || undefined // Include extracted text
     };
+  };
+
+  const handleDocumentClick = (document: any) => {
+    const file = createFileFromDocument(document);
+    console.log('Document selected from library:', {
+      name: file.name,
+      hasExtractedText: !!file.extractedText,
+      textLength: file.extractedText?.length || 0
+    });
     onDocumentSelect(file);
     onClose();
   };
@@ -56,18 +66,16 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     console.log('Drag started for document:', document.name);
     setIsDragging(true);
     
-    const file = {
-      name: document.name,
-      size: document.size,
-      type: document.mime_type,
-      lastModified: new Date(document.uploaded_at).getTime(),
-      preview: document.preview_url
-    };
+    const file = createFileFromDocument(document);
     
     e.dataTransfer.setData("application/lovable-document", JSON.stringify(file));
     e.dataTransfer.effectAllowed = "copy";
     
-    console.log('Drag data set:', file);
+    console.log('Drag data set with extracted text:', {
+      name: file.name,
+      hasExtractedText: !!file.extractedText,
+      textLength: file.extractedText?.length || 0
+    });
   };
 
   const handleDragEnd = () => {
@@ -157,33 +165,41 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
             </div>
           ) : (
             <div className="p-2">
-              {filteredDocuments.map((doc) => (
-                <div
-                  key={doc.id}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, doc)}
-                  onDragEnd={handleDragEnd}
-                  onClick={() => handleDocumentClick(doc)}
-                  className="flex items-center justify-between p-2 border border-black mb-2 cursor-grab hover:bg-gray-100 group active:cursor-grabbing transition-colors"
-                  title="Click to add to workspace or drag to position"
-                >
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <FileText size={16} />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-semibold">{doc.name}</div>
-                      <div className="text-xs text-gray-600">
-                        {Math.round(doc.size / 1024)} KB
+              {filteredDocuments.map((doc) => {
+                const hasText = !!doc.extracted_text;
+                return (
+                  <div
+                    key={doc.id}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, doc)}
+                    onDragEnd={handleDragEnd}
+                    onClick={() => handleDocumentClick(doc)}
+                    className="flex items-center justify-between p-2 border border-black mb-2 cursor-grab hover:bg-gray-100 group active:cursor-grabbing transition-colors"
+                    title="Click to add to workspace or drag to position"
+                  >
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <FileText size={16} />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-semibold">{doc.name}</div>
+                        <div className="text-xs text-gray-600 flex items-center gap-2">
+                          <span>{Math.round(doc.size / 1024)} KB</span>
+                          {hasText ? (
+                            <span className="text-green-600">✓ Text Ready</span>
+                          ) : (
+                            <span className="text-orange-600">⚠ No Text</span>
+                          )}
+                        </div>
                       </div>
                     </div>
+                    <button
+                      onClick={(e) => handleDelete(e, doc.id, doc.storage_path)}
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100"
+                    >
+                      <X size={14} />
+                    </button>
                   </div>
-                  <button
-                    onClick={(e) => handleDelete(e, doc.id, doc.storage_path)}
-                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

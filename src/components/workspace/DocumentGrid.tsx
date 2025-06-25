@@ -1,7 +1,8 @@
 
 import React from "react";
-import { Trash2, Check, Loader2 } from "lucide-react";
+import { Trash2, Check, AlertCircle } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { formatTokenCount } from "@/utils/tokenCalculation";
 
 export type UploadedFile = File & { preview?: string; extractedText?: string };
 
@@ -26,18 +27,24 @@ const DocumentGrid: React.FC<DocumentGridProps> = ({
   };
 
   const getOCRStatus = (file: UploadedFile) => {
-    if (file.extractedText) {
+    const hasExtractedText = !!(file.extractedText && file.extractedText.trim().length > 0);
+    
+    if (hasExtractedText) {
+      const tokenCount = Math.ceil(file.extractedText!.length / 4);
       return (
         <div className="flex items-center gap-1 text-green-600">
           <Check size={12} />
-          <span className="text-xs">Text Ready</span>
+          <span className="text-xs">
+            Text Ready ({formatTokenCount(tokenCount)} tokens)
+          </span>
         </div>
       );
     }
+    
     return (
-      <div className="flex items-center gap-1 text-yellow-600">
-        <Loader2 size={12} className="animate-spin" />
-        <span className="text-xs">Processing...</span>
+      <div className="flex items-center gap-1 text-red-600">
+        <AlertCircle size={12} />
+        <span className="text-xs">No Text Content</span>
       </div>
     );
   };

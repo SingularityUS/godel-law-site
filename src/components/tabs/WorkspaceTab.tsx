@@ -11,7 +11,12 @@ const WorkspaceTab: React.FC = () => {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
   const handleFilesAccepted = useCallback((files: UploadedFile[]) => {
-    console.log('Files accepted in workspace:', files);
+    console.log('Files accepted in workspace:', files.map(f => ({
+      name: f.name,
+      hasExtractedText: !!f.extractedText,
+      textLength: f.extractedText?.length || 0
+    })));
+    
     const filesWithPreviews = files.map(file => ({
       ...file,
       preview: file.preview || (file instanceof File ? URL.createObjectURL(file) : undefined)
@@ -53,10 +58,15 @@ const WorkspaceTab: React.FC = () => {
       const file = {
         ...fileData,
         preview: fileData.preview_url || fileData.preview,
-        extractedText: fileData.extractedText || fileData.extracted_text
+        extractedText: fileData.extractedText // Ensure extracted text is preserved
       } as UploadedFile;
       
-      console.log('Processed file data:', file);
+      console.log('Processed file data with extracted text:', {
+        name: file.name,
+        hasExtractedText: !!file.extractedText,
+        textLength: file.extractedText?.length || 0
+      });
+      
       setUploadedFiles(prev => [...prev, file]);
     }
   }, []);

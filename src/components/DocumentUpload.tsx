@@ -5,6 +5,7 @@ import { toast } from "@/components/ui/use-toast";
 import { Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { extractDocumentText } from "@/hooks/workbench/utils/documentProcessor";
 
 type UploadedFile = File & { preview?: string; extractedText?: string };
 
@@ -73,6 +74,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       const storagePath = `${user.id}/${Date.now()}_${sanitizedFilename}`;
 
       try {
+        // Upload file to storage
         const { data: uploadData, error: fileError } = await supabase
           .storage
           .from("documents")
@@ -84,6 +86,29 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
         const fileUrl = supabase.storage.from("documents").getPublicUrl(storagePath).data.publicUrl;
 
+        // Extract text content using the existing processor
+        console.log('Extracting text from uploaded document:', file.name);
+        const mockNode = {
+          id: 'temp',
+          type: 'documentInput',
+          position: { x: 0, y: 0 },
+          data: {
+            file: file,
+            documentName: file.name,
+            isUploaded: true
+          }
+        };
+
+        const extractionResult = await extractDocumentText(mockNode);
+        const extractedText = extractionResult.processableContent;
+
+        console.log('Text extraction result:', {
+          originalLength: extractionResult.metadata.originalLength,
+          processableLength: extractionResult.metadata.processableLength,
+          extractedSuccessfully: extractionResult.metadata.extractedSuccessfully
+        });
+
+        // Insert document record with extracted text
         const { data: docRow, error: insertError } = await supabase
           .from("documents")
           .insert([
@@ -94,6 +119,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
               size: file.size,
               preview_url: fileUrl,
               user_id: user.id,
+              extracted_text: extractedText || null
             },
           ])
           .select()
@@ -103,18 +129,21 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           throw new Error(`Database insert failed: ${insertError.message}`);
         }
 
-        const uploadedFile: UploadedFile = Object.assign(file, { preview: fileUrl });
+        // Create file object with extracted text for immediate use
+        const uploadedFile: UploadedFile = Object.assign(file, { 
+          preview: fileUrl,
+          extractedText: extractedText
+        });
+        
         onFilesAccepted([uploadedFile]);
         
         toast({
           title: "Upload successful",
-          description: "Your document has been uploaded and added to the library.",
+          description: `Document uploaded and ${extractedText ? 'text extracted' : 'processed'} successfully.`,
         });
 
-        // Call callbacks with proper timing
         onUploadComplete?.();
         
-        // Small delay then notify about document addition
         setTimeout(() => {
           onDocumentAdded?.();
         }, 100);
@@ -153,7 +182,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       <div className="flex items-center gap-2">
         <Upload size={16} className="text-black" />
         <span className="text-xs font-bold text-black">
-          {isLoading ? "UPLOADING..." : "DROP FILE OR CLICK"}
+          {isLoading ? "PROCESSING..." : "DROP FILE OR CLICK"}
         </span>
       </div>
     </div>
