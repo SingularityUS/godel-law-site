@@ -1,11 +1,12 @@
 
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, FileText, AlertCircle } from "lucide-react";
+import { Send, Bot, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useChatGPTApi } from "@/hooks/workbench/useChatGPTApi";
 import TokenMonitor from "./TokenMonitor";
+import DocumentSelector from "./DocumentSelector";
+import ChatOutputPanel from "./ChatOutputPanel";
 import { buildDocumentContext } from "@/utils/contextBuilder";
 
 export type UploadedFile = File & { preview?: string; extractedText?: string };
@@ -32,16 +33,7 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDocuments, setSelectedDocuments] = useState<Set<number>>(new Set());
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const { callChatGPT } = useChatGPTApi();
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
 
   // Auto-select all documents when they're uploaded
   useEffect(() => {
@@ -157,67 +149,33 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
   return (
     <div className="flex h-full bg-white">
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Chat Messages Area */}
-        <div 
-          className="flex-1 overflow-y-auto p-4 space-y-4"
-          onDrop={onFileDrop}
-          onDragOver={onDragOver}
-        >
-          {messages.length === 0 && uploadedFiles.length === 0 && (
-            <div className="text-center text-gray-500 mt-8">
-              <Bot size={48} className="mx-auto mb-4 text-gray-400" />
-              <h3 className="text-lg font-medium mb-2">Welcome to GPT-4.1 Workspace</h3>
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Welcome Message */}
+        {messages.length === 0 && uploadedFiles.length === 0 && (
+          <div 
+            className="flex-1 flex items-center justify-center text-center"
+            onDrop={onFileDrop}
+            onDragOver={onDragOver}
+          >
+            <div className="text-gray-500">
+              <Bot size={64} className="mx-auto mb-4 text-gray-400" />
+              <h3 className="text-xl font-semibold mb-2">GPT-4.1 Workspace</h3>
               <p className="text-sm mb-2">Advanced AI with 200K token context window</p>
-              <p className="text-xs">Drop documents here or start a conversation to get started</p>
+              <p className="text-xs">Drop documents here or start a conversation</p>
             </div>
-          )}
-          
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex items-start gap-3 ${
-                message.role === 'user' ? 'justify-end' : 'justify-start'
-              }`}
-            >
-              {message.role === 'assistant' && (
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Bot size={16} className="text-white" />
-                </div>
-              )}
-              <div
-                className={`max-w-[70%] p-3 rounded-lg ${
-                  message.role === 'user'
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-100 text-gray-900'
-                }`}
-              >
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-              </div>
-              {message.role === 'user' && (
-                <div className="w-8 h-8 bg-gray-500 rounded-full flex items-center justify-center flex-shrink-0">
-                  <User size={16} className="text-white" />
-                </div>
-              )}
-            </div>
-          ))}
-          
-          {isLoading && (
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                <Bot size={16} className="text-white" />
-              </div>
-              <div className="bg-gray-100 p-3 rounded-lg">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
-                </div>
-              </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+          </div>
+        )}
+
+        {/* Chat Output when there are messages */}
+        {messages.length > 0 && (
+          <div className="flex-1 min-h-0">
+            <ChatOutputPanel 
+              messages={messages} 
+              isLoading={isLoading}
+              className="h-full"
+            />
+          </div>
+        )}
 
         {/* Chat Input Area */}
         <div className="border-t bg-white p-4">
@@ -245,40 +203,55 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
         </div>
       </div>
 
-      {/* Sidebar for Documents and Token Monitoring */}
-      {uploadedFiles.length > 0 && (
-        <div className="w-80 border-l bg-gray-50 flex flex-col">
-          {/* Document Selection */}
-          <div className="p-4 border-b">
-            <h3 className="font-semibold text-gray-800 mb-3">
-              Documents ({uploadedFiles.length})
-            </h3>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {uploadedFiles.map((file, index) => (
-                <div key={index} className="flex items-center space-x-2">
-                  <Checkbox
-                    checked={selectedDocuments.has(index)}
-                    onCheckedChange={(checked) => handleDocumentToggle(index, !!checked)}
-                  />
-                  <FileText size={16} className="text-gray-500 flex-shrink-0" />
-                  <span className="text-sm truncate flex-1" title={file.name}>
-                    {file.name}
-                  </span>
-                </div>
-              ))}
+      {/* Right Sidebar */}
+      <div className="w-80 border-l bg-gray-50 flex flex-col">
+        {/* Document Selection */}
+        <div className="p-4">
+          <DocumentSelector
+            documents={uploadedFiles}
+            selectedDocuments={selectedDocuments}
+            onDocumentToggle={handleDocumentToggle}
+          />
+        </div>
+
+        {/* Token Monitor */}
+        <div className="p-4 border-t">
+          <TokenMonitor
+            prompt={inputMessage}
+            documents={getSelectedDocuments()}
+            model="gpt-4.1-2025-04-14"
+          />
+        </div>
+
+        {/* Workflow Hints */}
+        <div className="p-4 border-t bg-blue-50">
+          <h4 className="text-sm font-medium text-blue-800 mb-2">Workflow</h4>
+          <div className="space-y-1 text-xs text-blue-600">
+            <div className="flex items-center gap-2">
+              <span className={uploadedFiles.length > 0 ? "text-green-600" : "text-gray-400"}>
+                ✓
+              </span>
+              <span>Upload Documents</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={selectedDocuments.size > 0 ? "text-green-600" : "text-gray-400"}>
+                ✓
+              </span>
+              <span>Select Documents</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={inputMessage.trim() ? "text-green-600" : "text-gray-400"}>
+                ✓
+              </span>
+              <span>Write Prompt</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-blue-600">→</span>
+              <span>Send to GPT-4.1</span>
             </div>
           </div>
-
-          {/* Token Monitor */}
-          <div className="flex-1 p-4 overflow-y-auto">
-            <TokenMonitor
-              prompt={inputMessage}
-              documents={getSelectedDocuments()}
-              model="gpt-4.1-2025-04-14"
-            />
-          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };

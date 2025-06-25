@@ -35,21 +35,15 @@ const ChatGPTStatus: React.FC = () => {
     setErrorMessage('');
     
     try {
-      // Use the same dynamic model selection logic as the main pipeline
+      // Test with GPT-4.1 as the default model
       const testPrompt = 'Test connection. Please respond with "Connection successful."';
       const estimatedInputTokens = Math.ceil(testPrompt.length / 4);
       
       console.log(`ChatGPT connection test - estimated tokens: ${estimatedInputTokens}`);
       
-      // Use dynamic model selection (same logic as nodeProcessor and useChatGPTApi)
-      let selectedModel = 'gpt-4o-mini';
-      let maxTokens = 100;
-      
-      // Auto-upgrade model for large inputs (matching the production logic)
-      if (estimatedInputTokens > 15000) {
-        selectedModel = 'gpt-4o';
-        console.log(`Connection test: Auto-upgrading to ${selectedModel} for large input simulation`);
-      }
+      // Use GPT-4.1 as the primary model
+      const selectedModel = 'gpt-4.1-2025-04-14';
+      const maxTokens = 100;
 
       const { data, error } = await supabase.functions.invoke('chat-gpt', {
         body: {
@@ -111,7 +105,7 @@ const ChatGPTStatus: React.FC = () => {
 
   const getStatusText = () => {
     switch (status) {
-      case 'connected': return `Connected (${currentModel})`;
+      case 'connected': return `Connected (GPT-4.1)`;
       case 'testing': return 'Testing...';
       case 'error': return errorMessage ? `Error: ${errorMessage}` : 'Connection Failed';
       default: return 'Not Tested';
