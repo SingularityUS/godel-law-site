@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, FileText, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Search, FileText, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 import { CitationAnalysisResult } from '@/hooks/useCitationAnalyzer';
 
 interface CitationAnalysisTabProps {
@@ -25,7 +25,9 @@ const CitationAnalysisTab: React.FC<CitationAnalysisTabProps> = ({
       return (
         <div className="bg-gray-50 p-4 rounded-lg">
           <p className="text-sm text-gray-600 mb-2">Raw Response:</p>
-          <pre className="text-xs whitespace-pre-wrap">{data}</pre>
+          <pre className="text-xs whitespace-pre-wrap font-mono bg-white p-3 rounded border max-h-96 overflow-auto">
+            {data}
+          </pre>
         </div>
       );
     }
@@ -89,7 +91,7 @@ const CitationAnalysisTab: React.FC<CitationAnalysisTabProps> = ({
     return (
       <div className="bg-gray-50 p-4 rounded-lg">
         <p className="text-sm text-gray-600 mb-2">JSON Data:</p>
-        <pre className="text-xs whitespace-pre-wrap overflow-auto">
+        <pre className="text-xs whitespace-pre-wrap font-mono bg-white p-3 rounded border max-h-96 overflow-auto">
           {JSON.stringify(data, null, 2)}
         </pre>
       </div>
@@ -110,15 +112,17 @@ const CitationAnalysisTab: React.FC<CitationAnalysisTabProps> = ({
                 </Badge>
               )}
             </div>
-            <Button
-              onClick={onAnalyze}
-              disabled={isAnalyzing || !hasDocument}
-              className="flex items-center gap-2"
-              variant="outline"
-            >
-              <Search size={16} />
-              {isAnalyzing ? 'Analyzing...' : 'Analyze Citations'}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={onAnalyze}
+                disabled={isAnalyzing || !hasDocument}
+                className="flex items-center gap-2"
+                variant="outline"
+              >
+                {isAnalyzing ? <RefreshCw size={16} className="animate-spin" /> : <Search size={16} />}
+                {isAnalyzing ? 'Analyzing...' : 'Analyze Citations'}
+              </Button>
+            </div>
           </CardTitle>
         </CardHeader>
 
@@ -134,7 +138,7 @@ const CitationAnalysisTab: React.FC<CitationAnalysisTabProps> = ({
               </div>
             )}
 
-            {hasDocument && !result && (
+            {hasDocument && !result && !isAnalyzing && (
               <div className="flex items-center justify-center h-full text-center">
                 <div className="text-gray-500">
                   <Search size={48} className="mx-auto mb-4 text-gray-400" />
@@ -150,6 +154,7 @@ const CitationAnalysisTab: React.FC<CitationAnalysisTabProps> = ({
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
                   <h3 className="text-lg font-medium mb-2">Analyzing Citations</h3>
                   <p className="text-sm">GPT-4.1 is analyzing your document...</p>
+                  <p className="text-xs text-gray-500 mt-2">Check browser console for detailed logs</p>
                 </div>
               </div>
             )}
@@ -163,6 +168,15 @@ const CitationAnalysisTab: React.FC<CitationAnalysisTabProps> = ({
                       <span className="font-medium">Analysis Completed Successfully</span>
                     </div>
                     {renderJsonData(result.parsedData)}
+                    
+                    {result.rawResponse && result.rawResponse !== JSON.stringify(result.parsedData) && (
+                      <div className="mt-6">
+                        <p className="text-sm font-medium text-gray-600 mb-2">Raw GPT Response:</p>
+                        <pre className="text-xs whitespace-pre-wrap font-mono bg-gray-50 p-3 rounded border max-h-48 overflow-auto">
+                          {result.rawResponse}
+                        </pre>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="text-red-600">
@@ -170,7 +184,11 @@ const CitationAnalysisTab: React.FC<CitationAnalysisTabProps> = ({
                       <AlertTriangle size={20} />
                       <span className="font-medium">Analysis Failed</span>
                     </div>
-                    <p className="text-sm">{result.error}</p>
+                    <div className="bg-red-50 p-4 rounded-lg">
+                      <p className="text-sm font-medium mb-2">Error Details:</p>
+                      <p className="text-sm">{result.error || 'Unknown error occurred'}</p>
+                      <p className="text-xs text-gray-600 mt-2">Check browser console for more details</p>
+                    </div>
                   </div>
                 )}
               </div>

@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { useCitationSettings } from '@/hooks/useCitationSettings';
 
 export interface CitationAnalysisResult {
@@ -21,9 +21,24 @@ export const useCitationAnalyzer = () => {
     setIsAnalyzing(true);
     
     try {
+      console.log('=== CITATION ANALYSIS DEBUG ===');
       console.log('Starting citation analysis for:', documentName);
+      console.log('Document content length:', documentContent?.length || 0);
+      console.log('Document content preview (first 200 chars):', documentContent?.substring(0, 200));
       
       const prompt = getCurrentPrompt();
+      console.log('Using prompt length:', prompt?.length || 0);
+      console.log('Prompt preview (first 100 chars):', prompt?.substring(0, 100));
+      
+      if (!documentContent || documentContent.trim().length === 0) {
+        throw new Error('Document content is empty or invalid');
+      }
+      
+      if (!prompt || prompt.trim().length === 0) {
+        throw new Error('Citation prompt is not configured');
+      }
+
+      console.log('Calling analyze-citations function...');
       
       const { data, error } = await supabase.functions.invoke('analyze-citations', {
         body: {
@@ -33,16 +48,19 @@ export const useCitationAnalyzer = () => {
         }
       });
 
+      console.log('Supabase function response:', { data, error });
+
       if (error) {
         console.error('Supabase function error:', error);
-        throw new Error(error.message || 'Failed to analyze citations');
+        throw new Error(`Function error: ${error.message || JSON.stringify(error)}`);
       }
 
       if (!data) {
-        throw new Error('No data returned from analysis');
+        console.error('No data returned from function');
+        throw new Error('No data returned from analysis function');
       }
 
-      console.log('Citation analysis completed:', data);
+      console.log('Analysis completed successfully. Data keys:', Object.keys(data));
       setAnalysisResult(data);
       
       if (data.success) {
@@ -50,13 +68,24 @@ export const useCitationAnalyzer = () => {
           title: 'Analysis Complete',
           description: `Citation analysis completed for ${documentName}`,
         });
+      } else {
+        toast({
+          title: 'Analysis Warning',
+          description: data.error || 'Analysis completed with warnings',
+          variant: 'destructive',
+        });
       }
 
       return data;
     } catch (error) {
-      console.error('Citation analysis failed:', error);
+      console.error('=== CITATION ANALYSIS ERROR ===');
+      console.error('Error details:', error);
+      console.error('Error type:', typeof error);
+      console.error('Error constructor:', error?.constructor?.name);
       
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred during analysis';
+      
+      console.error('Final error message:', errorMessage);
       
       toast({
         title: 'Analysis Failed',
@@ -67,6 +96,7 @@ export const useCitationAnalyzer = () => {
       return null;
     } finally {
       setIsAnalyzing(false);
+      console.log('=== END CITATION ANALYSIS ===');
     }
   };
 
