@@ -48,7 +48,7 @@ serve(async (req) => {
       throw new Error('Citation extraction prompt is required')
     }
 
-    // Call GPT-4.1 for citation analysis using the same model as chat-gpt function
+    // Call GPT-4.1 for citation analysis
     const openaiKey = Deno.env.get('OPENAI_API_KEY')
     if (!openaiKey) {
       console.error('OpenAI API key not found in environment')
@@ -64,7 +64,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14', // Using the same model as chat-gpt function
+        model: 'gpt-4.1-2025-04-14',
         messages: [
           { role: 'system', content: customPrompt },
           { role: 'user', content: documentContent }
