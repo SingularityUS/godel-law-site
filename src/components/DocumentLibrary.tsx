@@ -4,6 +4,18 @@ import { FileText, X, Search, RefreshCw } from 'lucide-react';
 import { useDocuments } from '@/hooks/useDocuments';
 import { toast } from '@/components/ui/use-toast';
 
+interface StoredDocument {
+  id: string;
+  name: string;
+  storage_path: string;
+  mime_type: string;
+  size: number;
+  preview_url: string | null;
+  user_id: string | null;
+  uploaded_at: string | null;
+  extracted_text: string | null;
+}
+
 interface DocumentLibraryProps {
   onDocumentSelect: (document: any) => void;
   isOpen: boolean;
@@ -40,18 +52,18 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     }
   };
 
-  const createFileFromDocument = (document: any) => {
+  const createFileFromDocument = (document: StoredDocument) => {
     return {
       name: document.name,
       size: document.size,
       type: document.mime_type,
-      lastModified: new Date(document.uploaded_at).getTime(),
+      lastModified: new Date(document.uploaded_at || Date.now()).getTime(),
       preview: document.preview_url,
-      extractedText: document.extracted_text || undefined // Include extracted text
+      extractedText: document.extracted_text || undefined
     };
   };
 
-  const handleDocumentClick = (document: any) => {
+  const handleDocumentClick = (document: StoredDocument) => {
     const file = createFileFromDocument(document);
     console.log('Document selected from library:', {
       name: file.name,
@@ -62,7 +74,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     onClose();
   };
 
-  const handleDragStart = (e: React.DragEvent, document: any) => {
+  const handleDragStart = (e: React.DragEvent, document: StoredDocument) => {
     console.log('Drag started for document:', document.name);
     setIsDragging(true);
     

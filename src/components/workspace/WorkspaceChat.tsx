@@ -151,11 +151,11 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
   };
 
   return (
-    <div className="h-full">
+    <div className="h-full" style={{ height: '100%', maxHeight: '100%', overflow: 'hidden' }}>
       <ResizablePanelGroup direction="horizontal" className="h-full">
         {/* Left Panel - Chat Input and Documents */}
         <ResizablePanel defaultSize={60} minSize={40}>
-          <div className="h-full flex flex-col bg-white">
+          <div className="h-full flex flex-col bg-white" style={{ height: '100%', maxHeight: '100%' }}>
             {/* Welcome Message or Document Grid */}
             <div className="flex-1 min-h-0 overflow-hidden">
               {uploadedFiles.length === 0 ? (
@@ -224,11 +224,13 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
         {/* Right Panel - Chat Output */}
         <ResizableHandle />
         <ResizablePanel defaultSize={40} minSize={30}>
-          <ChatOutputPanel 
-            messages={messages} 
-            isLoading={isLoading}
-            className="h-full"
-          />
+          <div style={{ height: '100%', maxHeight: '100%', overflow: 'hidden' }}>
+            <ChatOutputPanel 
+              messages={messages} 
+              isLoading={isLoading}
+              className="h-full"
+            />
+          </div>
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
