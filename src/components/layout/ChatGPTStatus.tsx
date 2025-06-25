@@ -35,15 +35,20 @@ const ChatGPTStatus: React.FC = () => {
     setErrorMessage('');
     
     try {
-      // Test with GPT-4.1 as the default model
-      const testPrompt = 'Test connection. Please respond with "Connection successful."';
-      const estimatedInputTokens = Math.ceil(testPrompt.length / 4);
+      console.log('Testing ChatGPT connection...');
       
-      console.log(`ChatGPT connection test - estimated tokens: ${estimatedInputTokens}`);
+      // Test with a simple prompt
+      const testPrompt = 'Test connection. Please respond with "Connection successful."';
       
       // Use GPT-4.1 as the primary model
       const selectedModel = 'gpt-4.1-2025-04-14';
-      const maxTokens = 100;
+      const maxTokens = 50;
+
+      console.log('Calling chat-gpt function with:', {
+        prompt: testPrompt,
+        model: selectedModel,
+        maxTokens
+      });
 
       const { data, error } = await supabase.functions.invoke('chat-gpt', {
         body: {
@@ -54,6 +59,8 @@ const ChatGPTStatus: React.FC = () => {
         }
       });
 
+      console.log('ChatGPT function response:', { data, error });
+
       if (error) {
         console.error('ChatGPT connection test error:', error);
         setStatus('error');
@@ -62,6 +69,7 @@ const ChatGPTStatus: React.FC = () => {
       }
 
       if (data && data.response) {
+        console.log('ChatGPT connection successful:', data.response);
         setStatus('connected');
         setCurrentModel(data.model || selectedModel);
         setLastTestTime(new Date().toLocaleTimeString());
@@ -72,9 +80,8 @@ const ChatGPTStatus: React.FC = () => {
           console.log(`Connection test used ${data.usage.total_tokens} tokens`);
           addTokens(data.usage.total_tokens);
         }
-        
-        console.log(`ChatGPT connection test successful: ${data.response}`);
       } else {
+        console.error('No response received from ChatGPT');
         setStatus('error');
         setErrorMessage('No response received');
       }

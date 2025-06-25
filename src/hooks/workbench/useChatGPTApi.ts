@@ -51,10 +51,13 @@ export const useChatGPTApi = () => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('ChatGPT API error:', error);
+        throw error;
+      }
       
       // Track token usage using centralized hook
-      if (data.usage && data.usage.total_tokens) {
+      if (data && data.usage && data.usage.total_tokens) {
         console.log(`GPT-4.1 API used ${data.usage.total_tokens} tokens`);
         addTokens(data.usage.total_tokens);
       }
