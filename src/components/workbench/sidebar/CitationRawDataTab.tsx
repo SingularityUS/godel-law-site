@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -47,7 +46,8 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
         documentText = document.content;
         hasAnchors = document.hasAnchorTags || false;
         anchorCount = documentText.match(/⟦P-\d{5}⟧/g)?.length || 0;
-        documentName = document.name;
+        // Ensure documentName is always a string
+        documentName = typeof document.name === 'string' ? document.name : "Unknown Document";
         console.log('Extracted document from nodes:', {
           name: documentName,
           hasAnchors,
@@ -77,7 +77,7 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
     // Auto-process if enabled and document has anchor tags
     if (autoProcessEnabled && documentText && hasAnchors) {
       console.log('Auto-processing document with', anchorCount, 'anchor tags');
-      // Pass documentName as string, not the whole documentInfo object
+      // documentName is now guaranteed to be a string
       autoProcessDocument(documentText, documentName);
     }
   }, [output, previewDocument, extractDocumentFromNodes, autoProcessEnabled, autoProcessDocument]);
