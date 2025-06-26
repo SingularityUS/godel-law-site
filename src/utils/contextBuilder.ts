@@ -1,3 +1,4 @@
+
 /**
  * Context Builder for GPT-4.1 Document Integration
  * 
@@ -48,25 +49,41 @@ export function buildDocumentContext(
   let totalAnchors = 0; // NEW
 
   console.log(`Building document context with anchored text: ${useAnchoredText}`);
+  console.log('Available documents:', documents.map(doc => ({
+    name: doc.name,
+    hasExtractedText: !!doc.extractedText,
+    hasAnchoredText: !!doc.anchoredText,
+    anchorCount: doc.anchorCount || 0
+  })));
 
   // Process each document
   for (const doc of documents) {
-    // Choose which text version to use
-    const textToUse = useAnchoredText && doc.anchoredText ? doc.anchoredText : doc.extractedText;
+    // Choose which text version to use - prioritize anchored text for citation processing
+    let textToUse = "";
+    let anchorCount = 0;
+    
+    if (useAnchoredText && doc.anchoredText) {
+      textToUse = doc.anchoredText;
+      anchorCount = doc.anchorCount || 0;
+      console.log(`Using anchored text for ${doc.name}: ${anchorCount} anchors, ${textToUse.length} chars`);
+    } else if (doc.extractedText) {
+      textToUse = doc.extractedText;
+      // Check if extracted text has anchors
+      anchorCount = textToUse.match(/⟦P-\d{5}⟧/g)?.length || 0;
+      console.log(`Using extracted text for ${doc.name}: ${anchorCount} anchors found, ${textToUse.length} chars`);
+    }
     
     if (!textToUse) {
       excludedDocuments.push(`${doc.name} (no text content)`);
       continue;
     }
 
-    const anchorCount = doc.anchorCount || 0;
-    if (useAnchoredText && anchorCount > 0) {
+    if (anchorCount > 0) {
       totalAnchors += anchorCount;
-      console.log(`Using anchored text for ${doc.name}: ${anchorCount} anchors, ${textToUse.length} chars`);
     }
 
     const metadata = includeMetadata ? formatDocumentMetadata(doc, anchorCount) : '';
-    const content = formatDocumentContent(doc.name, textToUse, doc.type, useAnchoredText && anchorCount > 0);
+    const content = formatDocumentContent(doc.name, textToUse, doc.type, anchorCount > 0);
     
     const contextTokens = Math.ceil((metadata + content).length / 4);
     
@@ -81,7 +98,7 @@ export function buildDocumentContext(
           textToUse,
           doc.type,
           availableTokens * 4, // Convert back to characters
-          useAnchoredText && anchorCount > 0
+          anchorCount > 0
         );
         
         documentContexts.push({

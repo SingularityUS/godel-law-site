@@ -48,11 +48,12 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
         anchorCount = documentText.match(/⟦P-\d{5}⟧/g)?.length || 0;
         // Ensure documentName is always a string
         documentName = typeof document.name === 'string' ? document.name : "Unknown Document";
-        console.log('Extracted document from nodes:', {
+        console.log('🔍 CitationRawDataTab: Extracted document from nodes:', {
           name: documentName,
           hasAnchors,
           anchorCount,
-          textLength: documentText.length
+          textLength: documentText.length,
+          textPreview: documentText.substring(0, 300)
         });
       }
     }
@@ -63,6 +64,12 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
       anchorCount = documentText.match(/⟦P-\d{5}⟧/g)?.length || 0;
       hasAnchors = anchorCount > 0;
       documentName = previewDocument.name;
+      console.log('🔍 CitationRawDataTab: Using preview document:', {
+        name: documentName,
+        hasAnchors,
+        anchorCount,
+        textLength: documentText.length
+      });
     }
 
     const newDocumentInfo = {
@@ -75,10 +82,17 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
     setDocumentInfo(newDocumentInfo);
 
     // Auto-process if enabled and document has anchor tags
-    if (autoProcessEnabled && documentText && hasAnchors) {
-      console.log('Auto-processing document with', anchorCount, 'anchor tags');
+    if (autoProcessEnabled && documentText && hasAnchors && anchorCount > 0) {
+      console.log('🚀 CitationRawDataTab: Auto-processing document with', anchorCount, 'anchor tags');
       // documentName is now guaranteed to be a string
       autoProcessDocument(documentText, documentName);
+    } else {
+      console.log('🔍 CitationRawDataTab: Not auto-processing because:', {
+        autoProcessEnabled,
+        hasText: !!documentText,
+        hasAnchors,
+        anchorCount
+      });
     }
   }, [output, previewDocument, extractDocumentFromNodes, autoProcessEnabled, autoProcessDocument]);
 
@@ -88,7 +102,7 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
       return;
     }
 
-    console.log('Manually processing citations for document:', documentInfo.name);
+    console.log('🔧 CitationRawDataTab: Manually processing citations for document:', documentInfo.name);
     // Pass documentInfo.name as string
     await processCitations(documentInfo.text, documentInfo.name);
   };
