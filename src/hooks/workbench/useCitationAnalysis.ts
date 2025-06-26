@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useChatGPTApi } from "./useChatGPTApi";
 
 const CITATION_ANALYSIS_PROMPT = `You are a legal‐citation editor. Your task: 1. Read the full document text including the invisible anchor tags (⟦…⟧). 2. Identify every legal citation that should conform to The Bluebook. 3. For each citation, decide whether it needs a correction; if so, propose the corrected form. 4. Return only a JSON array that follows the exact schema shown below—no extra keys, no commentary, no markdown, no trailing commas.
@@ -89,20 +89,29 @@ export const useCitationAnalysis = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [citationResults, setCitationResults] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [autoProcessEnabled, setAutoProcessEnabled] = useState(true);
+  const [lastProcessedDocument, setLastProcessedDocument] = useState<string | null>(null);
   const { callChatGPT } = useChatGPTApi();
 
-  const processCitations = useCallback(async (documentText: string) => {
+  const processCitations = useCallback(async (documentText: string, documentId?: string) => {
     if (!documentText.trim()) {
       setError("No document text provided for analysis");
       return;
     }
 
+    // Check if we already processed this document recently
+    if (documentId && documentId === lastProcessedDocument) {
+      console.log('Skipping re-processing of same document:', documentId);
+      return;
+    }
+
     setIsProcessing(true);
     setError(null);
-    setCitationResults(null);
 
     try {
       console.log('Starting citation analysis with GPT-4.1...');
+      console.log('Document text preview:', documentText.substring(0, 500));
+      console.log('Contains anchor tags:', /⟦P-\d{5}⟧/.test(documentText));
       
       const response = await callChatGPT(
         documentText,
@@ -123,6 +132,7 @@ export const useCitationAnalysis = () => {
         const parsedResults = JSON.parse(responseContent);
         console.log('Parsed citation results:', parsedResults);
         setCitationResults(parsedResults);
+        setLastProcessedDocument(documentId || null);
       } catch (parseError) {
         console.error('Failed to parse JSON response:', parseError);
         console.error('Raw response was:', responseContent);
@@ -134,6 +144,7 @@ export const useCitationAnalysis = () => {
             const extractedJson = JSON.parse(jsonMatch[0]);
             console.log('Extracted and parsed citation results:', extractedJson);
             setCitationResults(extractedJson);
+            setLastProcessedDocument(documentId || null);
           } catch (extractError) {
             setError(`Failed to parse citation analysis response: ${parseError.message}`);
           }
@@ -147,18 +158,42 @@ export const useCitationAnalysis = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [callChatGPT]);
+  }, [callChatGPT, lastProcessedDocument]);
+
+  const autoProcessDocument = useCallback(async (documentText: string, documentId?: string) => {
+    if (!autoProcessEnabled || !documentText || isProcessing) {
+      return;
+    }
+
+    // Check if document has anchor tags
+    const hasAnchors = /⟦P-\d{5}⟧/.test(documentText);
+    if (!hasAnchors) {
+      console.log('Document does not contain anchor tags, skipping auto-processing');
+      return;
+    }
+
+    console.log('Auto-processing document with anchor tags...');
+    await processCitations(documentText, documentId);
+  }, [autoProcessEnabled, isProcessing, processCitations]);
 
   const clearResults = useCallback(() => {
     setCitationResults(null);
     setError(null);
+    setLastProcessedDocument(null);
+  }, []);
+
+  const toggleAutoProcess = useCallback(() => {
+    setAutoProcessEnabled(prev => !prev);
   }, []);
 
   return {
     isProcessing,
     citationResults,
     error,
+    autoProcessEnabled,
     processCitations,
-    clearResults
+    autoProcessDocument,
+    clearResults,
+    toggleAutoProcess
   };
 };

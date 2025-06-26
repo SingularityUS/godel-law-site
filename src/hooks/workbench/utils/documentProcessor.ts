@@ -278,6 +278,13 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
       }
     };
     
+    // IMPORTANT: Update the file object with anchored text for later access
+    if (file && typeof file === 'object') {
+      (file as any).anchoredText = anchoredContent;
+      (file as any).anchorCount = anchorMap.length;
+      console.log('Updated file object with anchored text and anchor count');
+    }
+    
     console.log('Document extraction result (UTF-8 preserved + anchored):', {
       originalLength: result.originalContent.length,
       processableLength: result.processableContent.length,
