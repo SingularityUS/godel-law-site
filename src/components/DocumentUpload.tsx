@@ -6,12 +6,13 @@ import { Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { extractDocumentText } from "@/hooks/workbench/utils/documentProcessor";
+import { useCitationAnalysis } from "@/hooks/workbench/useCitationAnalysis";
 
 type UploadedFile = File & { 
   preview?: string; 
   extractedText?: string;
-  anchoredText?: string; // NEW: Store anchored version
-  anchorCount?: number; // NEW: Store anchor count for debugging
+  anchoredText?: string; 
+  anchorCount?: number; 
 };
 
 interface DocumentUploadProps {
@@ -43,7 +44,9 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   onDocumentAdded 
 }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [analysisStatus, setAnalysisStatus] = useState<string>("");
   const { user } = useAuth();
+  const { processCitations } = useCitationAnalysis();
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -56,6 +59,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         return;
       }
       setIsLoading(true);
+      setAnalysisStatus("Uploading document...");
 
       const files = acceptedFiles.filter(
         (file) =>
@@ -71,6 +75,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           variant: "destructive",
         });
         setIsLoading(false);
+        setAnalysisStatus("");
         return;
       }
 
@@ -79,6 +84,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       const storagePath = `${user.id}/${Date.now()}_${sanitizedFilename}`;
 
       try {
+        setAnalysisStatus("Uploading to storage...");
+        
         // Upload file to storage
         const { data: uploadData, error: fileError } = await supabase
           .storage
@@ -90,6 +97,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         }
 
         const fileUrl = supabase.storage.from("documents").getPublicUrl(storagePath).data.publicUrl;
+
+        setAnalysisStatus("Extracting text and anchor tokens...");
 
         // Extract text content using the existing processor (now with anchor tokens)
         console.log('Extracting text from uploaded document:', file.name);
@@ -107,18 +116,20 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
         const extractionResult = await extractDocumentText(mockNode);
         const extractedText = extractionResult.processableContent;
-        const anchoredText = extractionResult.anchoredContent; // NEW
-        const anchorCount = extractionResult.anchorMap.length; // NEW
+        const anchoredText = extractionResult.anchoredContent;
+        const anchorCount = extractionResult.anchorMap.length;
 
         console.log('Text extraction result:', {
           originalLength: extractionResult.metadata.originalLength,
           processableLength: extractionResult.metadata.processableLength,
-          anchoredLength: extractionResult.metadata.anchoredLength, // NEW
-          anchorCount: extractionResult.metadata.anchorCount, // NEW
+          anchoredLength: extractionResult.metadata.anchoredLength,
+          anchorCount: extractionResult.metadata.anchorCount,
           extractedSuccessfully: extractionResult.metadata.extractedSuccessfully
         });
 
-        // Insert document record with extracted text (store both versions)
+        setAnalysisStatus("Saving document to database...");
+
+        // Insert document record with extracted text
         const { data: docRow, error: insertError } = await supabase
           .from("documents")
           .insert([
@@ -130,8 +141,6 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
               preview_url: fileUrl,
               user_id: user.id,
               extracted_text: extractedText || null
-              // Note: If we need to store anchored text in DB, we'd add it here
-              // anchored_text: anchoredText || null
             },
           ])
           .select()
@@ -145,16 +154,39 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         const uploadedFile: UploadedFile = Object.assign(file, { 
           preview: fileUrl,
           extractedText: extractedText,
-          anchoredText: anchoredText, // NEW: Include anchored version
-          anchorCount: anchorCount // NEW: Include anchor count
+          anchoredText: anchoredText,
+          anchorCount: anchorCount
         });
         
         onFilesAccepted([uploadedFile]);
-        
-        toast({
-          title: "Upload successful",
-          description: `Document uploaded and processed with ${anchorCount} anchor tokens inserted.`,
-        });
+
+        // Automatically analyze citations if anchor tags are present
+        if (anchoredText && anchorCount > 0) {
+          setAnalysisStatus("Analyzing legal citations with GPT-4.1...");
+          
+          try {
+            console.log('Auto-analyzing citations for uploaded document:', file.name);
+            await processCitations(anchoredText, file.name);
+            
+            toast({
+              title: "Upload and analysis complete",
+              description: `Document uploaded with ${anchorCount} anchor tokens and citations analyzed automatically.`,
+            });
+          } catch (citationError) {
+            console.error('Citation analysis failed:', citationError);
+            
+            // Still show success for upload, but note citation analysis failed
+            toast({
+              title: "Upload successful",
+              description: `Document uploaded with ${anchorCount} anchor tokens. Citation analysis failed but can be retried manually.`,
+            });
+          }
+        } else {
+          toast({
+            title: "Upload successful",
+            description: `Document uploaded and processed with ${anchorCount} anchor tokens.`,
+          });
+        }
 
         onUploadComplete?.();
         
@@ -171,9 +203,10 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         });
       } finally {
         setIsLoading(false);
+        setAnalysisStatus("");
       }
     },
-    [onFilesAccepted, onUploadComplete, onDocumentAdded, user]
+    [onFilesAccepted, onUploadComplete, onDocumentAdded, user, processCitations]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -196,7 +229,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       <div className="flex items-center gap-2">
         <Upload size={16} className="text-black" />
         <span className="text-xs font-bold text-black">
-          {isLoading ? "PROCESSING..." : "DROP FILE OR CLICK"}
+          {isLoading ? (analysisStatus || "PROCESSING...") : "DROP FILE OR CLICK"}
         </span>
       </div>
     </div>
