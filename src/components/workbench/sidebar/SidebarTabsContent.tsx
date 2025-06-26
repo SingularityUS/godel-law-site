@@ -1,12 +1,13 @@
 
 import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Edit3, BarChart3, Code } from "lucide-react";
+import { FileText, Edit3, BarChart3, Code, Scale } from "lucide-react";
 import { RedlineDocument } from "@/types/redlining";
 import RedlineTabContent from "./RedlineTabContent";
 import DocumentPreviewTab from "./DocumentPreviewTab";
 import AnalysisContent from "../output/AnalysisContent";
 import RawDataTab from "../output/RawDataTab";
+import CitationRawDataTab from "./CitationRawDataTab";
 
 interface SidebarTabsContentProps {
   activeTab: string;
@@ -35,7 +36,7 @@ const SidebarTabsContent: React.FC<SidebarTabsContentProps> = ({
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-        <TabsList className="grid w-full grid-cols-4 flex-shrink-0">
+        <TabsList className="grid w-full grid-cols-5 flex-shrink-0">
           <TabsTrigger value="document" className="flex items-center gap-1">
             <FileText size={14} />
             <span className="hidden sm:inline">Document</span>
@@ -47,6 +48,10 @@ const SidebarTabsContent: React.FC<SidebarTabsContentProps> = ({
           <TabsTrigger value="analysis" className="flex items-center gap-1">
             <BarChart3 size={14} />
             <span className="hidden sm:inline">Analysis</span>
+          </TabsTrigger>
+          <TabsTrigger value="citations" className="flex items-center gap-1">
+            <Scale size={14} />
+            <span className="hidden sm:inline">Citations</span>
           </TabsTrigger>
           <TabsTrigger value="raw" className="flex items-center gap-1">
             <Code size={14} />
@@ -74,6 +79,13 @@ const SidebarTabsContent: React.FC<SidebarTabsContentProps> = ({
             <div className="h-full overflow-auto">
               <AnalysisContent analysisData={output?.output?.analysis || []} />
             </div>
+          </TabsContent>
+
+          <TabsContent value="citations" className="h-full m-0 overflow-hidden">
+            <CitationRawDataTab 
+              output={output}
+              previewDocument={previewDocument}
+            />
           </TabsContent>
 
           <TabsContent value="raw" className="h-full m-0 overflow-hidden">

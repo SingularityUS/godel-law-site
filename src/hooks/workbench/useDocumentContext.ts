@@ -3,6 +3,7 @@
  * useDocumentContext Hook
  * 
  * Purpose: Extracts document context from workbench nodes for sidebar display
+ * Enhanced to preserve paragraph anchor tags for citation analysis
  */
 
 import { useCallback } from "react";
@@ -29,19 +30,32 @@ export const useDocumentContext = () => {
       fileType: docData?.file?.type,
       hasFile: !!docData?.file,
       hasPreview: !!docData?.file?.preview,
-      hasExtractedText: !!docData?.file?.extractedText
+      hasExtractedText: !!docData?.file?.extractedText,
+      hasAnchoredText: !!docData?.file?.anchoredText
     });
+
+    // Prefer anchored text for citation analysis (preserves paragraph markers)
+    const documentContent = docData?.file?.anchoredText || 
+                           docData?.file?.extractedText || 
+                           docData?.file?.preview || 
+                           '';
 
     const extractedDocument = {
       name: docData?.documentName || 'Unknown Document',
       type: docData?.file?.type || 'text/plain',
       preview: docData?.file?.preview,
-      content: docData?.file?.extractedText || '',
+      content: documentContent,
       size: docData?.file?.size,
-      nodeId: primaryDoc.id
+      nodeId: primaryDoc.id,
+      hasAnchorTags: !!docData?.file?.anchoredText
     };
     
-    console.log('📄 useDocumentContext: Extracted document:', extractedDocument);
+    console.log('📄 useDocumentContext: Extracted document:', {
+      ...extractedDocument,
+      contentLength: extractedDocument.content.length,
+      contentPreview: extractedDocument.content.substring(0, 200)
+    });
+    
     return extractedDocument;
   }, []);
 
