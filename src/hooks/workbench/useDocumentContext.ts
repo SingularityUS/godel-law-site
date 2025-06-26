@@ -32,6 +32,7 @@ export const useDocumentContext = () => {
       hasPreview: !!docData?.file?.preview,
       hasExtractedText: !!docData?.file?.extractedText,
       hasAnchoredText: !!docData?.file?.anchoredText,
+      hasExtractedData: !!docData?.extractedData,
       anchorCount: docData?.file?.anchorCount || 0
     });
 
@@ -45,19 +46,22 @@ export const useDocumentContext = () => {
       hasAnchorTags = true;
       console.log('📄 useDocumentContext: Using anchored text from file object');
     }
-    // Then try from extracted data in the node
-    else if (docData?.extractedData?.anchoredContent) {
-      documentContent = docData.extractedData.anchoredContent;
-      hasAnchorTags = true;
-      console.log('📄 useDocumentContext: Using anchored content from extracted data');
+    // Then try from extracted data in the node with proper type checking
+    else if (docData?.extractedData && typeof docData.extractedData === 'object' && docData.extractedData !== null) {
+      const extractedData = docData.extractedData as Record<string, any>;
+      if (extractedData.anchoredContent && typeof extractedData.anchoredContent === 'string') {
+        documentContent = extractedData.anchoredContent;
+        hasAnchorTags = true;
+        console.log('📄 useDocumentContext: Using anchored content from extracted data');
+      }
     }
     // Fallback to regular extracted text
-    else if (docData?.file?.extractedText) {
+    if (!documentContent && docData?.file?.extractedText) {
       documentContent = docData.file.extractedText;
       console.log('📄 useDocumentContext: Using extracted text (no anchors)');
     }
     // Last resort - preview text
-    else if (docData?.file?.preview) {
+    if (!documentContent && docData?.file?.preview) {
       documentContent = docData.file.preview;
       console.log('📄 useDocumentContext: Using preview text (no anchors)');
     }

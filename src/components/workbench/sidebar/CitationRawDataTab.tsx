@@ -77,6 +77,7 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
     // Auto-process if enabled and document has anchor tags
     if (autoProcessEnabled && documentText && hasAnchors) {
       console.log('Auto-processing document with', anchorCount, 'anchor tags');
+      // Pass documentName as string, not the whole documentInfo object
       autoProcessDocument(documentText, documentName);
     }
   }, [output, previewDocument, extractDocumentFromNodes, autoProcessEnabled, autoProcessDocument]);
@@ -88,6 +89,7 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
     }
 
     console.log('Manually processing citations for document:', documentInfo.name);
+    // Pass documentInfo.name as string
     await processCitations(documentInfo.text, documentInfo.name);
   };
 
