@@ -71,6 +71,19 @@ export const useAnchoringStatus = () => {
     });
   }, []);
 
+  // New function to initialize document status based on existing data
+  const initializeDocumentStatus = useCallback((documentName: string, file: any) => {
+    // Check if document already has anchored content
+    if (file.anchoredText && file.anchorCount > 0) {
+      console.log('🔄 Initializing document with existing anchored content:', documentName);
+      updateDocumentStatus(documentName, 'complete', 100, `Completed with ${file.anchorCount} anchors`);
+    } else if (file.extractedText && !file.anchoredText) {
+      console.log('⚠️ Initializing document with extracted text but no anchors:', documentName);
+      updateDocumentStatus(documentName, 'error', 0, 'No anchor tokens found');
+    }
+    // If no extracted text, leave as idle (won't show indicator)
+  }, [updateDocumentStatus]);
+
   // Listen for anchoring start events
   useEffect(() => {
     const handleAnchoringStart = (event: CustomEvent<AnchoringStartEvent>) => {
@@ -123,6 +136,7 @@ export const useAnchoringStatus = () => {
     getDocumentStatus,
     updateDocumentStatus,
     clearDocumentStatus,
+    initializeDocumentStatus,
     documentStatuses: Array.from(documentStatuses.entries())
   };
 };

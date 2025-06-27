@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import { FileText, X, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -30,7 +30,14 @@ const DocumentGrid: React.FC<DocumentGridProps> = ({
   onRemoveDocument,
   onDocumentPreview
 }) => {
-  const { getDocumentStatus } = useAnchoringStatus();
+  const { getDocumentStatus, initializeDocumentStatus } = useAnchoringStatus();
+
+  // Initialize status for all uploaded files on mount or when files change
+  useEffect(() => {
+    uploadedFiles.forEach(file => {
+      initializeDocumentStatus(file.name, file);
+    });
+  }, [uploadedFiles, initializeDocumentStatus]);
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
