@@ -51,6 +51,28 @@ const DocumentGrid: React.FC<DocumentGridProps> = ({
     return <FileText className="w-8 h-8 text-blue-500" />;
   };
 
+  // Safe file type extraction with fallback
+  const getFileExtension = (file: UploadedFile): string => {
+    if (!file.type) return 'FILE';
+    try {
+      const parts = file.type.split('/');
+      return parts.length > 1 ? parts[1].toUpperCase() : 'FILE';
+    } catch (error) {
+      console.warn('Error extracting file extension:', error);
+      return 'FILE';
+    }
+  };
+
+  // Safe file size handling
+  const getSafeFileSize = (file: UploadedFile): number => {
+    return typeof file.size === 'number' ? file.size : 0;
+  };
+
+  // Safe file name handling
+  const getSafeFileName = (file: UploadedFile): string => {
+    return file.name || 'Unnamed Document';
+  };
+
   return (
     <div>
       <div className="mb-4">
@@ -64,7 +86,10 @@ const DocumentGrid: React.FC<DocumentGridProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {uploadedFiles.map((file, index) => {
-          const anchoringStatus = getDocumentStatus(file.name);
+          const anchoringStatus = getDocumentStatus(getSafeFileName(file));
+          const fileName = getSafeFileName(file);
+          const fileSize = getSafeFileSize(file);
+          const fileExtension = getFileExtension(file);
           
           return (
             <Card 
@@ -122,13 +147,13 @@ const DocumentGrid: React.FC<DocumentGridProps> = ({
                 {/* File icon and info */}
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0">
-                    {getFileTypeIcon(file.type)}
+                    {getFileTypeIcon(file.type || '')}
                   </div>
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <h4 className="font-medium text-sm text-gray-900 truncate">
-                        {file.name}
+                        {fileName}
                       </h4>
                       {/* Anchoring Status Indicator */}
                       <AnchoringStatusIndicator
@@ -142,7 +167,7 @@ const DocumentGrid: React.FC<DocumentGridProps> = ({
                     
                     <div className="space-y-1">
                       <p className="text-xs text-gray-500">
-                        {formatFileSize(file.size)} • {file.type.split('/')[1]?.toUpperCase()}
+                        {formatFileSize(fileSize)} • {fileExtension}
                       </p>
                       
                       {/* Text extraction status */}

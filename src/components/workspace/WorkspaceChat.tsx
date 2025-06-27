@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Send, Bot, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -67,31 +68,40 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
   // Initialize anchoring status tracking
   useAnchoringStatus();
 
+  // Memoize uploaded files length to prevent unnecessary re-renders
+  const uploadedFilesLength = useMemo(() => uploadedFiles.length, [uploadedFiles]);
+  const messagesLength = useMemo(() => messages.length, [messages]);
+
+  // Stable function to create welcome message
+  const createWelcomeMessage = useCallback((files: UploadedFile[]) => {
+    const fileNames = files.map(f => f.name || 'Unnamed Document').join(", ");
+    const totalAnchors = files.reduce((sum, f) => sum + (f.anchorCount || 0), 0);
+    const anchorInfo = totalAnchors > 0 ? ` I've detected ${totalAnchors} anchor tokens for citation processing.` : '';
+    
+    return {
+      id: Date.now().toString(),
+      content: `I can see you've uploaded ${files.length} document(s): ${fileNames}.${anchorInfo} I'm now using GPT-4.1 with a 200K token context window for analysis. How can I help you analyze these documents?`,
+      role: 'assistant' as const,
+      timestamp: new Date()
+    };
+  }, []);
+
   // Auto-select all documents when they're uploaded
   useEffect(() => {
-    if (uploadedFiles.length > 0) {
+    if (uploadedFilesLength > 0) {
       setSelectedDocuments(new Set(uploadedFiles.map((_, index) => index)));
       
-      if (messages.length === 0) {
-        const fileNames = uploadedFiles.map(f => f.name).join(", ");
-        const totalAnchors = uploadedFiles.reduce((sum, f) => sum + (f.anchorCount || 0), 0);
-        const anchorInfo = totalAnchors > 0 ? ` I've detected ${totalAnchors} anchor tokens for citation processing.` : '';
-        
-        setMessages([{
-          id: Date.now().toString(),
-          content: `I can see you've uploaded ${uploadedFiles.length} document(s): ${fileNames}.${anchorInfo} I'm now using GPT-4.1 with a 200K token context window for analysis. How can I help you analyze these documents?`,
-          role: 'assistant',
-          timestamp: new Date()
-        }]);
+      if (messagesLength === 0) {
+        setMessages([createWelcomeMessage(uploadedFiles)]);
       }
     }
-  }, [uploadedFiles, messages.length]);
+  }, [uploadedFilesLength, messagesLength, uploadedFiles, createWelcomeMessage]);
 
-  const getSelectedDocuments = () => {
+  const getSelectedDocuments = useCallback(() => {
     return uploadedFiles.filter((_, index) => selectedDocuments.has(index));
-  };
+  }, [uploadedFiles, selectedDocuments]);
 
-  const handleDocumentToggle = (index: number, checked: boolean) => {
+  const handleDocumentToggle = useCallback((index: number, checked: boolean) => {
     const newSelected = new Set(selectedDocuments);
     if (checked) {
       newSelected.add(index);
@@ -99,7 +109,7 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
       newSelected.delete(index);
     }
     setSelectedDocuments(newSelected);
-  };
+  }, [selectedDocuments]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

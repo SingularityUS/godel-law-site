@@ -49,6 +49,52 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   // Initialize the anchor token completion listener
   useAnchoringStatus();
 
+  // Enhanced file validation function
+  const validateFile = (file: File): { isValid: boolean; error?: string } => {
+    // Basic file validation
+    if (!file) {
+      return { isValid: false, error: 'No file provided' };
+    }
+    
+    if (!file.name || file.name.trim() === '') {
+      return { isValid: false, error: 'File has no name' };
+    }
+    
+    if (typeof file.size !== 'number' || file.size <= 0) {
+      return { isValid: false, error: 'Invalid file size' };
+    }
+    
+    // File type validation
+    const allowedTypes = [
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "text/plain"
+    ];
+    
+    if (!file.type || !allowedTypes.includes(file.type)) {
+      return { isValid: false, error: 'Unsupported file type' };
+    }
+    
+    return { isValid: true };
+  };
+
+  // Enhanced file object creation with safety checks
+  const createSafeFileObject = (file: File, fileUrl: string, extractedText?: string, anchoredText?: string, anchorCount?: number): UploadedFile => {
+    const uploadedFile: UploadedFile = Object.assign(file, {
+      preview: fileUrl,
+      extractedText: extractedText || '',
+      anchoredText: anchoredText || '',
+      anchorCount: anchorCount || 0
+    });
+    
+    // Ensure all required properties are defined
+    if (!uploadedFile.name) uploadedFile.name = 'Unnamed Document';
+    if (!uploadedFile.type) uploadedFile.type = 'application/octet-stream';
+    if (typeof uploadedFile.size !== 'number') uploadedFile.size = 0;
+    
+    return uploadedFile;
+  };
+
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
       if (!user) {
@@ -59,28 +105,32 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         });
         return;
       }
-      setIsLoading(true);
-      setAnalysisStatus("Uploading document...");
 
-      const files = acceptedFiles.filter(
-        (file) =>
-          file.type === "application/pdf" ||
-          file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-          file.type === "text/plain"
-      );
-
-      if (files.length === 0) {
+      if (acceptedFiles.length === 0) {
         toast({
-          title: "Unsupported file type",
-          description: "Only PDF, DOCX, and TXT files are allowed.",
+          title: "No files selected",
+          description: "Please select a file to upload.",
           variant: "destructive",
         });
-        setIsLoading(false);
-        setAnalysisStatus("");
         return;
       }
 
-      const file = files[0];
+      const file = acceptedFiles[0];
+      
+      // Validate file before processing
+      const validation = validateFile(file);
+      if (!validation.isValid) {
+        toast({
+          title: "Invalid file",
+          description: validation.error || "The selected file is not valid.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setIsLoading(true);
+      setAnalysisStatus("Uploading document...");
+
       const sanitizedFilename = sanitizeFilename(file.name);
       const storagePath = `${user.id}/${Date.now()}_${sanitizedFilename}`;
 
@@ -185,13 +235,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           throw new Error(`Database insert failed: ${insertError.message}`);
         }
 
-        // Create file object with both extracted and anchored text for immediate use
-        const uploadedFile: UploadedFile = Object.assign(file, { 
-          preview: fileUrl,
-          extractedText: extractedText,
-          anchoredText: anchoredText,
-          anchorCount: anchorCount
-        });
+        // Create safe file object with validation
+        const uploadedFile = createSafeFileObject(file, fileUrl, extractedText, anchoredText, anchorCount);
         
         onFilesAccepted([uploadedFile]);
 
