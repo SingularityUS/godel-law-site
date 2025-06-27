@@ -3,7 +3,7 @@
  * useWorkbenchPositioning Hook
  * 
  * Purpose: Handles position calculations and coordinate transformations
- * Extracted from useWorkbenchDragDrop for better separation of concerns
+ * Enhanced with multiple document positioning support
  */
 
 import { useCallback } from "react";
@@ -43,8 +43,49 @@ export const useWorkbenchPositioning = ({
     };
   }, [reactFlowWrapper]);
 
+  /**
+   * Get the next optimal position for a document node to prevent overlap
+   */
+  const getNextDocumentPosition = useCallback(() => {
+    const documentNodes = nodes.filter(node => node.type === "document-input");
+    
+    // Starting position for first document
+    const startX = 80;
+    const startY = 100;
+    const nodeWidth = 140; // Document node width + margin
+    const nodeHeight = 100; // Document node height + margin
+    const maxNodesPerRow = 4; // Maximum documents per row
+    
+    if (documentNodes.length === 0) {
+      return { x: startX, y: startY };
+    }
+    
+    // Calculate grid position
+    const row = Math.floor(documentNodes.length / maxNodesPerRow);
+    const col = documentNodes.length % maxNodesPerRow;
+    
+    return {
+      x: startX + (col * nodeWidth),
+      y: startY + (row * nodeHeight)
+    };
+  }, [nodes]);
+
+  /**
+   * Check if a position is clear (no overlapping nodes)
+   */
+  const isPositionClear = useCallback((x: number, y: number, margin = 50) => {
+    return !nodes.some(node => {
+      const nodeX = node.position.x;
+      const nodeY = node.position.y;
+      
+      return Math.abs(nodeX - x) < margin && Math.abs(nodeY - y) < margin;
+    });
+  }, [nodes]);
+
   return {
     getNodeAtPosition,
-    calculateFlowPosition
+    calculateFlowPosition,
+    getNextDocumentPosition,
+    isPositionClear
   };
 };

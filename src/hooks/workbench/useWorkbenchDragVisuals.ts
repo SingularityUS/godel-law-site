@@ -3,22 +3,13 @@
  * useWorkbenchDragVisuals Hook
  * 
  * Purpose: Manages visual feedback during drag operations
- * Extracted from useWorkbenchDragDrop for better separation of concerns
- * 
- * Key Responsibilities:
- * - Provides visual feedback during drag-over operations
- * - Manages drag-leave cleanup
- * - Coordinates with positioning for target detection
+ * Enhanced to support multiple document queue building
  */
 
 import { useCallback } from "react";
-import { Node } from "@xyflow/react";
-import { useWorkbenchPositioning } from "./useWorkbenchPositioning";
-
-type AllNodes = Node<any>;
 
 interface UseWorkbenchDragVisualsProps {
-  nodes: AllNodes[];
+  nodes: any[];
   reactFlowWrapper: React.RefObject<HTMLDivElement>;
   updateDragOverState: (targetNodeId: string | undefined) => void;
   clearDragOverStates: () => void;
@@ -30,35 +21,73 @@ export const useWorkbenchDragVisuals = ({
   updateDragOverState,
   clearDragOverStates
 }: UseWorkbenchDragVisualsProps) => {
-  const { getNodeAtPosition } = useWorkbenchPositioning({
-    nodes,
-    reactFlowWrapper
-  });
+  /**
+   * Enhanced drag over handler with visual feedback for document queue building
+   */
+  const onDragOver = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+
+      // Check if we're dragging a document
+      const hasDocumentData = event.dataTransfer.types.includes("application/lovable-document");
+      
+      if (hasDocumentData) {
+        const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
+        if (!reactFlowBounds) return;
+
+        // Calculate relative position within React Flow
+        const relativeX = event.clientX - reactFlowBounds.left;
+        const relativeY = event.clientY - reactFlowBounds.top;
+
+        // Find if we're hovering over an existing document node
+        const targetNode = nodes.find(node => {
+          if (node.type !== "document-input") return false;
+          
+          const nodeX = node.position.x;
+          const nodeY = node.position.y;
+          const nodeWidth = 128; // Document node width
+          const nodeHeight = 96; // Document node height
+          
+          return relativeX >= nodeX && relativeX <= nodeX + nodeWidth &&
+                 relativeY >= nodeY && relativeY <= nodeY + nodeHeight;
+        });
+
+        if (targetNode) {
+          // Hovering over existing document - show replacement feedback
+          updateDragOverState(targetNode.id);
+          event.dataTransfer.dropEffect = "move";
+        } else {
+          // Hovering over empty space - show addition feedback
+          clearDragOverStates();
+          event.dataTransfer.dropEffect = "copy";
+        }
+      }
+    },
+    [nodes, reactFlowWrapper, updateDragOverState, clearDragOverStates]
+  );
 
   /**
-   * Provide visual feedback during drag operations
+   * Handle drag leave events
    */
-  const onDragOver = useCallback((event: React.DragEvent) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "copy";
-    
-    // Only handle visual feedback for document drags
-    const docData = event.dataTransfer.types.includes("application/lovable-document");
-    if (docData) {
-      const targetNode = getNodeAtPosition(event.clientX, event.clientY);
-      updateDragOverState(targetNode?.id);
-    }
-  }, [getNodeAtPosition, updateDragOverState]);
+  const onDragLeave = useCallback(
+    (event: React.DragEvent) => {
+      // Only clear if we're actually leaving the React Flow area
+      const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
+      if (!reactFlowBounds) return;
 
-  /**
-   * Clean up visual states when drag leaves workspace
-   */
-  const onDragLeave = useCallback((event: React.DragEvent) => {
-    // Only clear states if actually leaving the container
-    if (!reactFlowWrapper.current?.contains(event.relatedTarget as HTMLElement)) {
-      clearDragOverStates();
-    }
-  }, [clearDragOverStates, reactFlowWrapper]);
+      const isLeavingReactFlow = 
+        event.clientX < reactFlowBounds.left ||
+        event.clientX > reactFlowBounds.right ||
+        event.clientY < reactFlowBounds.top ||
+        event.clientY > reactFlowBounds.bottom;
+
+      if (isLeavingReactFlow) {
+        clearDragOverStates();
+      }
+    },
+    [reactFlowWrapper, clearDragOverStates]
+  );
 
   return {
     onDragOver,

@@ -11,6 +11,7 @@
  * - Manages node creation and updates
  * - Coordinates with positioning system
  * - Uses event-driven citation analysis triggering
+ * - Supports multiple document queue building
  */
 
 import { useCallback } from "react";
@@ -32,7 +33,7 @@ export const useWorkbenchDropHandling = ({
   reactFlowWrapper,
   clearDragOverStates
 }: UseWorkbenchDropHandlingProps) => {
-  const { getNodeAtPosition, calculateFlowPosition } = useWorkbenchPositioning({
+  const { getNodeAtPosition, calculateFlowPosition, getNextDocumentPosition } = useWorkbenchPositioning({
     nodes,
     reactFlowWrapper
   });
@@ -132,6 +133,16 @@ export const useWorkbenchDropHandling = ({
   };
 
   /**
+   * Check if a document with the same name already exists in the workbench
+   */
+  const documentExists = useCallback((documentName: string) => {
+    return nodes.some(node => 
+      node.type === "document-input" && 
+      node.data?.documentName === documentName
+    );
+  }, [nodes]);
+
+  /**
    * Handle document drops from library or module drops from palette
    */
   const onDrop = useCallback(
@@ -195,17 +206,29 @@ export const useWorkbenchDropHandling = ({
             return;
           }
           
-          // Create new document input node at drop position
-          const pos = calculateFlowPosition(event.clientX, event.clientY);
-          console.log('📍 [DROP] Calculated position:', pos);
+          // Check if document already exists in workbench (prevent duplicates)
+          if (documentExists(fileData.name)) {
+            console.log('⚠️ [DROP] Document already exists in workbench, skipping:', fileData.name);
+            // Still show in sidebar and dispatch events for existing document
+            dispatchAnchorEvents(fileData, 'drag-drop-existing');
+            return;
+          }
+          
+          // Create new document input node at appropriate position
+          const pos = getNextDocumentPosition();
+          console.log('📍 [DROP] Calculated position for new document:', pos);
           
           // Create unique node ID and new document node
-          const nodeId = `doc-${Date.now()}-${fileData.name}`;
+          const nodeId = `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
           const newNode = {
             id: nodeId,
             type: "document-input",
             position: pos,
-            data: { moduleType: "document-input" as const, documentName: fileData.name, file: fileData },
+            data: { 
+              moduleType: "document-input" as const, 
+              documentName: fileData.name, 
+              file: fileData 
+            },
             draggable: true,
           };
           
@@ -246,7 +269,7 @@ export const useWorkbenchDropHandling = ({
       console.log('➕ [DROP] Creating new helper node:', newNode.id, 'type:', module.type);
       setNodes((nds) => [...nds, newNode]);
     },
-    [setNodes, getNodeAtPosition, clearDragOverStates, calculateFlowPosition]
+    [setNodes, getNodeAtPosition, clearDragOverStates, calculateFlowPosition, getNextDocumentPosition, documentExists]
   );
 
   return {
