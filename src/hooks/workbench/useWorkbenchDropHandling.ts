@@ -62,6 +62,15 @@ export const useWorkbenchDropHandling = ({
           anchorCount: fileData.anchorCount || 0
         });
         
+        // Dispatch anchoring started event for drop
+        const anchoringStartEvent = new CustomEvent('anchoringStarted', {
+          detail: {
+            documentName: fileData.name,
+            source: 'drag-drop'
+          }
+        });
+        window.dispatchEvent(anchoringStartEvent);
+        
         // Trigger sidebar document preview
         const previewEvent = new CustomEvent('showDocumentInSidebar', {
           detail: {
@@ -107,6 +116,16 @@ export const useWorkbenchDropHandling = ({
               }
             });
             window.dispatchEvent(completionEvent);
+          } else {
+            // Dispatch error if no anchored text
+            const errorEvent = new CustomEvent('anchoringError', {
+              detail: {
+                documentName: fileData.name,
+                error: 'No anchored text available',
+                source: 'drag-drop'
+              }
+            });
+            window.dispatchEvent(errorEvent);
           }
           return;
         }
@@ -142,7 +161,15 @@ export const useWorkbenchDropHandling = ({
           });
           window.dispatchEvent(completionEvent);
         } else {
-          console.log('⚠️ Document dropped without anchored text - citation analysis may not be available');
+          console.log('⚠️ Document dropped without anchored text - dispatching error event');
+          const errorEvent = new CustomEvent('anchoringError', {
+            detail: {
+              documentName: fileData.name,
+              error: 'Document dropped without anchored text - citation analysis may not be available',
+              source: 'drag-drop'
+            }
+          });
+          window.dispatchEvent(errorEvent);
         }
         
         return;

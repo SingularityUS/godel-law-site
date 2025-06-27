@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Send, Bot, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,7 @@ import DocumentGrid from "./DocumentGrid";
 import DocumentPreviewModal from "./DocumentPreviewModal";
 import ContextDebugPanel from "./ContextDebugPanel";
 import { buildDocumentContext } from "@/utils/contextBuilder";
+import { useAnchoringStatus } from "@/hooks/useAnchoringStatus";
 
 export type UploadedFile = File & { 
   preview?: string; 
@@ -63,6 +63,9 @@ const WorkspaceChat: React.FC<WorkspaceChatProps> = ({
     openPreview, 
     closePreview 
   } = useDocumentPreview();
+
+  // Initialize anchoring status tracking
+  useAnchoringStatus();
 
   // Auto-select all documents when they're uploaded
   useEffect(() => {

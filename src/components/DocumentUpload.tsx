@@ -5,7 +5,7 @@ import { Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { extractDocumentText } from "@/hooks/workbench/utils/documentProcessor";
-import { useAnchorTokenCompletionListener } from "@/hooks/workbench/useAnchorTokenCompletionListener";
+import { useAnchoringStatus } from "@/hooks/useAnchoringStatus";
 
 type UploadedFile = File & { 
   preview?: string; 
@@ -47,7 +47,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   const { user } = useAuth();
   
   // Initialize the anchor token completion listener
-  useAnchorTokenCompletionListener();
+  useAnchoringStatus();
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -99,9 +99,28 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
         const fileUrl = supabase.storage.from("documents").getPublicUrl(storagePath).data.publicUrl;
 
+        // Dispatch anchoring started event
+        const anchoringStartEvent = new CustomEvent('anchoringStarted', {
+          detail: {
+            documentName: file.name,
+            source: 'upload'
+          }
+        });
+        window.dispatchEvent(anchoringStartEvent);
+
         setAnalysisStatus("Extracting text and generating anchor tokens...");
 
-        // Extract text content using the existing processor (now with anchor tokens and event dispatch)
+        // Dispatch progress event
+        const progressEvent = new CustomEvent('anchoringProgress', {
+          detail: {
+            documentName: file.name,
+            progress: 50,
+            step: 'Extracting text and generating anchor tokens...'
+          }
+        });
+        window.dispatchEvent(progressEvent);
+
+        // Extract text content using the existing processor
         console.log('Extracting text from uploaded document:', file.name);
         const mockNode = {
           id: 'temp',
@@ -128,6 +147,16 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           anchorCount: extractionResult.metadata.anchorCount,
           extractedSuccessfully: extractionResult.metadata.extractedSuccessfully
         });
+
+        // Dispatch progress event
+        const progressEvent2 = new CustomEvent('anchoringProgress', {
+          detail: {
+            documentName: file.name,
+            progress: 90,
+            step: 'Saving to database...'
+          }
+        });
+        window.dispatchEvent(progressEvent2);
 
         setAnalysisStatus("Saving document to database...");
 
@@ -166,7 +195,19 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         
         onFilesAccepted([uploadedFile]);
 
-        // Show success message - citation analysis will be triggered automatically by the event system
+        // Dispatch anchoring completion event (this will trigger the completion status)
+        const completionEvent = new CustomEvent('anchorTokensComplete', {
+          detail: {
+            documentName: file.name,
+            documentText: extractedText || '',
+            anchoredText: anchoredText || '',
+            anchorCount: anchorCount,
+            source: 'upload'
+          }
+        });
+        window.dispatchEvent(completionEvent);
+
+        // Show success message
         if (anchoredText && anchorCount > 0) {
           setAnalysisStatus("Document ready - citation analysis will start automatically...");
           
@@ -189,6 +230,17 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
       } catch (error) {
         console.error('Upload error:', error);
+        
+        // Dispatch error event
+        const errorEvent = new CustomEvent('anchoringError', {
+          detail: {
+            documentName: file.name,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            source: 'upload'
+          }
+        });
+        window.dispatchEvent(errorEvent);
+        
         toast({
           title: "Upload failed",
           description: error instanceof Error ? error.message : "An unknown error occurred",
