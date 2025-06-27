@@ -129,7 +129,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
         setAnalysisStatus("Saving document to database...");
 
-        // Insert document record with extracted text
+        // Insert document record with both extracted and anchored text
         const { data: docRow, error: insertError } = await supabase
           .from("documents")
           .insert([
@@ -140,7 +140,11 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
               size: file.size,
               preview_url: fileUrl,
               user_id: user.id,
-              extracted_text: extractedText || null
+              extracted_text: JSON.stringify({
+                original: extractedText || '',
+                anchored: anchoredText || '',
+                anchorCount: anchorCount
+              })
             },
           ])
           .select()

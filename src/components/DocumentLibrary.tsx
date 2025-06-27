@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { FileText, X, Search, RefreshCw } from 'lucide-react';
 import { useDocuments, StoredDocument } from '@/hooks/useDocuments';
@@ -39,14 +40,80 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     }
   };
 
+  /**
+   * Generate anchor tokens for text that doesn't have them
+   */
+  const generateAnchoredText = (originalText: string): { anchoredText: string; anchorCount: number } => {
+    if (!originalText) return { anchoredText: '', anchorCount: 0 };
+    
+    const paragraphs = originalText.split(/\n\s*\n/);
+    let anchoredContent = '';
+    let anchorCount = 0;
+    
+    paragraphs.forEach((paragraph, index) => {
+      if (paragraph.trim()) {
+        const anchor = `⟦P-${String(index + 1).padStart(5, '0')}⟧`;
+        anchoredContent += anchor + paragraph.trim();
+        anchorCount++;
+        
+        if (index < paragraphs.length - 1) {
+          anchoredContent += '\n\n';
+        }
+      }
+    });
+    
+    return { anchoredText: anchoredContent, anchorCount };
+  };
+
   const createFileFromDocument = (document: StoredDocument) => {
+    let extractedText = '';
+    let anchoredText = '';
+    let anchorCount = 0;
+
+    // Parse the stored extracted_text field
+    if (document.extracted_text) {
+      try {
+        // Try to parse as JSON (new format)
+        const parsedData = JSON.parse(document.extracted_text);
+        extractedText = parsedData.original || '';
+        anchoredText = parsedData.anchored || '';
+        anchorCount = parsedData.anchorCount || 0;
+        
+        console.log('Parsed document data:', {
+          name: document.name,
+          hasOriginal: !!extractedText,
+          hasAnchored: !!anchoredText,
+          anchorCount
+        });
+      } catch (e) {
+        // Fallback: treat as plain text (legacy format)
+        extractedText = document.extracted_text;
+        console.log('Legacy document format detected, generating anchored text for:', document.name);
+        
+        // Generate anchored text on-the-fly for legacy documents
+        const generated = generateAnchoredText(extractedText);
+        anchoredText = generated.anchoredText;
+        anchorCount = generated.anchorCount;
+      }
+    }
+
+    // If we still don't have anchored text but have extracted text, generate it
+    if (!anchoredText && extractedText) {
+      console.log('Generating anchored text for document without anchor tokens:', document.name);
+      const generated = generateAnchoredText(extractedText);
+      anchoredText = generated.anchoredText;
+      anchorCount = generated.anchorCount;
+    }
+
     return {
       name: document.name,
       size: document.size,
       type: document.mime_type,
       lastModified: new Date(document.uploaded_at || Date.now()).getTime(),
       preview: document.preview_url,
-      extractedText: document.extracted_text || undefined
+      extractedText: extractedText || undefined,
+      anchoredText: anchoredText || undefined,
+      anchorCount: anchorCount
     };
   };
 
@@ -55,6 +122,8 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     console.log('Document selected from library:', {
       name: file.name,
       hasExtractedText: !!file.extractedText,
+      hasAnchoredText: !!file.anchoredText,
+      anchorCount: file.anchorCount,
       textLength: file.extractedText?.length || 0
     });
     onDocumentSelect(file);
@@ -70,9 +139,11 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     e.dataTransfer.setData("application/lovable-document", JSON.stringify(file));
     e.dataTransfer.effectAllowed = "copy";
     
-    console.log('Drag data set with extracted text:', {
+    console.log('Drag data set with anchored text:', {
       name: file.name,
       hasExtractedText: !!file.extractedText,
+      hasAnchoredText: !!file.anchoredText,
+      anchorCount: file.anchorCount,
       textLength: file.extractedText?.length || 0
     });
   };
@@ -165,7 +236,10 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
           ) : (
             <div className="p-2">
               {filteredDocuments.map((doc) => {
-                const hasText = !!doc.extracted_text;
+                const file = createFileFromDocument(doc);
+                const hasText = !!file.extractedText;
+                const hasAnchors = !!file.anchoredText && file.anchorCount > 0;
+                
                 return (
                   <div
                     key={doc.id}
@@ -183,7 +257,11 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                         <div className="text-xs text-gray-600 flex items-center gap-2">
                           <span>{Math.round(doc.size / 1024)} KB</span>
                           {hasText ? (
-                            <span className="text-green-600">✓ Text Ready</span>
+                            hasAnchors ? (
+                              <span className="text-green-600">✓ Anchored ({file.anchorCount})</span>
+                            ) : (
+                              <span className="text-blue-600">✓ Text Ready</span>
+                            )
                           ) : (
                             <span className="text-orange-600">⚠ No Text</span>
                           )}

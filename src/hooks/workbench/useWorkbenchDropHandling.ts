@@ -44,32 +44,40 @@ export const useWorkbenchDropHandling = ({
    * Automatically process citations for dropped documents
    */
   const autoProcessDroppedDocument = useCallback(async (fileData: any) => {
+    console.log('🔍 Auto-processing dropped document:', {
+      name: fileData.name,
+      hasExtractedText: !!fileData.extractedText,
+      hasAnchoredText: !!fileData.anchoredText,
+      anchorCount: fileData.anchorCount || 0
+    });
+
     try {
-      // Check if the file has anchored text available
-      const anchoredText = fileData.anchoredText || fileData.extractedText;
+      // Prioritize anchored text over extracted text
+      const textToAnalyze = fileData.anchoredText || fileData.extractedText;
       
-      if (!anchoredText) {
-        console.log('No text content available for citation analysis');
+      if (!textToAnalyze) {
+        console.log('❌ No text content available for citation analysis');
         return;
       }
 
       // Check if document has anchor tokens
-      const hasAnchors = /⟦P-\d{5}⟧/.test(anchoredText);
+      const hasAnchors = /⟦P-\d{5}⟧/.test(textToAnalyze);
       
       if (!hasAnchors) {
-        console.log('Document does not contain anchor tokens, skipping auto-processing');
+        console.log('⚠️ Document does not contain anchor tokens, skipping auto-processing');
+        console.log('Text preview:', textToAnalyze.substring(0, 200) + '...');
         return;
       }
 
-      console.log('Auto-processing citations for dropped document:', fileData.name);
-      console.log('Document has anchor tokens, triggering citation analysis...');
+      console.log('✅ Auto-processing citations for dropped document:', fileData.name);
+      console.log('📍 Document has anchor tokens, triggering citation analysis...');
       
       // Trigger citation analysis
-      await processCitations(anchoredText, fileData.name);
+      await processCitations(textToAnalyze, fileData.name);
       
-      console.log('Citation analysis completed for dropped document:', fileData.name);
+      console.log('🎉 Citation analysis completed for dropped document:', fileData.name);
     } catch (error) {
-      console.error('Citation analysis failed for dropped document:', error);
+      console.error('💥 Citation analysis failed for dropped document:', error);
       // Don't throw error to prevent disrupting the drop operation
     }
   }, [processCitations]);
@@ -80,15 +88,21 @@ export const useWorkbenchDropHandling = ({
   const onDrop = useCallback(
     async (event: React.DragEvent) => {
       event.preventDefault();
-      console.log('Drop event received in workbench');
+      console.log('📥 Drop event received in workbench');
       clearDragOverStates();
       
       // Handle document file drops from library
       const docData = event.dataTransfer.getData("application/lovable-document");
       if (docData) {
-        console.log('Document data found:', docData);
+        console.log('📄 Document data found:', docData.substring(0, 200) + '...');
         const fileData = JSON.parse(docData);
-        console.log('Parsed file data:', fileData);
+        console.log('📋 Parsed file data:', {
+          name: fileData.name,
+          type: fileData.type,
+          hasExtractedText: !!fileData.extractedText,
+          hasAnchoredText: !!fileData.anchoredText,
+          anchorCount: fileData.anchorCount || 0
+        });
         
         // Trigger sidebar document preview
         const previewEvent = new CustomEvent('showDocumentInSidebar', {
@@ -104,7 +118,7 @@ export const useWorkbenchDropHandling = ({
         const targetNode = getNodeAtPosition(event.clientX, event.clientY);
         
         if (targetNode && targetNode.type === "document-input") {
-          console.log('Updating existing document node:', targetNode.id);
+          console.log('🔄 Updating existing document node:', targetNode.id);
           // Update existing document input node with new document
           setNodes((nds) =>
             nds.map((node) =>
@@ -129,7 +143,7 @@ export const useWorkbenchDropHandling = ({
         
         // Create new document input node at drop position
         const pos = calculateFlowPosition(event.clientX, event.clientY);
-        console.log('Calculated position:', pos);
+        console.log('📍 Calculated position:', pos);
         
         // Create unique node ID and new document node
         const nodeId = `doc-${Date.now()}-${fileData.name}`;
@@ -141,7 +155,7 @@ export const useWorkbenchDropHandling = ({
           draggable: true,
         };
         
-        console.log('Creating new document node:', newNode);
+        console.log('➕ Creating new document node:', newNode.id);
         setNodes((nds) => [...nds, newNode]);
         
         // Auto-process citations for new document
@@ -152,7 +166,7 @@ export const useWorkbenchDropHandling = ({
       // Handle module palette drops
       const transfer = event.dataTransfer.getData("application/json");
       if (!transfer) {
-        console.log('No transfer data found');
+        console.log('❌ No transfer data found');
         return;
       }
       
