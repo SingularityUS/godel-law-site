@@ -10,11 +10,13 @@
  * - Handles module drops from palette
  * - Manages node creation and updates
  * - Coordinates with positioning system
+ * - Automatically triggers citation analysis for dropped documents
  */
 
 import { useCallback } from "react";
 import { Node } from "@xyflow/react";
 import { useWorkbenchPositioning } from "./useWorkbenchPositioning";
+import { useCitationAnalysis } from "./useCitationAnalysis";
 
 type AllNodes = Node<any>;
 
@@ -36,11 +38,47 @@ export const useWorkbenchDropHandling = ({
     reactFlowWrapper
   });
 
+  const { processCitations } = useCitationAnalysis();
+
+  /**
+   * Automatically process citations for dropped documents
+   */
+  const autoProcessDroppedDocument = useCallback(async (fileData: any) => {
+    try {
+      // Check if the file has anchored text available
+      const anchoredText = fileData.anchoredText || fileData.extractedText;
+      
+      if (!anchoredText) {
+        console.log('No text content available for citation analysis');
+        return;
+      }
+
+      // Check if document has anchor tokens
+      const hasAnchors = /⟦P-\d{5}⟧/.test(anchoredText);
+      
+      if (!hasAnchors) {
+        console.log('Document does not contain anchor tokens, skipping auto-processing');
+        return;
+      }
+
+      console.log('Auto-processing citations for dropped document:', fileData.name);
+      console.log('Document has anchor tokens, triggering citation analysis...');
+      
+      // Trigger citation analysis
+      await processCitations(anchoredText, fileData.name);
+      
+      console.log('Citation analysis completed for dropped document:', fileData.name);
+    } catch (error) {
+      console.error('Citation analysis failed for dropped document:', error);
+      // Don't throw error to prevent disrupting the drop operation
+    }
+  }, [processCitations]);
+
   /**
    * Handle document drops from library or module drops from palette
    */
   const onDrop = useCallback(
-    (event: React.DragEvent) => {
+    async (event: React.DragEvent) => {
       event.preventDefault();
       console.log('Drop event received in workbench');
       clearDragOverStates();
@@ -83,6 +121,9 @@ export const useWorkbenchDropHandling = ({
                 : node
             )
           );
+          
+          // Auto-process citations for replaced document
+          autoProcessDroppedDocument(fileData);
           return;
         }
         
@@ -102,6 +143,9 @@ export const useWorkbenchDropHandling = ({
         
         console.log('Creating new document node:', newNode);
         setNodes((nds) => [...nds, newNode]);
+        
+        // Auto-process citations for new document
+        autoProcessDroppedDocument(fileData);
         return;
       }
       
@@ -126,7 +170,7 @@ export const useWorkbenchDropHandling = ({
       };
       setNodes((nds) => [...nds, newNode]);
     },
-    [setNodes, getNodeAtPosition, clearDragOverStates, calculateFlowPosition]
+    [setNodes, getNodeAtPosition, clearDragOverStates, calculateFlowPosition, autoProcessDroppedDocument]
   );
 
   return {
