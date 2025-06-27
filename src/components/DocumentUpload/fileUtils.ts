@@ -13,8 +13,8 @@ export const createSafeFileObject = (
   anchoredText?: string, 
   anchorCount?: number
 ): UploadedFile => {
-  // Create a proper extended File object that preserves the File prototype
-  const uploadedFile = file as UploadedFile;
+  // Create a new object that extends the file with additional properties
+  const uploadedFile = Object.create(file) as UploadedFile;
   
   // Add the additional properties we need
   uploadedFile.preview = fileUrl;

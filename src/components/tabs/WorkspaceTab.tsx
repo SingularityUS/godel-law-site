@@ -1,4 +1,3 @@
-
 import React, { useCallback, useState, useRef } from "react";
 import { FileText, Trash2 } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -17,22 +16,10 @@ const WorkspaceTab: React.FC = () => {
       textLength: f.extractedText?.length || 0
     })));
     
-    const filesWithPreviews = files.map(file => {
-      // Only create preview URL if it doesn't already exist and file is a valid File instance
-      if (!file.preview && file instanceof File) {
-        try {
-          return {
-            ...file,
-            preview: URL.createObjectURL(file)
-          };
-        } catch (error) {
-          console.warn('Failed to create preview URL for file:', file.name, error);
-          return file; // Return file without preview if URL creation fails
-        }
-      }
-      return file;
-    });
-    
+    const filesWithPreviews = files.map(file => ({
+      ...file,
+      preview: file.preview || (file instanceof File ? URL.createObjectURL(file) : undefined)
+    }));
     setUploadedFiles(prev => [...prev, ...filesWithPreviews]);
   }, []);
 
@@ -55,11 +42,7 @@ const WorkspaceTab: React.FC = () => {
 
     // Clean up preview URL if it was created locally
     if (fileToRemove.preview && fileToRemove.preview.startsWith('blob:')) {
-      try {
-        URL.revokeObjectURL(fileToRemove.preview);
-      } catch (error) {
-        console.warn('Failed to revoke object URL:', error);
-      }
+      URL.revokeObjectURL(fileToRemove.preview);
     }
   }, []);
 
