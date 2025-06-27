@@ -1,4 +1,3 @@
-
 /**
  * Document Processor Utility
  * 
@@ -49,8 +48,9 @@ export interface AnchorMapping {
 
 /**
  * Insert anchor tokens before paragraphs for citation processing
+ * Now dispatches completion event when finished
  */
-function insertAnchorTokens(content: string): { anchoredContent: string; anchorMap: AnchorMapping[] } {
+function insertAnchorTokens(content: string, documentName: string, source: 'upload' | 'drag-drop' | 'manual' = 'manual'): { anchoredContent: string; anchorMap: AnchorMapping[] } {
   console.log('Inserting anchor tokens for citation processing...');
   
   // Split content into paragraphs (double line breaks or similar)
@@ -85,6 +85,25 @@ function insertAnchorTokens(content: string): { anchoredContent: string; anchorM
   
   console.log(`Inserted ${anchorMap.length} anchor tokens`);
   console.log('Sample anchored content (first 300 chars):', anchoredContent.substring(0, 300));
+  
+  // Dispatch anchor completion event
+  const completionEvent = new CustomEvent('anchorTokensComplete', {
+    detail: {
+      documentName,
+      documentText: content,
+      anchoredText: anchoredContent,
+      anchorCount: anchorMap.length,
+      source
+    }
+  });
+  
+  console.log('📡 Dispatching anchor tokens completion event:', {
+    documentName,
+    anchorCount: anchorMap.length,
+    source
+  });
+  
+  window.dispatchEvent(completionEvent);
   
   return { anchoredContent, anchorMap };
 }
@@ -124,7 +143,7 @@ const validateAndFixEncoding = (text: string): string => {
   return fixedText;
 };
 
-export const extractDocumentText = async (docNode: DocumentInputNode): Promise<DocumentExtractionResult> => {
+export const extractDocumentText = async (docNode: DocumentInputNode, source: 'upload' | 'drag-drop' | 'manual' = 'manual'): Promise<DocumentExtractionResult> => {
   console.log('=== DOCUMENT PROCESSOR DEBUG (UTF-8 Character Preservation + Anchor Tokens) ===');
   
   if (!docNode.data?.file) {
@@ -207,10 +226,10 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
     
     console.log('Character validation:');
     console.log(`- Contains special legal characters: ${hasSpecialChars}`);
-    console.log(`- Contains replacement characters (�): ${hasReplacementChars}`);
+    console.log(`- Contains replacement characters (): ${hasReplacementChars}`);
     
     if (hasReplacementChars) {
-      console.warn('WARNING: Document contains replacement characters (�) - encoding may be corrupted');
+      console.warn('WARNING: Document contains replacement characters () - encoding may be corrupted');
     }
     
     // Apply minimal cleaning while preserving original
@@ -223,9 +242,9 @@ export const extractDocumentText = async (docNode: DocumentInputNode): Promise<D
     console.log(`- Cleaning applied: ${cleaningResult.cleaningApplied.join(', ')}`);
     console.log(`- First 200 chars (processable): "${cleaningResult.processableContent.substring(0, 200)}..."`);
     
-    // Insert anchor tokens for citation processing
+    // Insert anchor tokens for citation processing (now with event dispatch)
     console.log('Inserting anchor tokens for citation processing...');
-    const { anchoredContent, anchorMap } = insertAnchorTokens(cleaningResult.processableContent);
+    const { anchoredContent, anchorMap } = insertAnchorTokens(cleaningResult.processableContent, fileName, source);
     
     console.log('Anchor token insertion results:');
     console.log(`- Anchored content length: ${anchoredContent.length}`);

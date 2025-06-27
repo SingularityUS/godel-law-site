@@ -1,4 +1,3 @@
-
 /**
  * useWorkbenchDropHandling Hook
  * 
@@ -10,13 +9,13 @@
  * - Handles module drops from palette
  * - Manages node creation and updates
  * - Coordinates with positioning system
- * - Automatically triggers citation analysis for dropped documents
+ * - Uses event-driven citation analysis triggering
  */
 
 import { useCallback } from "react";
 import { Node } from "@xyflow/react";
 import { useWorkbenchPositioning } from "./useWorkbenchPositioning";
-import { useCitationAnalysis } from "./useCitationAnalysis";
+import { useAnchorTokenCompletionListener } from "./useAnchorTokenCompletionListener";
 
 type AllNodes = Node<any>;
 
@@ -38,49 +37,8 @@ export const useWorkbenchDropHandling = ({
     reactFlowWrapper
   });
 
-  const { processCitations } = useCitationAnalysis();
-
-  /**
-   * Automatically process citations for dropped documents
-   */
-  const autoProcessDroppedDocument = useCallback(async (fileData: any) => {
-    console.log('🔍 Auto-processing dropped document:', {
-      name: fileData.name,
-      hasExtractedText: !!fileData.extractedText,
-      hasAnchoredText: !!fileData.anchoredText,
-      anchorCount: fileData.anchorCount || 0
-    });
-
-    try {
-      // Prioritize anchored text over extracted text
-      const textToAnalyze = fileData.anchoredText || fileData.extractedText;
-      
-      if (!textToAnalyze) {
-        console.log('❌ No text content available for citation analysis');
-        return;
-      }
-
-      // Check if document has anchor tokens
-      const hasAnchors = /⟦P-\d{5}⟧/.test(textToAnalyze);
-      
-      if (!hasAnchors) {
-        console.log('⚠️ Document does not contain anchor tokens, skipping auto-processing');
-        console.log('Text preview:', textToAnalyze.substring(0, 200) + '...');
-        return;
-      }
-
-      console.log('✅ Auto-processing citations for dropped document:', fileData.name);
-      console.log('📍 Document has anchor tokens, triggering citation analysis...');
-      
-      // Trigger citation analysis
-      await processCitations(textToAnalyze, fileData.name);
-      
-      console.log('🎉 Citation analysis completed for dropped document:', fileData.name);
-    } catch (error) {
-      console.error('💥 Citation analysis failed for dropped document:', error);
-      // Don't throw error to prevent disrupting the drop operation
-    }
-  }, [processCitations]);
+  // Initialize the anchor token completion listener
+  useAnchorTokenCompletionListener();
 
   /**
    * Handle document drops from library or module drops from palette
@@ -136,8 +94,20 @@ export const useWorkbenchDropHandling = ({
             )
           );
           
-          // Auto-process citations for replaced document
-          autoProcessDroppedDocument(fileData);
+          // Dispatch anchor completion event for replaced document if it has anchored text
+          if (fileData.anchoredText && fileData.anchorCount > 0) {
+            console.log('📡 Dispatching anchor completion event for replaced document');
+            const completionEvent = new CustomEvent('anchorTokensComplete', {
+              detail: {
+                documentName: fileData.name,
+                documentText: fileData.extractedText || '',
+                anchoredText: fileData.anchoredText,
+                anchorCount: fileData.anchorCount,
+                source: 'drag-drop'
+              }
+            });
+            window.dispatchEvent(completionEvent);
+          }
           return;
         }
         
@@ -158,8 +128,23 @@ export const useWorkbenchDropHandling = ({
         console.log('➕ Creating new document node:', newNode.id);
         setNodes((nds) => [...nds, newNode]);
         
-        // Auto-process citations for new document
-        autoProcessDroppedDocument(fileData);
+        // Dispatch anchor completion event for new document if it has anchored text
+        if (fileData.anchoredText && fileData.anchorCount > 0) {
+          console.log('📡 Dispatching anchor completion event for new document');
+          const completionEvent = new CustomEvent('anchorTokensComplete', {
+            detail: {
+              documentName: fileData.name,
+              documentText: fileData.extractedText || '',
+              anchoredText: fileData.anchoredText,
+              anchorCount: fileData.anchorCount,
+              source: 'drag-drop'
+            }
+          });
+          window.dispatchEvent(completionEvent);
+        } else {
+          console.log('⚠️ Document dropped without anchored text - citation analysis may not be available');
+        }
+        
         return;
       }
       
@@ -184,7 +169,7 @@ export const useWorkbenchDropHandling = ({
       };
       setNodes((nds) => [...nds, newNode]);
     },
-    [setNodes, getNodeAtPosition, clearDragOverStates, calculateFlowPosition, autoProcessDroppedDocument]
+    [setNodes, getNodeAtPosition, clearDragOverStates, calculateFlowPosition]
   );
 
   return {

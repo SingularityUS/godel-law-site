@@ -4,6 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Scale, Play, RotateCcw, FileText, AlertCircle, Settings, CheckCircle } from "lucide-react";
 import { useCitationAnalysis } from "@/hooks/workbench/useCitationAnalysis";
 import { useDocumentContext } from "@/hooks/workbench/useDocumentContext";
+import { useAnchorTokenCompletionListener } from "@/hooks/workbench/useAnchorTokenCompletionListener";
 
 interface CitationRawDataTabProps {
   output: any;
@@ -25,6 +26,9 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
     clearResults,
     toggleAutoProcess
   } = useCitationAnalysis();
+
+  // Initialize the anchor token completion listener
+  const { clearProcessedDocuments } = useAnchorTokenCompletionListener();
 
   const [documentInfo, setDocumentInfo] = useState<{
     text: string;
@@ -81,20 +85,10 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
 
     setDocumentInfo(newDocumentInfo);
 
-    // Auto-process if enabled and document has anchor tags
-    if (autoProcessEnabled && documentText && hasAnchors && anchorCount > 0) {
-      console.log('🚀 CitationRawDataTab: Auto-processing document with', anchorCount, 'anchor tags');
-      // documentName is now guaranteed to be a string
-      autoProcessDocument(documentText, documentName);
-    } else {
-      console.log('🔍 CitationRawDataTab: Not auto-processing because:', {
-        autoProcessEnabled,
-        hasText: !!documentText,
-        hasAnchors,
-        anchorCount
-      });
-    }
-  }, [output, previewDocument, extractDocumentFromNodes, autoProcessEnabled, autoProcessDocument]);
+    // Note: Auto-processing is now handled by the event system
+    // The anchor token completion listener will automatically trigger citation analysis
+    console.log('🔍 CitationRawDataTab: Document info updated - auto-processing handled by event system');
+  }, [output, previewDocument, extractDocumentFromNodes]);
 
   const handleProcessCitations = async () => {
     if (!documentInfo?.text) {
@@ -105,6 +99,11 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
     console.log('🔧 CitationRawDataTab: Manually processing citations for document:', documentInfo.name);
     // Pass documentInfo.name as string
     await processCitations(documentInfo.text, documentInfo.name);
+  };
+
+  const handleClearResults = () => {
+    clearResults();
+    clearProcessedDocuments(); // Also clear the processed documents cache
   };
 
   const hasDocument = documentInfo?.text;
@@ -135,7 +134,7 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
                   {hasAnchorTags ? (
                     <span className="text-xs text-green-600 flex items-center gap-1">
                       <CheckCircle size={12} />
-                      {documentInfo.anchorCount} anchors
+                      {documentInfo.anchorCount} anchors (auto-ready)
                     </span>
                   ) : (
                     <span className="text-xs text-amber-600">No anchor tags</span>
@@ -147,6 +146,7 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
                 variant={autoProcessEnabled ? "default" : "outline"}
                 size="sm"
                 className="flex items-center gap-1"
+                title="Auto-processing via event system"
               >
                 <Settings size={12} />
                 Auto
@@ -167,7 +167,7 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
           
           {citationResults && (
             <Button
-              onClick={clearResults}
+              onClick={handleClearResults}
               variant="outline"
               className="flex items-center gap-2"
             >
@@ -180,6 +180,12 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
         {!hasAnchorTags && hasDocument && (
           <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800">
             ⚠️ Document lacks anchor tags (⟦P-#####⟧) needed for precise citation analysis
+          </div>
+        )}
+
+        {hasAnchorTags && autoProcessEnabled && (
+          <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-800">
+            ✅ Auto-processing enabled - citations will be analyzed automatically when anchor tokens are ready
           </div>
         )}
       </div>
@@ -202,7 +208,7 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
                 <p className="text-sm">Ready to analyze legal citations</p>
                 <p className="text-xs mt-1">
                   {autoProcessEnabled && hasAnchorTags
-                    ? "Auto-processing will start when anchor tags are detected"
+                    ? "Auto-processing active - analysis will start when document is ready"
                     : "Click 'Analyze Citations' to process the document"
                   }
                 </p>

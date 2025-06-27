@@ -1,4 +1,3 @@
-
 import React, { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { toast } from "@/components/ui/use-toast";
@@ -6,7 +5,7 @@ import { Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { extractDocumentText } from "@/hooks/workbench/utils/documentProcessor";
-import { useCitationAnalysis } from "@/hooks/workbench/useCitationAnalysis";
+import { useAnchorTokenCompletionListener } from "@/hooks/workbench/useAnchorTokenCompletionListener";
 
 type UploadedFile = File & { 
   preview?: string; 
@@ -46,7 +45,9 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [analysisStatus, setAnalysisStatus] = useState<string>("");
   const { user } = useAuth();
-  const { processCitations } = useCitationAnalysis();
+  
+  // Initialize the anchor token completion listener
+  useAnchorTokenCompletionListener();
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -98,9 +99,9 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
         const fileUrl = supabase.storage.from("documents").getPublicUrl(storagePath).data.publicUrl;
 
-        setAnalysisStatus("Extracting text and anchor tokens...");
+        setAnalysisStatus("Extracting text and generating anchor tokens...");
 
-        // Extract text content using the existing processor (now with anchor tokens)
+        // Extract text content using the existing processor (now with anchor tokens and event dispatch)
         console.log('Extracting text from uploaded document:', file.name);
         const mockNode = {
           id: 'temp',
@@ -114,7 +115,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           }
         };
 
-        const extractionResult = await extractDocumentText(mockNode);
+        // Pass 'upload' as source to trigger proper event dispatching
+        const extractionResult = await extractDocumentText(mockNode, 'upload');
         const extractedText = extractionResult.processableContent;
         const anchoredText = extractionResult.anchoredContent;
         const anchorCount = extractionResult.anchorMap.length;
@@ -164,27 +166,14 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         
         onFilesAccepted([uploadedFile]);
 
-        // Automatically analyze citations if anchor tags are present
+        // Show success message - citation analysis will be triggered automatically by the event system
         if (anchoredText && anchorCount > 0) {
-          setAnalysisStatus("Analyzing legal citations with GPT-4.1...");
+          setAnalysisStatus("Document ready - citation analysis will start automatically...");
           
-          try {
-            console.log('Auto-analyzing citations for uploaded document:', file.name);
-            await processCitations(anchoredText, file.name);
-            
-            toast({
-              title: "Upload and analysis complete",
-              description: `Document uploaded with ${anchorCount} anchor tokens and citations analyzed automatically.`,
-            });
-          } catch (citationError) {
-            console.error('Citation analysis failed:', citationError);
-            
-            // Still show success for upload, but note citation analysis failed
-            toast({
-              title: "Upload successful",
-              description: `Document uploaded with ${anchorCount} anchor tokens. Citation analysis failed but can be retried manually.`,
-            });
-          }
+          toast({
+            title: "Upload complete",
+            description: `Document uploaded with ${anchorCount} anchor tokens. Citation analysis will start automatically.`,
+          });
         } else {
           toast({
             title: "Upload successful",
@@ -210,7 +199,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         setAnalysisStatus("");
       }
     },
-    [onFilesAccepted, onUploadComplete, onDocumentAdded, user, processCitations]
+    [onFilesAccepted, onUploadComplete, onDocumentAdded, user]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
