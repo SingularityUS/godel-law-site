@@ -11,6 +11,7 @@
  * - Manages drag-drop operations via useWorkbenchDragDrop
  * - Handles node events through useWorkbenchNodeEvents
  * - Processes keyboard interactions with useWorkbenchKeyboard
+ * - Initializes anchor token completion listener for auto-citation analysis
  * - Provides unified API for workbench components
  * 
  * Integration Points:
@@ -31,6 +32,7 @@ import { useWorkbenchState } from "./workbench/useWorkbenchState";
 import { useWorkbenchDragDrop } from "./workbench/useWorkbenchDragDrop";
 import { useWorkbenchNodeEvents } from "./workbench/useWorkbenchNodeEvents";
 import { useWorkbenchKeyboard } from "./workbench/useWorkbenchKeyboard";
+import { useAnchorTokenCompletionListener } from "./workbench/useAnchorTokenCompletionListener";
 
 // Type definition for all supported node types in the workbench
 type AllNodes = Node<any>;
@@ -84,6 +86,10 @@ export const useWorkbenchEvents = ({
     setNodes,
     setEdges
   });
+
+  // Initialize anchor token completion listener for auto-citation analysis
+  console.log('🎧 [WORKBENCH-EVENTS] Initializing anchor token completion listener');
+  useAnchorTokenCompletionListener();
 
   // Return unified interface for workbench components
   return {

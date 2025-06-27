@@ -95,18 +95,39 @@ export const useCitationAnalysis = () => {
   const { callChatGPT } = useChatGPTApi();
 
   const processCitations = useCallback(async (documentText: string, documentId?: string) => {
-    if (!documentText.trim()) {
+    console.log('🔄 [CITATION] Starting processCitations:', {
+      documentId: documentId || 'unknown',
+      hasDocumentText: !!documentText,
+      documentTextLength: documentText?.length || 0,
+      isProcessing,
+      autoProcessEnabled,
+      processingQueueSize: processingQueue.size
+    });
+
+    if (!documentText || !documentText.trim()) {
       console.error('❌ [CITATION] No document text provided for analysis');
       setError("No document text provided for analysis");
       return;
     }
 
-    // Validate anchor text format
-    if (!/⟦P-\d{5}⟧/.test(documentText)) {
+    // Validate anchor text format with detailed logging
+    const anchorMatches = documentText.match(/⟦P-\d{5}⟧/g);
+    if (!anchorMatches || anchorMatches.length === 0) {
       console.error('❌ [CITATION] Document text lacks proper anchor tags');
+      console.error('🔍 [CITATION] Text analysis:', {
+        textLength: documentText.length,
+        firstChars: documentText.substring(0, 200),
+        anchorPattern: /⟦P-\d{5}⟧/.test(documentText),
+        anchorMatches: anchorMatches
+      });
       setError("Document text lacks proper anchor tags for citation analysis");
       return;
     }
+
+    console.log('✅ [CITATION] Found anchor tags:', {
+      count: anchorMatches.length,
+      first5: anchorMatches.slice(0, 5)
+    });
 
     // Check if we already processed this document recently
     if (documentId && documentId === lastProcessedDocument) {
@@ -122,7 +143,11 @@ export const useCitationAnalysis = () => {
 
     // Add to processing queue
     if (documentId) {
-      setProcessingQueue(prev => new Set([...prev, documentId]));
+      setProcessingQueue(prev => {
+        const newSet = new Set([...prev, documentId]);
+        console.log('📝 [CITATION] Added to processing queue:', documentId, 'Queue size:', newSet.size);
+        return newSet;
+      });
     }
 
     setIsProcessing(true);
@@ -133,8 +158,9 @@ export const useCitationAnalysis = () => {
       console.log('📊 [CITATION] Analysis parameters:', {
         documentId: documentId || 'unknown',
         textLength: documentText.length,
-        anchorTagCount: (documentText.match(/⟦P-\d{5}⟧/g) || []).length,
-        autoProcessEnabled
+        anchorTagCount: anchorMatches.length,
+        autoProcessEnabled,
+        queueSize: processingQueue.size
       });
       
       const response = await callChatGPT(
@@ -149,15 +175,20 @@ export const useCitationAnalysis = () => {
       }
 
       const responseContent = response.response;
-      console.log('📥 [CITATION] Raw GPT response received, length:', responseContent.length);
-      console.log('📝 [CITATION] Response preview:', responseContent.substring(0, 300) + '...');
+      console.log('📥 [CITATION] Raw GPT response received:', {
+        length: responseContent.length,
+        preview: responseContent.substring(0, 300) + '...',
+        documentId: documentId || 'unknown'
+      });
 
       // Try to parse the JSON response
       try {
         const parsedResults = JSON.parse(responseContent);
         console.log('✅ [CITATION] Successfully parsed citation results:', {
           resultCount: Array.isArray(parsedResults) ? parsedResults.length : 'Not an array',
-          documentId: documentId || 'unknown'
+          documentId: documentId || 'unknown',
+          isArray: Array.isArray(parsedResults),
+          firstResult: Array.isArray(parsedResults) && parsedResults.length > 0 ? parsedResults[0] : null
         });
         setCitationResults(parsedResults);
         setLastProcessedDocument(documentId || null);
@@ -171,6 +202,7 @@ export const useCitationAnalysis = () => {
               citationCount: Array.isArray(parsedResults) ? parsedResults.length : 0
             }
           });
+          console.log('📤 [CITATION] Dispatching citationAnalysisComplete event');
           window.dispatchEvent(completionEvent);
         }
 
@@ -210,6 +242,11 @@ export const useCitationAnalysis = () => {
       }
     } catch (error: any) {
       console.error('💥 [CITATION] Citation analysis error:', error);
+      console.error('🔍 [CITATION] Error details:', {
+        documentId: documentId || 'unknown',
+        errorMessage: error.message || 'Unknown error',
+        errorStack: error.stack || 'No stack trace'
+      });
       setError(error.message || 'Failed to analyze citations');
       
       // Dispatch error event
@@ -221,41 +258,23 @@ export const useCitationAnalysis = () => {
             source: 'citation-analysis'
           }
         });
+        console.log('📤 [CITATION] Dispatching citationAnalysisError event');
         window.dispatchEvent(errorEvent);
       }
     } finally {
+      console.log('🏁 [CITATION] Processing completed for:', documentId || 'unknown');
       setIsProcessing(false);
       // Remove from processing queue
       if (documentId) {
         setProcessingQueue(prev => {
           const newSet = new Set(prev);
           newSet.delete(documentId);
+          console.log('🗑️ [CITATION] Removed from processing queue:', documentId, 'Queue size:', newSet.size);
           return newSet;
         });
       }
     }
-  }, [callChatGPT, lastProcessedDocument, autoProcessEnabled, processingQueue]);
-
-  const autoProcessDocument = useCallback(async (documentText: string, documentId?: string) => {
-    if (!autoProcessEnabled || !documentText || isProcessing) {
-      console.log('⏭️ [CITATION] Auto-processing skipped:', {
-        autoProcessEnabled,
-        hasDocumentText: !!documentText,
-        isProcessing
-      });
-      return;
-    }
-
-    // Check if document has anchor tags
-    const hasAnchors = /⟦P-\d{5}⟧/.test(documentText);
-    if (!hasAnchors) {
-      console.log('⚠️ [CITATION] Document does not contain anchor tags, skipping auto-processing');
-      return;
-    }
-
-    console.log('🤖 [CITATION] Auto-processing document with anchor tags...');
-    await processCitations(documentText, documentId);
-  }, [autoProcessEnabled, isProcessing, processCitations]);
+  }, [callChatGPT, lastProcessedDocument, autoProcessEnabled, processingQueue, isProcessing]);
 
   const clearResults = useCallback(() => {
     console.log('🧹 [CITATION] Clearing citation results');
@@ -276,6 +295,7 @@ export const useCitationAnalysis = () => {
     console.log('📊 [CITATION] State update:', {
       isProcessing,
       hasResults: !!citationResults,
+      resultsCount: Array.isArray(citationResults) ? citationResults.length : 0,
       hasError: !!error,
       autoProcessEnabled,
       lastProcessedDocument,
@@ -290,7 +310,6 @@ export const useCitationAnalysis = () => {
     autoProcessEnabled,
     processingQueue: processingQueue.size,
     processCitations,
-    autoProcessDocument,
     clearResults,
     toggleAutoProcess
   };

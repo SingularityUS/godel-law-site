@@ -16,7 +16,6 @@
 import { useCallback } from "react";
 import { Node } from "@xyflow/react";
 import { useWorkbenchPositioning } from "./useWorkbenchPositioning";
-import { useAnchorTokenCompletionListener } from "./useAnchorTokenCompletionListener";
 
 type AllNodes = Node<any>;
 
@@ -38,14 +37,11 @@ export const useWorkbenchDropHandling = ({
     reactFlowWrapper
   });
 
-  // Initialize the anchor token completion listener
-  useAnchorTokenCompletionListener();
-
   /**
    * Enhanced debugging function for document data validation
    */
   const debugDocumentData = (fileData: any, source: string) => {
-    console.log(`🔍 [${source}] Document debugging:`, {
+    console.log(`🔍 [DROP-${source}] Document debugging:`, {
       name: fileData.name,
       type: fileData.type,
       hasExtractedText: !!fileData.extractedText,
@@ -59,19 +55,19 @@ export const useWorkbenchDropHandling = ({
   };
 
   /**
-   * Enhanced event dispatching with validation
+   * Enhanced event dispatching with validation and comprehensive logging
    */
   const dispatchAnchorEvents = (fileData: any, source: string) => {
-    console.log(`📡 [${source}] Dispatching anchor events for: ${fileData.name}`);
+    console.log(`📡 [DROP-${source}] Starting anchor event dispatch for: ${fileData.name}`);
     
     // Always dispatch anchoring started event
+    console.log(`📤 [DROP-${source}] Dispatching anchoringStarted event`);
     const anchoringStartEvent = new CustomEvent('anchoringStarted', {
       detail: {
         documentName: fileData.name,
         source: source
       }
     });
-    console.log(`📤 [${source}] Dispatching anchoringStarted event`);
     window.dispatchEvent(anchoringStartEvent);
     
     // Check if we have valid anchor data
@@ -79,8 +75,15 @@ export const useWorkbenchDropHandling = ({
                               fileData.anchorCount > 0 && 
                               /⟦P-\d{5}⟧/.test(fileData.anchoredText);
     
+    console.log(`🔎 [DROP-${source}] Anchor data validation:`, {
+      hasAnchoredText: !!fileData.anchoredText,
+      anchorCount: fileData.anchorCount,
+      hasValidFormat: fileData.anchoredText ? /⟦P-\d{5}⟧/.test(fileData.anchoredText) : false,
+      isValid: hasValidAnchorData
+    });
+    
     if (hasValidAnchorData) {
-      console.log(`✅ [${source}] Document has valid anchor data - dispatching completion event`);
+      console.log(`✅ [DROP-${source}] Document has valid anchor data - dispatching completion event`);
       const completionEvent = new CustomEvent('anchorTokensComplete', {
         detail: {
           documentName: fileData.name,
@@ -90,22 +93,40 @@ export const useWorkbenchDropHandling = ({
           source: source
         }
       });
-      console.log(`📤 [${source}] Dispatching anchorTokensComplete event with:`, {
+      console.log(`📤 [DROP-${source}] Dispatching anchorTokensComplete event with:`, {
         documentName: fileData.name,
         anchorCount: fileData.anchorCount,
-        anchoredTextLength: fileData.anchoredText.length
+        anchoredTextLength: fileData.anchoredText.length,
+        hasValidAnchors: /⟦P-\d{5}⟧/.test(fileData.anchoredText)
       });
       window.dispatchEvent(completionEvent);
     } else {
-      console.warn(`⚠️ [${source}] Document lacks valid anchor data - dispatching error event`);
+      const errorReason = !fileData.anchoredText ? 'No anchored text available' : 
+                         fileData.anchorCount === 0 ? 'Zero anchor count' :
+                         'Invalid anchor text format - missing anchor tags';
+      
+      console.warn(`⚠️ [DROP-${source}] Document lacks valid anchor data: ${errorReason}`);
+      console.warn(`🔍 [DROP-${source}] Anchor text analysis:`, {
+        anchoredTextExists: !!fileData.anchoredText,
+        anchoredTextLength: fileData.anchoredText?.length || 0,
+        anchorCount: fileData.anchorCount || 0,
+        firstChars: fileData.anchoredText ? fileData.anchoredText.substring(0, 100) : 'N/A',
+        containsAnchorPattern: fileData.anchoredText ? /⟦P-\d{5}⟧/.test(fileData.anchoredText) : false
+      });
+      
       const errorEvent = new CustomEvent('anchoringError', {
         detail: {
           documentName: fileData.name,
-          error: hasValidAnchorData ? 'No anchored text available' : 'Invalid anchor text format - missing anchor tags',
-          source: source
+          error: errorReason,
+          source: source,
+          debugInfo: {
+            hasAnchoredText: !!fileData.anchoredText,
+            anchorCount: fileData.anchorCount || 0,
+            textLength: fileData.anchoredText?.length || 0
+          }
         }
       });
-      console.log(`📤 [${source}] Dispatching anchoringError event`);
+      console.log(`📤 [DROP-${source}] Dispatching anchoringError event: ${errorReason}`);
       window.dispatchEvent(errorEvent);
     }
   };
@@ -116,20 +137,24 @@ export const useWorkbenchDropHandling = ({
   const onDrop = useCallback(
     async (event: React.DragEvent) => {
       event.preventDefault();
-      console.log('📥 Drop event received in workbench');
+      console.log('📥 [DROP] Drop event received in workbench');
       clearDragOverStates();
       
       // Handle document file drops from library
       const docData = event.dataTransfer.getData("application/lovable-document");
       if (docData) {
-        console.log('📄 Document data found:', docData.substring(0, 200) + '...');
+        console.log('📄 [DROP] Document data found, length:', docData.length);
         
         try {
           const fileData = JSON.parse(docData);
-          console.log('📋 Parsed file data successfully');
+          console.log('📋 [DROP] Parsed file data successfully:', {
+            name: fileData.name,
+            type: fileData.type,
+            size: fileData.size || 'unknown'
+          });
           
           // Enhanced debugging
-          debugDocumentData(fileData, 'drag-drop');
+          debugDocumentData(fileData, 'LIBRARY');
           
           // Trigger sidebar document preview immediately
           const previewEvent = new CustomEvent('showDocumentInSidebar', {
@@ -139,14 +164,14 @@ export const useWorkbenchDropHandling = ({
               preview: fileData.preview
             }
           });
-          console.log('📤 Dispatching sidebar preview event');
+          console.log('📤 [DROP] Dispatching sidebar preview event');
           window.dispatchEvent(previewEvent);
           
           // Check if dropping on an existing document node for replacement
           const targetNode = getNodeAtPosition(event.clientX, event.clientY);
           
           if (targetNode && targetNode.type === "document-input") {
-            console.log('🔄 Updating existing document node:', targetNode.id);
+            console.log('🔄 [DROP] Updating existing document node:', targetNode.id);
             // Update existing document input node with new document
             setNodes((nds) =>
               nds.map((node) =>
@@ -171,7 +196,7 @@ export const useWorkbenchDropHandling = ({
           
           // Create new document input node at drop position
           const pos = calculateFlowPosition(event.clientX, event.clientY);
-          console.log('📍 Calculated position:', pos);
+          console.log('📍 [DROP] Calculated position:', pos);
           
           // Create unique node ID and new document node
           const nodeId = `doc-${Date.now()}-${fileData.name}`;
@@ -183,15 +208,15 @@ export const useWorkbenchDropHandling = ({
             draggable: true,
           };
           
-          console.log('➕ Creating new document node:', newNode.id);
+          console.log('➕ [DROP] Creating new document node:', newNode.id);
           setNodes((nds) => [...nds, newNode]);
           
           // Dispatch anchor events for new document
           dispatchAnchorEvents(fileData, 'drag-drop-new');
           
         } catch (parseError) {
-          console.error('💥 Failed to parse document data:', parseError);
-          console.error('Raw data:', docData);
+          console.error('💥 [DROP] Failed to parse document data:', parseError);
+          console.error('📄 [DROP] Raw data preview:', docData.substring(0, 200) + '...');
         }
         
         return;
@@ -200,7 +225,7 @@ export const useWorkbenchDropHandling = ({
       // Handle module palette drops
       const transfer = event.dataTransfer.getData("application/json");
       if (!transfer) {
-        console.log('❌ No transfer data found');
+        console.log('❌ [DROP] No transfer data found');
         return;
       }
       
@@ -216,7 +241,7 @@ export const useWorkbenchDropHandling = ({
         position: pos,
         data: { moduleType: module.type },
       };
-      console.log('➕ Creating new helper node:', newNode.id, 'type:', module.type);
+      console.log('➕ [DROP] Creating new helper node:', newNode.id, 'type:', module.type);
       setNodes((nds) => [...nds, newNode]);
     },
     [setNodes, getNodeAtPosition, clearDragOverStates, calculateFlowPosition]

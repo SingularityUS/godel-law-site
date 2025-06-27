@@ -35,36 +35,50 @@ export const useAnchorTokenCompletionListener = () => {
       autoProcessEnabled,
       alreadyProcessed: processedDocuments.current.has(documentName),
       anchoredTextLength: anchoredText?.length || 0,
-      hasAnchorTags: anchoredText ? /⟦P-\d{5}⟧/.test(anchoredText) : false
+      hasAnchorTags: anchoredText ? /⟦P-\d{5}⟧/.test(anchoredText) : false,
+      documentTextLength: documentText?.length || 0
     });
 
     // Check if auto-processing is enabled
     if (!autoProcessEnabled) {
-      console.log('⏭️ [LISTENER] Auto-processing disabled, skipping');
+      console.log('⏭️ [LISTENER] Auto-processing disabled, skipping citation analysis');
       return;
     }
 
     // Prevent duplicate processing
     if (isProcessing) {
-      console.log('⏭️ [LISTENER] Already processing another document, skipping');
+      console.log('⏭️ [LISTENER] Already processing another document, skipping citation analysis');
       return;
     }
 
     if (processedDocuments.current.has(documentName)) {
-      console.log('⏭️ [LISTENER] Document already processed, skipping');
+      console.log('⏭️ [LISTENER] Document already processed, skipping citation analysis');
       return;
     }
 
-    // Validate anchor data
+    // Validate anchor data with detailed logging
     if (!anchoredText || anchorCount === 0) {
-      console.warn('⚠️ [LISTENER] No anchor tokens found, skipping auto-analysis');
+      console.warn('⚠️ [LISTENER] Invalid anchor data:', {
+        hasAnchoredText: !!anchoredText,
+        anchoredTextLength: anchoredText?.length || 0,
+        anchorCount: anchorCount,
+        documentName
+      });
+      console.warn('⚠️ [LISTENER] Skipping auto-analysis due to missing anchor tokens');
       return;
     }
 
     // Check for valid anchor tag format
     if (!anchoredText || !/⟦P-\d{5}⟧/.test(anchoredText)) {
       console.error('❌ [LISTENER] Invalid anchor text format - missing proper anchor tags');
-      console.error('Anchor text preview:', anchoredText?.substring(0, 500));
+      console.error('🔍 [LISTENER] Anchor text analysis:', {
+        anchoredTextExists: !!anchoredText,
+        anchoredTextLength: anchoredText?.length || 0,
+        anchorCount: anchorCount,
+        firstChars: anchoredText ? anchoredText.substring(0, 200) : 'N/A',
+        containsAnchorPattern: anchoredText ? /⟦P-\d{5}⟧/.test(anchoredText) : false,
+        regexMatch: anchoredText ? anchoredText.match(/⟦P-\d{5}⟧/g) : null
+      });
       return;
     }
 
@@ -76,8 +90,20 @@ export const useAnchorTokenCompletionListener = () => {
       console.log('📊 [LISTENER] Analysis parameters:', {
         anchoredTextLength: anchoredText.length,
         anchorCount: anchorCount,
-        documentTextLength: documentText?.length || 0
+        documentTextLength: documentText?.length || 0,
+        source: source,
+        autoProcessEnabled: autoProcessEnabled
       });
+      
+      // Log first few anchor tags found
+      const anchorMatches = anchoredText.match(/⟦P-\d{5}⟧/g);
+      if (anchorMatches) {
+        console.log('🔖 [LISTENER] Found anchor tags:', {
+          count: anchorMatches.length,
+          first5: anchorMatches.slice(0, 5),
+          expectedCount: anchorCount
+        });
+      }
       
       await processCitations(anchoredText, documentName);
       
@@ -88,6 +114,13 @@ export const useAnchorTokenCompletionListener = () => {
       
     } catch (error) {
       console.error('💥 [LISTENER] Auto-citation analysis failed:', error);
+      console.error('🔍 [LISTENER] Error details:', {
+        documentName,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        errorStack: error instanceof Error ? error.stack : 'No stack trace',
+        anchoredTextLength: anchoredText?.length || 0,
+        anchorCount: anchorCount
+      });
       
       // Implement retry logic
       const currentRetries = retryAttempts.current.get(documentName) || 0;
@@ -98,11 +131,12 @@ export const useAnchorTokenCompletionListener = () => {
         // Remove from processed set to allow retry
         processedDocuments.current.delete(documentName);
         
-        // Retry after a short delay
+        // Retry after a short delay with exponential backoff
         setTimeout(() => {
+          console.log(`⏰ [LISTENER] Executing retry ${currentRetries + 1} for: ${documentName}`);
           const retryEvent = new CustomEvent('anchorTokensComplete', { detail: event.detail });
           window.dispatchEvent(retryEvent);
-        }, 2000 * (currentRetries + 1)); // Exponential backoff
+        }, 2000 * (currentRetries + 1));
       } else {
         console.error(`❌ [LISTENER] Max retries exceeded for document: ${documentName}`);
         // Dispatch error event for UI feedback
@@ -110,9 +144,11 @@ export const useAnchorTokenCompletionListener = () => {
           detail: {
             documentName,
             error: error instanceof Error ? error.message : 'Unknown error',
-            source: 'auto-processing'
+            source: 'auto-processing',
+            maxRetriesExceeded: true
           }
         });
+        console.log('📤 [LISTENER] Dispatching citationAnalysisError event after max retries');
         window.dispatchEvent(errorEvent);
       }
     }
@@ -120,11 +156,12 @@ export const useAnchorTokenCompletionListener = () => {
 
   // Enhanced error handling
   const handleAnchoringError = useCallback((event: CustomEvent) => {
-    const { documentName, error, source } = event.detail;
+    const { documentName, error, source, debugInfo } = event.detail;
     console.error(`🚨 [LISTENER] Anchoring error detected:`, {
       documentName,
       error,
-      source
+      source,
+      debugInfo
     });
     
     // Remove from processed documents to allow manual retry
@@ -137,12 +174,18 @@ export const useAnchorTokenCompletionListener = () => {
     const { documentName, source } = event.detail;
     console.log(`🎬 [LISTENER] Anchoring started:`, {
       documentName,
-      source
+      source,
+      timestamp: new Date().toISOString()
     });
   }, []);
 
   useEffect(() => {
     console.log('🎧 [LISTENER] Setting up anchor token completion listeners');
+    console.log('🔧 [LISTENER] Citation analysis state:', {
+      autoProcessEnabled,
+      isProcessing,
+      processedDocumentsCount: processedDocuments.current.size
+    });
     
     // Listen for anchor token completion events
     const completionHandler = handleAnchorTokensComplete as EventListener;
@@ -159,7 +202,7 @@ export const useAnchorTokenCompletionListener = () => {
       window.removeEventListener('anchoringError', errorHandler);
       window.removeEventListener('anchoringStarted', startHandler);
     };
-  }, [handleAnchorTokensComplete, handleAnchoringError, handleAnchoringStart]);
+  }, [handleAnchorTokensComplete, handleAnchoringError, handleAnchoringStart, autoProcessEnabled, isProcessing]);
 
   const clearProcessedDocuments = useCallback(() => {
     console.log('🧹 [LISTENER] Clearing processed documents cache');
