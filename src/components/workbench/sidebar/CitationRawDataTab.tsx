@@ -22,7 +22,6 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
     error, 
     autoProcessEnabled,
     processCitations, 
-    autoProcessDocument,
     clearResults,
     toggleAutoProcess
   } = useCitationAnalysis();
