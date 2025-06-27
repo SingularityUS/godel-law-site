@@ -1,3 +1,4 @@
+
 import React, { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { toast } from "@/components/ui/use-toast";
@@ -78,19 +79,16 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     return { isValid: true };
   };
 
-  // Enhanced file object creation with safety checks
+  // Enhanced file object creation with proper object structure
   const createSafeFileObject = (file: File, fileUrl: string, extractedText?: string, anchoredText?: string, anchorCount?: number): UploadedFile => {
-    const uploadedFile: UploadedFile = Object.assign(file, {
-      preview: fileUrl,
-      extractedText: extractedText || '',
-      anchoredText: anchoredText || '',
-      anchorCount: anchorCount || 0
-    });
+    // Create a new object that extends the file with additional properties
+    const uploadedFile = Object.create(file) as UploadedFile;
     
-    // Ensure all required properties are defined
-    if (!uploadedFile.name) uploadedFile.name = 'Unnamed Document';
-    if (!uploadedFile.type) uploadedFile.type = 'application/octet-stream';
-    if (typeof uploadedFile.size !== 'number') uploadedFile.size = 0;
+    // Add the additional properties we need
+    uploadedFile.preview = fileUrl;
+    uploadedFile.extractedText = extractedText || '';
+    uploadedFile.anchoredText = anchoredText || '';
+    uploadedFile.anchorCount = anchorCount || 0;
     
     return uploadedFile;
   };
