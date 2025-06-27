@@ -1,8 +1,9 @@
+
 /**
  * useWorkbenchDropHandling Hook
  * 
  * Purpose: Handles document and module drop operations for the workbench
- * Extracted from useWorkbenchDragDrop for better separation of concerns
+ * Refactored to use specialized hooks for better separation of concerns
  * 
  * Key Responsibilities:
  * - Processes document drops from library
