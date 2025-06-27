@@ -91,27 +91,51 @@ export const useCitationAnalysis = () => {
   const [error, setError] = useState<string | null>(null);
   const [autoProcessEnabled, setAutoProcessEnabled] = useState(true);
   const [lastProcessedDocument, setLastProcessedDocument] = useState<string | null>(null);
+  const [processingQueue, setProcessingQueue] = useState<Set<string>>(new Set());
   const { callChatGPT } = useChatGPTApi();
 
   const processCitations = useCallback(async (documentText: string, documentId?: string) => {
     if (!documentText.trim()) {
+      console.error('❌ [CITATION] No document text provided for analysis');
       setError("No document text provided for analysis");
+      return;
+    }
+
+    // Validate anchor text format
+    if (!/⟦P-\d{5}⟧/.test(documentText)) {
+      console.error('❌ [CITATION] Document text lacks proper anchor tags');
+      setError("Document text lacks proper anchor tags for citation analysis");
       return;
     }
 
     // Check if we already processed this document recently
     if (documentId && documentId === lastProcessedDocument) {
-      console.log('Skipping re-processing of same document:', documentId);
+      console.log('⏭️ [CITATION] Skipping re-processing of same document:', documentId);
       return;
+    }
+
+    // Check if document is already in processing queue
+    if (documentId && processingQueue.has(documentId)) {
+      console.log('⏭️ [CITATION] Document already in processing queue:', documentId);
+      return;
+    }
+
+    // Add to processing queue
+    if (documentId) {
+      setProcessingQueue(prev => new Set([...prev, documentId]));
     }
 
     setIsProcessing(true);
     setError(null);
 
     try {
-      console.log('Starting citation analysis with GPT-4.1...');
-      console.log('Document text preview:', documentText.substring(0, 500));
-      console.log('Contains anchor tags:', /⟦P-\d{5}⟧/.test(documentText));
+      console.log('🚀 [CITATION] Starting citation analysis with GPT-4.1...');
+      console.log('📊 [CITATION] Analysis parameters:', {
+        documentId: documentId || 'unknown',
+        textLength: documentText.length,
+        anchorTagCount: (documentText.match(/⟦P-\d{5}⟧/g) || []).length,
+        autoProcessEnabled
+      });
       
       const response = await callChatGPT(
         documentText,
@@ -125,72 +149,146 @@ export const useCitationAnalysis = () => {
       }
 
       const responseContent = response.response;
-      console.log('Raw GPT response:', responseContent);
+      console.log('📥 [CITATION] Raw GPT response received, length:', responseContent.length);
+      console.log('📝 [CITATION] Response preview:', responseContent.substring(0, 300) + '...');
 
       // Try to parse the JSON response
       try {
         const parsedResults = JSON.parse(responseContent);
-        console.log('Parsed citation results:', parsedResults);
+        console.log('✅ [CITATION] Successfully parsed citation results:', {
+          resultCount: Array.isArray(parsedResults) ? parsedResults.length : 'Not an array',
+          documentId: documentId || 'unknown'
+        });
         setCitationResults(parsedResults);
         setLastProcessedDocument(documentId || null);
+
+        // Dispatch completion event for UI updates
+        if (documentId) {
+          const completionEvent = new CustomEvent('citationAnalysisComplete', {
+            detail: {
+              documentId,
+              results: parsedResults,
+              citationCount: Array.isArray(parsedResults) ? parsedResults.length : 0
+            }
+          });
+          window.dispatchEvent(completionEvent);
+        }
+
       } catch (parseError) {
-        console.error('Failed to parse JSON response:', parseError);
-        console.error('Raw response was:', responseContent);
+        console.error('💥 [CITATION] Failed to parse JSON response:', parseError);
+        console.error('📄 [CITATION] Raw response was:', responseContent);
         
         // Try to extract JSON from the response if it's wrapped in markdown or other text
         const jsonMatch = responseContent.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
           try {
             const extractedJson = JSON.parse(jsonMatch[0]);
-            console.log('Extracted and parsed citation results:', extractedJson);
+            console.log('✅ [CITATION] Extracted and parsed citation results from wrapped response');
             setCitationResults(extractedJson);
             setLastProcessedDocument(documentId || null);
+
+            // Dispatch completion event
+            if (documentId) {
+              const completionEvent = new CustomEvent('citationAnalysisComplete', {
+                detail: {
+                  documentId,
+                  results: extractedJson,
+                  citationCount: Array.isArray(extractedJson) ? extractedJson.length : 0
+                }
+              });
+              window.dispatchEvent(completionEvent);
+            }
+
           } catch (extractError) {
+            console.error('💥 [CITATION] Failed to extract JSON from response:', extractError);
             setError(`Failed to parse citation analysis response: ${parseError.message}`);
           }
         } else {
+          console.error('❌ [CITATION] No JSON array found in response');
           setError(`Response is not valid JSON. Raw response: ${responseContent.substring(0, 500)}...`);
         }
       }
     } catch (error: any) {
-      console.error('Citation analysis error:', error);
+      console.error('💥 [CITATION] Citation analysis error:', error);
       setError(error.message || 'Failed to analyze citations');
+      
+      // Dispatch error event
+      if (documentId) {
+        const errorEvent = new CustomEvent('citationAnalysisError', {
+          detail: {
+            documentId,
+            error: error.message || 'Failed to analyze citations',
+            source: 'citation-analysis'
+          }
+        });
+        window.dispatchEvent(errorEvent);
+      }
     } finally {
       setIsProcessing(false);
+      // Remove from processing queue
+      if (documentId) {
+        setProcessingQueue(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(documentId);
+          return newSet;
+        });
+      }
     }
-  }, [callChatGPT, lastProcessedDocument]);
+  }, [callChatGPT, lastProcessedDocument, autoProcessEnabled, processingQueue]);
 
   const autoProcessDocument = useCallback(async (documentText: string, documentId?: string) => {
     if (!autoProcessEnabled || !documentText || isProcessing) {
+      console.log('⏭️ [CITATION] Auto-processing skipped:', {
+        autoProcessEnabled,
+        hasDocumentText: !!documentText,
+        isProcessing
+      });
       return;
     }
 
     // Check if document has anchor tags
     const hasAnchors = /⟦P-\d{5}⟧/.test(documentText);
     if (!hasAnchors) {
-      console.log('Document does not contain anchor tags, skipping auto-processing');
+      console.log('⚠️ [CITATION] Document does not contain anchor tags, skipping auto-processing');
       return;
     }
 
-    console.log('Auto-processing document with anchor tags...');
+    console.log('🤖 [CITATION] Auto-processing document with anchor tags...');
     await processCitations(documentText, documentId);
   }, [autoProcessEnabled, isProcessing, processCitations]);
 
   const clearResults = useCallback(() => {
+    console.log('🧹 [CITATION] Clearing citation results');
     setCitationResults(null);
     setError(null);
     setLastProcessedDocument(null);
+    setProcessingQueue(new Set());
   }, []);
 
   const toggleAutoProcess = useCallback(() => {
-    setAutoProcessEnabled(prev => !prev);
-  }, []);
+    const newState = !autoProcessEnabled;
+    console.log('🔄 [CITATION] Toggling auto-process:', newState ? 'ENABLED' : 'DISABLED');
+    setAutoProcessEnabled(newState);
+  }, [autoProcessEnabled]);
+
+  // Log state changes for debugging
+  useEffect(() => {
+    console.log('📊 [CITATION] State update:', {
+      isProcessing,
+      hasResults: !!citationResults,
+      hasError: !!error,
+      autoProcessEnabled,
+      lastProcessedDocument,
+      queueSize: processingQueue.size
+    });
+  }, [isProcessing, citationResults, error, autoProcessEnabled, lastProcessedDocument, processingQueue.size]);
 
   return {
     isProcessing,
     citationResults,
     error,
     autoProcessEnabled,
+    processingQueue: processingQueue.size,
     processCitations,
     autoProcessDocument,
     clearResults,

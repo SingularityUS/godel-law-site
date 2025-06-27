@@ -5,6 +5,7 @@ import { sanitizeFilename } from "./fileValidation";
 import { createSafeFileObject, UploadedFile } from "./fileUtils";
 
 export const dispatchAnchoringStartEvent = (documentName: string, source: string) => {
+  console.log(`📤 [UPLOAD] Dispatching anchoringStarted event for: ${documentName} (source: ${source})`);
   const anchoringStartEvent = new CustomEvent('anchoringStarted', {
     detail: {
       documentName,
@@ -15,6 +16,7 @@ export const dispatchAnchoringStartEvent = (documentName: string, source: string
 };
 
 export const dispatchProgressEvent = (documentName: string, progress: number, step: string) => {
+  console.log(`📊 [UPLOAD] Progress update for ${documentName}: ${progress}% - ${step}`);
   const progressEvent = new CustomEvent('anchoringProgress', {
     detail: {
       documentName,
@@ -32,6 +34,14 @@ export const dispatchCompletionEvent = (
   anchorCount: number,
   source: string
 ) => {
+  console.log(`✅ [UPLOAD] Dispatching completion event for: ${documentName}`, {
+    source,
+    anchorCount,
+    extractedTextLength: extractedText.length,
+    anchoredTextLength: anchoredText.length,
+    hasAnchorTags: /⟦P-\d{5}⟧/.test(anchoredText)
+  });
+  
   const completionEvent = new CustomEvent('anchorTokensComplete', {
     detail: {
       documentName,
@@ -45,6 +55,7 @@ export const dispatchCompletionEvent = (
 };
 
 export const dispatchErrorEvent = (documentName: string, error: string, source: string) => {
+  console.error(`❌ [UPLOAD] Dispatching error event for: ${documentName} (source: ${source}) - ${error}`);
   const errorEvent = new CustomEvent('anchoringError', {
     detail: {
       documentName,
@@ -63,6 +74,7 @@ export const processDocumentUpload = async (
   const sanitizedFilename = sanitizeFilename(file.name);
   const storagePath = `${userId}/${Date.now()}_${sanitizedFilename}`;
 
+  console.log(`🚀 [UPLOAD] Starting document upload process for: ${file.name}`);
   setAnalysisStatus("Uploading to storage...");
   
   // Upload file to storage
@@ -76,17 +88,16 @@ export const processDocumentUpload = async (
   }
 
   const fileUrl = supabase.storage.from("documents").getPublicUrl(storagePath).data.publicUrl;
+  console.log(`📁 [UPLOAD] File uploaded to storage: ${storagePath}`);
 
   // Dispatch anchoring started event
   dispatchAnchoringStartEvent(file.name, 'upload');
 
   setAnalysisStatus("Extracting text and generating anchor tokens...");
-
-  // Dispatch progress event
   dispatchProgressEvent(file.name, 50, 'Extracting text and generating anchor tokens...');
 
   // Extract text content using the existing processor
-  console.log('Extracting text from uploaded document:', file.name);
+  console.log(`📄 [UPLOAD] Extracting text from uploaded document: ${file.name}`);
   const mockNode = {
     id: 'temp',
     type: 'documentInput',
@@ -105,17 +116,16 @@ export const processDocumentUpload = async (
   const anchoredText = extractionResult.anchoredContent;
   const anchorCount = extractionResult.anchorMap.length;
 
-  console.log('Text extraction result:', {
+  console.log(`📊 [UPLOAD] Text extraction completed for: ${file.name}`, {
     originalLength: extractionResult.metadata.originalLength,
     processableLength: extractionResult.metadata.processableLength,
     anchoredLength: extractionResult.metadata.anchoredLength,
     anchorCount: extractionResult.metadata.anchorCount,
-    extractedSuccessfully: extractionResult.metadata.extractedSuccessfully
+    extractedSuccessfully: extractionResult.metadata.extractedSuccessfully,
+    hasAnchorTags: anchoredText ? /⟦P-\d{5}⟧/.test(anchoredText) : false
   });
 
-  // Dispatch progress event
   dispatchProgressEvent(file.name, 90, 'Saving to database...');
-
   setAnalysisStatus("Saving document to database...");
 
   // Insert document record with both extracted and anchored text
@@ -143,11 +153,14 @@ export const processDocumentUpload = async (
     throw new Error(`Database insert failed: ${insertError.message}`);
   }
 
+  console.log(`💾 [UPLOAD] Document saved to database with ID: ${docRow.id}`);
+
   // Create safe file object with validation
   const uploadedFile = createSafeFileObject(file, fileUrl, extractedText, anchoredText, anchorCount);
   
   // Dispatch anchoring completion event
   dispatchCompletionEvent(file.name, extractedText || '', anchoredText || '', anchorCount, 'upload');
 
+  console.log(`🎉 [UPLOAD] Upload process completed successfully for: ${file.name}`);
   return uploadedFile;
 };

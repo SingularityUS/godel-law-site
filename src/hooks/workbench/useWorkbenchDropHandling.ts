@@ -42,6 +42,75 @@ export const useWorkbenchDropHandling = ({
   useAnchorTokenCompletionListener();
 
   /**
+   * Enhanced debugging function for document data validation
+   */
+  const debugDocumentData = (fileData: any, source: string) => {
+    console.log(`🔍 [${source}] Document debugging:`, {
+      name: fileData.name,
+      type: fileData.type,
+      hasExtractedText: !!fileData.extractedText,
+      extractedTextLength: fileData.extractedText?.length || 0,
+      hasAnchoredText: !!fileData.anchoredText,
+      anchoredTextLength: fileData.anchoredText?.length || 0,
+      anchorCount: fileData.anchorCount || 0,
+      anchoredTextPreview: fileData.anchoredText ? fileData.anchoredText.substring(0, 200) + '...' : 'None',
+      containsAnchorTags: fileData.anchoredText ? /⟦P-\d{5}⟧/.test(fileData.anchoredText) : false
+    });
+  };
+
+  /**
+   * Enhanced event dispatching with validation
+   */
+  const dispatchAnchorEvents = (fileData: any, source: string) => {
+    console.log(`📡 [${source}] Dispatching anchor events for: ${fileData.name}`);
+    
+    // Always dispatch anchoring started event
+    const anchoringStartEvent = new CustomEvent('anchoringStarted', {
+      detail: {
+        documentName: fileData.name,
+        source: source
+      }
+    });
+    console.log(`📤 [${source}] Dispatching anchoringStarted event`);
+    window.dispatchEvent(anchoringStartEvent);
+    
+    // Check if we have valid anchor data
+    const hasValidAnchorData = fileData.anchoredText && 
+                              fileData.anchorCount > 0 && 
+                              /⟦P-\d{5}⟧/.test(fileData.anchoredText);
+    
+    if (hasValidAnchorData) {
+      console.log(`✅ [${source}] Document has valid anchor data - dispatching completion event`);
+      const completionEvent = new CustomEvent('anchorTokensComplete', {
+        detail: {
+          documentName: fileData.name,
+          documentText: fileData.extractedText || '',
+          anchoredText: fileData.anchoredText,
+          anchorCount: fileData.anchorCount,
+          source: source
+        }
+      });
+      console.log(`📤 [${source}] Dispatching anchorTokensComplete event with:`, {
+        documentName: fileData.name,
+        anchorCount: fileData.anchorCount,
+        anchoredTextLength: fileData.anchoredText.length
+      });
+      window.dispatchEvent(completionEvent);
+    } else {
+      console.warn(`⚠️ [${source}] Document lacks valid anchor data - dispatching error event`);
+      const errorEvent = new CustomEvent('anchoringError', {
+        detail: {
+          documentName: fileData.name,
+          error: hasValidAnchorData ? 'No anchored text available' : 'Invalid anchor text format - missing anchor tags',
+          source: source
+        }
+      });
+      console.log(`📤 [${source}] Dispatching anchoringError event`);
+      window.dispatchEvent(errorEvent);
+    }
+  };
+
+  /**
    * Handle document drops from library or module drops from palette
    */
   const onDrop = useCallback(
@@ -54,123 +123,75 @@ export const useWorkbenchDropHandling = ({
       const docData = event.dataTransfer.getData("application/lovable-document");
       if (docData) {
         console.log('📄 Document data found:', docData.substring(0, 200) + '...');
-        const fileData = JSON.parse(docData);
-        console.log('📋 Parsed file data:', {
-          name: fileData.name,
-          type: fileData.type,
-          hasExtractedText: !!fileData.extractedText,
-          hasAnchoredText: !!fileData.anchoredText,
-          anchorCount: fileData.anchorCount || 0
-        });
         
-        // Dispatch anchoring started event for drop
-        const anchoringStartEvent = new CustomEvent('anchoringStarted', {
-          detail: {
-            documentName: fileData.name,
-            source: 'drag-drop'
-          }
-        });
-        window.dispatchEvent(anchoringStartEvent);
-        
-        // Trigger sidebar document preview
-        const previewEvent = new CustomEvent('showDocumentInSidebar', {
-          detail: {
-            name: fileData.name,
-            type: fileData.type,
-            preview: fileData.preview
-          }
-        });
-        window.dispatchEvent(previewEvent);
-        
-        // Check if dropping on an existing document node for replacement
-        const targetNode = getNodeAtPosition(event.clientX, event.clientY);
-        
-        if (targetNode && targetNode.type === "document-input") {
-          console.log('🔄 Updating existing document node:', targetNode.id);
-          // Update existing document input node with new document
-          setNodes((nds) =>
-            nds.map((node) =>
-              node.id === targetNode.id
-                ? {
-                    ...node,
-                    data: {
-                      ...node.data,
-                      documentName: fileData.name,
-                      file: fileData,
-                      isDragOver: false
-                    }
-                  }
-                : node
-            )
-          );
+        try {
+          const fileData = JSON.parse(docData);
+          console.log('📋 Parsed file data successfully');
           
-          // Dispatch anchor completion event for replaced document if it has anchored text
-          if (fileData.anchoredText && fileData.anchorCount > 0) {
-            console.log('📡 Dispatching anchor completion event for replaced document');
-            const completionEvent = new CustomEvent('anchorTokensComplete', {
-              detail: {
-                documentName: fileData.name,
-                documentText: fileData.extractedText || '',
-                anchoredText: fileData.anchoredText,
-                anchorCount: fileData.anchorCount,
-                source: 'drag-drop'
-              }
-            });
-            window.dispatchEvent(completionEvent);
-          } else {
-            // Dispatch error if no anchored text
-            const errorEvent = new CustomEvent('anchoringError', {
-              detail: {
-                documentName: fileData.name,
-                error: 'No anchored text available',
-                source: 'drag-drop'
-              }
-            });
-            window.dispatchEvent(errorEvent);
+          // Enhanced debugging
+          debugDocumentData(fileData, 'drag-drop');
+          
+          // Trigger sidebar document preview immediately
+          const previewEvent = new CustomEvent('showDocumentInSidebar', {
+            detail: {
+              name: fileData.name,
+              type: fileData.type,
+              preview: fileData.preview
+            }
+          });
+          console.log('📤 Dispatching sidebar preview event');
+          window.dispatchEvent(previewEvent);
+          
+          // Check if dropping on an existing document node for replacement
+          const targetNode = getNodeAtPosition(event.clientX, event.clientY);
+          
+          if (targetNode && targetNode.type === "document-input") {
+            console.log('🔄 Updating existing document node:', targetNode.id);
+            // Update existing document input node with new document
+            setNodes((nds) =>
+              nds.map((node) =>
+                node.id === targetNode.id
+                  ? {
+                      ...node,
+                      data: {
+                        ...node.data,
+                        documentName: fileData.name,
+                        file: fileData,
+                        isDragOver: false
+                      }
+                    }
+                  : node
+              )
+            );
+            
+            // Dispatch anchor events for replaced document
+            dispatchAnchorEvents(fileData, 'drag-drop-replace');
+            return;
           }
-          return;
-        }
-        
-        // Create new document input node at drop position
-        const pos = calculateFlowPosition(event.clientX, event.clientY);
-        console.log('📍 Calculated position:', pos);
-        
-        // Create unique node ID and new document node
-        const nodeId = `doc-${Date.now()}-${fileData.name}`;
-        const newNode = {
-          id: nodeId,
-          type: "document-input",
-          position: pos,
-          data: { moduleType: "document-input" as const, documentName: fileData.name, file: fileData },
-          draggable: true,
-        };
-        
-        console.log('➕ Creating new document node:', newNode.id);
-        setNodes((nds) => [...nds, newNode]);
-        
-        // Dispatch anchor completion event for new document if it has anchored text
-        if (fileData.anchoredText && fileData.anchorCount > 0) {
-          console.log('📡 Dispatching anchor completion event for new document');
-          const completionEvent = new CustomEvent('anchorTokensComplete', {
-            detail: {
-              documentName: fileData.name,
-              documentText: fileData.extractedText || '',
-              anchoredText: fileData.anchoredText,
-              anchorCount: fileData.anchorCount,
-              source: 'drag-drop'
-            }
-          });
-          window.dispatchEvent(completionEvent);
-        } else {
-          console.log('⚠️ Document dropped without anchored text - dispatching error event');
-          const errorEvent = new CustomEvent('anchoringError', {
-            detail: {
-              documentName: fileData.name,
-              error: 'Document dropped without anchored text - citation analysis may not be available',
-              source: 'drag-drop'
-            }
-          });
-          window.dispatchEvent(errorEvent);
+          
+          // Create new document input node at drop position
+          const pos = calculateFlowPosition(event.clientX, event.clientY);
+          console.log('📍 Calculated position:', pos);
+          
+          // Create unique node ID and new document node
+          const nodeId = `doc-${Date.now()}-${fileData.name}`;
+          const newNode = {
+            id: nodeId,
+            type: "document-input",
+            position: pos,
+            data: { moduleType: "document-input" as const, documentName: fileData.name, file: fileData },
+            draggable: true,
+          };
+          
+          console.log('➕ Creating new document node:', newNode.id);
+          setNodes((nds) => [...nds, newNode]);
+          
+          // Dispatch anchor events for new document
+          dispatchAnchorEvents(fileData, 'drag-drop-new');
+          
+        } catch (parseError) {
+          console.error('💥 Failed to parse document data:', parseError);
+          console.error('Raw data:', docData);
         }
         
         return;
@@ -195,6 +216,7 @@ export const useWorkbenchDropHandling = ({
         position: pos,
         data: { moduleType: module.type },
       };
+      console.log('➕ Creating new helper node:', newNode.id, 'type:', module.type);
       setNodes((nds) => [...nds, newNode]);
     },
     [setNodes, getNodeAtPosition, clearDragOverStates, calculateFlowPosition]
