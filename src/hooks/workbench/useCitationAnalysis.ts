@@ -87,21 +87,63 @@ Output exactly the JSON schema shown above.`;
 
 export const useCitationAnalysis = () => {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [citationResults, setCitationResults] = useState<any>(null);
+  // Change to Map for document-specific citation results
+  const [citationResultsMap, setCitationResultsMap] = useState<Map<string, any>>(new Map());
+  const [currentDocumentId, setCurrentDocumentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [autoProcessEnabled, setAutoProcessEnabled] = useState(true);
-  const [lastProcessedDocument, setLastProcessedDocument] = useState<string | null>(null);
   const [processingQueue, setProcessingQueue] = useState<Set<string>>(new Set());
   const { callChatGPT } = useChatGPTApi();
 
+  // Get current document's citation results
+  const citationResults = currentDocumentId ? citationResultsMap.get(currentDocumentId) || null : null;
+
+  // Listen for document context changes to update current document
+  useEffect(() => {
+    const handleDocumentChange = (event: CustomEvent) => {
+      const { documentName } = event.detail;
+      console.log('📄 [CITATION] Document context changed to:', documentName);
+      
+      if (documentName !== currentDocumentId) {
+        setCurrentDocumentId(documentName);
+        setError(null); // Clear any previous errors when switching documents
+        
+        console.log('🔄 [CITATION] Switched to document:', documentName, 'Has cached results:', citationResultsMap.has(documentName));
+      }
+    };
+
+    const handleSidebarPreview = (event: CustomEvent) => {
+      const { name } = event.detail;
+      console.log('👁️ [CITATION] Sidebar preview changed to:', name);
+      
+      if (name !== currentDocumentId) {
+        setCurrentDocumentId(name);
+        setError(null);
+        
+        console.log('🔄 [CITATION] Switched to preview document:', name, 'Has cached results:', citationResultsMap.has(name));
+      }
+    };
+
+    window.addEventListener('showDocumentInSidebar', handleSidebarPreview as EventListener);
+    window.addEventListener('documentContextChanged', handleDocumentChange as EventListener);
+
+    return () => {
+      window.removeEventListener('showDocumentInSidebar', handleSidebarPreview as EventListener);
+      window.removeEventListener('documentContextChanged', handleDocumentChange as EventListener);
+    };
+  }, [currentDocumentId, citationResultsMap]);
+
   const processCitations = useCallback(async (documentText: string, documentId?: string) => {
+    const targetDocumentId = documentId || currentDocumentId || 'unknown';
+    
     console.log('🔄 [CITATION] Starting processCitations:', {
-      documentId: documentId || 'unknown',
+      documentId: targetDocumentId,
       hasDocumentText: !!documentText,
       documentTextLength: documentText?.length || 0,
       isProcessing,
       autoProcessEnabled,
-      processingQueueSize: processingQueue.size
+      processingQueueSize: processingQueue.size,
+      hasCachedResults: citationResultsMap.has(targetDocumentId)
     });
 
     if (!documentText || !documentText.trim()) {
@@ -129,34 +171,34 @@ export const useCitationAnalysis = () => {
       first5: anchorMatches.slice(0, 5)
     });
 
-    // Check if we already processed this document recently
-    if (documentId && documentId === lastProcessedDocument) {
-      console.log('⏭️ [CITATION] Skipping re-processing of same document:', documentId);
+    // Check if we already have results for this document
+    if (citationResultsMap.has(targetDocumentId)) {
+      console.log('⏭️ [CITATION] Using cached results for document:', targetDocumentId);
+      setCurrentDocumentId(targetDocumentId);
       return;
     }
 
     // Check if document is already in processing queue
-    if (documentId && processingQueue.has(documentId)) {
-      console.log('⏭️ [CITATION] Document already in processing queue:', documentId);
+    if (processingQueue.has(targetDocumentId)) {
+      console.log('⏭️ [CITATION] Document already in processing queue:', targetDocumentId);
       return;
     }
 
     // Add to processing queue
-    if (documentId) {
-      setProcessingQueue(prev => {
-        const newSet = new Set([...prev, documentId]);
-        console.log('📝 [CITATION] Added to processing queue:', documentId, 'Queue size:', newSet.size);
-        return newSet;
-      });
-    }
+    setProcessingQueue(prev => {
+      const newSet = new Set([...prev, targetDocumentId]);
+      console.log('📝 [CITATION] Added to processing queue:', targetDocumentId, 'Queue size:', newSet.size);
+      return newSet;
+    });
 
     setIsProcessing(true);
     setError(null);
+    setCurrentDocumentId(targetDocumentId);
 
     try {
       console.log('🚀 [CITATION] Starting citation analysis with GPT-4.1...');
       console.log('📊 [CITATION] Analysis parameters:', {
-        documentId: documentId || 'unknown',
+        documentId: targetDocumentId,
         textLength: documentText.length,
         anchorTagCount: anchorMatches.length,
         autoProcessEnabled,
@@ -178,7 +220,7 @@ export const useCitationAnalysis = () => {
       console.log('📥 [CITATION] Raw GPT response received:', {
         length: responseContent.length,
         preview: responseContent.substring(0, 300) + '...',
-        documentId: documentId || 'unknown'
+        documentId: targetDocumentId
       });
 
       // Try to parse the JSON response
@@ -186,25 +228,29 @@ export const useCitationAnalysis = () => {
         const parsedResults = JSON.parse(responseContent);
         console.log('✅ [CITATION] Successfully parsed citation results:', {
           resultCount: Array.isArray(parsedResults) ? parsedResults.length : 'Not an array',
-          documentId: documentId || 'unknown',
+          documentId: targetDocumentId,
           isArray: Array.isArray(parsedResults),
           firstResult: Array.isArray(parsedResults) && parsedResults.length > 0 ? parsedResults[0] : null
         });
-        setCitationResults(parsedResults);
-        setLastProcessedDocument(documentId || null);
+        
+        // Store results for this specific document
+        setCitationResultsMap(prev => {
+          const newMap = new Map(prev);
+          newMap.set(targetDocumentId, parsedResults);
+          console.log('💾 [CITATION] Cached results for document:', targetDocumentId, 'Total cached documents:', newMap.size);
+          return newMap;
+        });
 
         // Dispatch completion event for UI updates
-        if (documentId) {
-          const completionEvent = new CustomEvent('citationAnalysisComplete', {
-            detail: {
-              documentId,
-              results: parsedResults,
-              citationCount: Array.isArray(parsedResults) ? parsedResults.length : 0
-            }
-          });
-          console.log('📤 [CITATION] Dispatching citationAnalysisComplete event');
-          window.dispatchEvent(completionEvent);
-        }
+        const completionEvent = new CustomEvent('citationAnalysisComplete', {
+          detail: {
+            documentId: targetDocumentId,
+            results: parsedResults,
+            citationCount: Array.isArray(parsedResults) ? parsedResults.length : 0
+          }
+        });
+        console.log('📤 [CITATION] Dispatching citationAnalysisComplete event');
+        window.dispatchEvent(completionEvent);
 
       } catch (parseError) {
         console.error('💥 [CITATION] Failed to parse JSON response:', parseError);
@@ -216,20 +262,22 @@ export const useCitationAnalysis = () => {
           try {
             const extractedJson = JSON.parse(jsonMatch[0]);
             console.log('✅ [CITATION] Extracted and parsed citation results from wrapped response');
-            setCitationResults(extractedJson);
-            setLastProcessedDocument(documentId || null);
+            
+            setCitationResultsMap(prev => {
+              const newMap = new Map(prev);
+              newMap.set(targetDocumentId, extractedJson);
+              return newMap;
+            });
 
             // Dispatch completion event
-            if (documentId) {
-              const completionEvent = new CustomEvent('citationAnalysisComplete', {
-                detail: {
-                  documentId,
-                  results: extractedJson,
-                  citationCount: Array.isArray(extractedJson) ? extractedJson.length : 0
-                }
-              });
-              window.dispatchEvent(completionEvent);
-            }
+            const completionEvent = new CustomEvent('citationAnalysisComplete', {
+              detail: {
+                documentId: targetDocumentId,
+                results: extractedJson,
+                citationCount: Array.isArray(extractedJson) ? extractedJson.length : 0
+              }
+            });
+            window.dispatchEvent(completionEvent);
 
           } catch (extractError) {
             console.error('💥 [CITATION] Failed to extract JSON from response:', extractError);
@@ -243,44 +291,54 @@ export const useCitationAnalysis = () => {
     } catch (error: any) {
       console.error('💥 [CITATION] Citation analysis error:', error);
       console.error('🔍 [CITATION] Error details:', {
-        documentId: documentId || 'unknown',
+        documentId: targetDocumentId,
         errorMessage: error.message || 'Unknown error',
         errorStack: error.stack || 'No stack trace'
       });
       setError(error.message || 'Failed to analyze citations');
       
       // Dispatch error event
-      if (documentId) {
-        const errorEvent = new CustomEvent('citationAnalysisError', {
-          detail: {
-            documentId,
-            error: error.message || 'Failed to analyze citations',
-            source: 'citation-analysis'
-          }
-        });
-        console.log('📤 [CITATION] Dispatching citationAnalysisError event');
-        window.dispatchEvent(errorEvent);
-      }
+      const errorEvent = new CustomEvent('citationAnalysisError', {
+        detail: {
+          documentId: targetDocumentId,
+          error: error.message || 'Failed to analyze citations',
+          source: 'citation-analysis'
+        }
+      });
+      console.log('📤 [CITATION] Dispatching citationAnalysisError event');
+      window.dispatchEvent(errorEvent);
     } finally {
-      console.log('🏁 [CITATION] Processing completed for:', documentId || 'unknown');
+      console.log('🏁 [CITATION] Processing completed for:', targetDocumentId);
       setIsProcessing(false);
       // Remove from processing queue
-      if (documentId) {
-        setProcessingQueue(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(documentId);
-          console.log('🗑️ [CITATION] Removed from processing queue:', documentId, 'Queue size:', newSet.size);
-          return newSet;
-        });
-      }
+      setProcessingQueue(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(targetDocumentId);
+        console.log('🗑️ [CITATION] Removed from processing queue:', targetDocumentId, 'Queue size:', newSet.size);
+        return newSet;
+      });
     }
-  }, [callChatGPT, lastProcessedDocument, autoProcessEnabled, processingQueue, isProcessing]);
+  }, [callChatGPT, currentDocumentId, autoProcessEnabled, processingQueue, isProcessing, citationResultsMap]);
 
   const clearResults = useCallback(() => {
-    console.log('🧹 [CITATION] Clearing citation results');
-    setCitationResults(null);
+    console.log('🧹 [CITATION] Clearing citation results for current document:', currentDocumentId);
+    if (currentDocumentId) {
+      setCitationResultsMap(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(currentDocumentId);
+        console.log('🗑️ [CITATION] Removed results for:', currentDocumentId, 'Remaining cached documents:', newMap.size);
+        return newMap;
+      });
+    }
     setError(null);
-    setLastProcessedDocument(null);
+    setProcessingQueue(new Set());
+  }, [currentDocumentId]);
+
+  const clearAllResults = useCallback(() => {
+    console.log('🧹 [CITATION] Clearing all citation results');
+    setCitationResultsMap(new Map());
+    setError(null);
+    setCurrentDocumentId(null);
     setProcessingQueue(new Set());
   }, []);
 
@@ -294,23 +352,27 @@ export const useCitationAnalysis = () => {
   useEffect(() => {
     console.log('📊 [CITATION] State update:', {
       isProcessing,
+      currentDocumentId,
       hasResults: !!citationResults,
       resultsCount: Array.isArray(citationResults) ? citationResults.length : 0,
+      totalCachedDocuments: citationResultsMap.size,
       hasError: !!error,
       autoProcessEnabled,
-      lastProcessedDocument,
       queueSize: processingQueue.size
     });
-  }, [isProcessing, citationResults, error, autoProcessEnabled, lastProcessedDocument, processingQueue.size]);
+  }, [isProcessing, citationResults, currentDocumentId, citationResultsMap.size, error, autoProcessEnabled, processingQueue.size]);
 
   return {
     isProcessing,
     citationResults,
     error,
     autoProcessEnabled,
+    currentDocumentId,
     processingQueue: processingQueue.size,
+    totalCachedResults: citationResultsMap.size,
     processCitations,
     clearResults,
+    clearAllResults,
     toggleAutoProcess
   };
 };

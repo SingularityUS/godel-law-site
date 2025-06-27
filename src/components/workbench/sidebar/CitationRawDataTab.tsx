@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Scale, Play, RotateCcw, FileText, AlertCircle, Settings, CheckCircle } from "lucide-react";
+import { Scale, Play, RotateCcw, FileText, AlertCircle, Settings, CheckCircle, Trash2 } from "lucide-react";
 import { useCitationAnalysis } from "@/hooks/workbench/useCitationAnalysis";
 import { useDocumentContext } from "@/hooks/workbench/useDocumentContext";
 import { useAnchorTokenCompletionListener } from "@/hooks/workbench/useAnchorTokenCompletionListener";
@@ -21,8 +22,11 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
     citationResults, 
     error, 
     autoProcessEnabled,
+    currentDocumentId,
+    totalCachedResults,
     processCitations, 
     clearResults,
+    clearAllResults,
     toggleAutoProcess
   } = useCitationAnalysis();
 
@@ -84,8 +88,6 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
 
     setDocumentInfo(newDocumentInfo);
 
-    // Note: Auto-processing is now handled by the event system
-    // The anchor token completion listener will automatically trigger citation analysis
     console.log('🔍 CitationRawDataTab: Document info updated - auto-processing handled by event system');
   }, [output, previewDocument, extractDocumentFromNodes]);
 
@@ -96,13 +98,17 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
     }
 
     console.log('🔧 CitationRawDataTab: Manually processing citations for document:', documentInfo.name);
-    // Pass documentInfo.name as string
     await processCitations(documentInfo.text, documentInfo.name);
   };
 
   const handleClearResults = () => {
     clearResults();
     clearProcessedDocuments(); // Also clear the processed documents cache
+  };
+
+  const handleClearAllResults = () => {
+    clearAllResults();
+    clearProcessedDocuments();
   };
 
   const hasDocument = documentInfo?.text;
@@ -138,6 +144,11 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
                   ) : (
                     <span className="text-xs text-amber-600">No anchor tags</span>
                   )}
+                  {currentDocumentId && (
+                    <span className="text-xs text-blue-600">
+                      Active: {currentDocumentId}
+                    </span>
+                  )}
                 </div>
               </div>
               <Button
@@ -149,6 +160,26 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
               >
                 <Settings size={12} />
                 Auto
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Cache Status */}
+        {totalCachedResults > 0 && (
+          <div className="mb-3 p-2 bg-blue-50 rounded border border-blue-200">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-blue-700">
+                📚 {totalCachedResults} document{totalCachedResults > 1 ? 's' : ''} analyzed
+              </span>
+              <Button
+                onClick={handleClearAllResults}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1 text-xs"
+              >
+                <Trash2 size={10} />
+                Clear All
               </Button>
             </div>
           </div>
@@ -243,6 +274,7 @@ const CitationRawDataTab: React.FC<CitationRawDataTabProps> = ({
                   <p className="text-xs text-green-700 mt-1">
                     Found {Array.isArray(citationResults) ? citationResults.length : 0} citations
                     {hasAnchorTags && ` with precise anchor positioning`}
+                    {currentDocumentId && ` for ${currentDocumentId}`}
                   </p>
                 </div>
 

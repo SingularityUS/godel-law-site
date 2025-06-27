@@ -189,7 +189,8 @@ export const useWorkbenchDropHandling = ({
               )
             );
             
-            // Dispatch anchor events for replaced document
+            // CRITICAL: Always dispatch anchor events for document drops
+            console.log('🚀 [DROP] Force dispatching anchor events for document replacement');
             dispatchAnchorEvents(fileData, 'drag-drop-replace');
             return;
           }
@@ -211,7 +212,8 @@ export const useWorkbenchDropHandling = ({
           console.log('➕ [DROP] Creating new document node:', newNode.id);
           setNodes((nds) => [...nds, newNode]);
           
-          // Dispatch anchor events for new document
+          // CRITICAL: Always dispatch anchor events for new document drops
+          console.log('🚀 [DROP] Force dispatching anchor events for new document');
           dispatchAnchorEvents(fileData, 'drag-drop-new');
           
         } catch (parseError) {

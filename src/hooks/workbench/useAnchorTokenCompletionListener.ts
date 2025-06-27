@@ -51,8 +51,11 @@ export const useAnchorTokenCompletionListener = () => {
       return;
     }
 
-    if (processedDocuments.current.has(documentName)) {
-      console.log('⏭️ [LISTENER] Document already processed, skipping citation analysis');
+    // For document replacements and new documents, always process regardless of previous processing
+    const shouldForceProcess = source === 'drag-drop-replace' || source === 'drag-drop-new';
+    
+    if (!shouldForceProcess && processedDocuments.current.has(documentName)) {
+      console.log('⏭️ [LISTENER] Document already processed and not a forced update, skipping citation analysis');
       return;
     }
 
@@ -83,7 +86,12 @@ export const useAnchorTokenCompletionListener = () => {
     }
 
     try {
-      // Mark as processing to prevent duplicates
+      // Mark as processing to prevent duplicates (but allow force processing for document updates)
+      if (shouldForceProcess) {
+        console.log('🔄 [LISTENER] Force processing document update:', documentName);
+        processedDocuments.current.delete(documentName); // Remove from processed to allow reprocessing
+      }
+      
       processedDocuments.current.add(documentName);
       
       console.log('🚀 [LISTENER] Starting auto-citation analysis for document:', documentName);
@@ -92,7 +100,8 @@ export const useAnchorTokenCompletionListener = () => {
         anchorCount: anchorCount,
         documentTextLength: documentText?.length || 0,
         source: source,
-        autoProcessEnabled: autoProcessEnabled
+        autoProcessEnabled: autoProcessEnabled,
+        isForceProcess: shouldForceProcess
       });
       
       // Log first few anchor tags found
@@ -179,6 +188,15 @@ export const useAnchorTokenCompletionListener = () => {
     });
   }, []);
 
+  // Listen for document changes to clear processed state when appropriate
+  const handleDocumentChange = useCallback((event: CustomEvent) => {
+    const { documentName } = event.detail;
+    console.log('📄 [LISTENER] Document context changed to:', documentName);
+    
+    // Don't automatically clear processed state - let the citation analysis hook handle caching
+    // This allows users to switch between documents and see cached results
+  }, []);
+
   useEffect(() => {
     console.log('🎧 [LISTENER] Setting up anchor token completion listeners');
     console.log('🔧 [LISTENER] Citation analysis state:', {
@@ -191,18 +209,21 @@ export const useAnchorTokenCompletionListener = () => {
     const completionHandler = handleAnchorTokensComplete as EventListener;
     const errorHandler = handleAnchoringError as EventListener;
     const startHandler = handleAnchoringStart as EventListener;
+    const documentChangeHandler = handleDocumentChange as EventListener;
     
     window.addEventListener('anchorTokensComplete', completionHandler);
     window.addEventListener('anchoringError', errorHandler);
     window.addEventListener('anchoringStarted', startHandler);
+    window.addEventListener('showDocumentInSidebar', documentChangeHandler);
 
     return () => {
       console.log('🎧 [LISTENER] Cleaning up anchor token completion listeners');
       window.removeEventListener('anchorTokensComplete', completionHandler);
       window.removeEventListener('anchoringError', errorHandler);
       window.removeEventListener('anchoringStarted', startHandler);
+      window.removeEventListener('showDocumentInSidebar', documentChangeHandler);
     };
-  }, [handleAnchorTokensComplete, handleAnchoringError, handleAnchoringStart, autoProcessEnabled, isProcessing]);
+  }, [handleAnchorTokensComplete, handleAnchoringError, handleAnchoringStart, handleDocumentChange, autoProcessEnabled, isProcessing]);
 
   const clearProcessedDocuments = useCallback(() => {
     console.log('🧹 [LISTENER] Clearing processed documents cache');
