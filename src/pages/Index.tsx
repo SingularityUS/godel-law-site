@@ -1,4 +1,3 @@
-
 import { useCallback, useState, useRef } from "react";
 import ModuleSettingsDrawer from "@/components/ModuleSettingsDrawer";
 import DocumentLibrary from "@/components/DocumentLibrary";
@@ -53,7 +52,16 @@ const IndexContent = () => {
   };
 
   const handleFilesAccepted = (files: UploadedFile[]) => {
+    console.log('📥 [INDEX] Files accepted, adding to uploadedFiles and workbench:', files.length);
     setUploadedFiles(prev => [...prev, ...files]);
+    
+    // Automatically add uploaded documents to the workbench queue
+    if (workbenchRef.current && typeof workbenchRef.current.addDocumentNodes === "function") {
+      console.log('🚀 [INDEX] Adding documents to workbench automatically');
+      workbenchRef.current.addDocumentNodes(files);
+    } else {
+      console.warn('⚠️ [INDEX] Workbench ref not available or addDocumentNodes method missing');
+    }
   };
 
   const handleUploadComplete = () => {

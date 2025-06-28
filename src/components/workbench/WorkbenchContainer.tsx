@@ -1,5 +1,5 @@
 
-import React, { forwardRef, useRef } from "react";
+import React, { forwardRef, useRef, useImperativeHandle } from "react";
 import DocumentPreviewManager from "./DocumentPreviewManager";
 import ModulePaletteSection from "./sections/ModulePaletteSection";
 import WorkspaceSection from "./sections/WorkspaceSection";
@@ -43,7 +43,28 @@ const WorkbenchContainer = forwardRef<any, WorkbenchContainerProps>(function Wor
   ref
 ) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const workspaceRef = useRef<any>(null);
   const { handlePaletteDragStart } = useWorkbenchDragDropHandlers();
+
+  // Expose methods through the ref
+  useImperativeHandle(ref, () => ({
+    addDocumentNode: (file: any) => {
+      if (workspaceRef.current && typeof workspaceRef.current.addDocumentNode === "function") {
+        console.log('🔗 [WORKBENCH-CONTAINER] Forwarding addDocumentNode call');
+        return workspaceRef.current.addDocumentNode(file);
+      } else {
+        console.warn('⚠️ [WORKBENCH-CONTAINER] WorkspaceSection ref not available');
+      }
+    },
+    addDocumentNodes: (files: any[]) => {
+      if (workspaceRef.current && typeof workspaceRef.current.addDocumentNodes === "function") {
+        console.log('🔗 [WORKBENCH-CONTAINER] Forwarding addDocumentNodes call for', files.length, 'files');
+        return workspaceRef.current.addDocumentNodes(files);
+      } else {
+        console.warn('⚠️ [WORKBENCH-CONTAINER] WorkspaceSection ref not available');
+      }
+    }
+  }), []);
 
   return (
     <>
@@ -53,7 +74,7 @@ const WorkbenchContainer = forwardRef<any, WorkbenchContainerProps>(function Wor
       {/* Main Workspace Section */}
       <WorkspaceSection
         reactFlowWrapper={reactFlowWrapper}
-        forwardedRef={ref}
+        forwardedRef={workspaceRef}
         onOpenSidebar={props.onOpenSidebar}
         {...props}
       />

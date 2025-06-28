@@ -11,7 +11,7 @@
  * - Maintains workspace styling and dimensions
  */
 
-import React from "react";
+import React, { useImperativeHandle } from "react";
 import WorkbenchFlow from "../WorkbenchFlow";
 
 interface WorkspaceSectionProps {
@@ -31,6 +31,28 @@ const WorkspaceSection: React.FC<WorkspaceSectionProps> = ({
   forwardedRef,
   onOpenSidebar
 }) => {
+  const workbenchFlowRef = React.useRef<any>(null);
+
+  // Expose methods through the forwarded ref
+  useImperativeHandle(forwardedRef, () => ({
+    addDocumentNode: (file: any) => {
+      if (workbenchFlowRef.current && typeof workbenchFlowRef.current.addDocumentNode === "function") {
+        console.log('🔗 [WORKSPACE-SECTION] Forwarding addDocumentNode call');
+        return workbenchFlowRef.current.addDocumentNode(file);
+      } else {
+        console.warn('⚠️ [WORKSPACE-SECTION] WorkbenchFlow ref not available');
+      }
+    },
+    addDocumentNodes: (files: any[]) => {
+      if (workbenchFlowRef.current && typeof workbenchFlowRef.current.addDocumentNodes === "function") {
+        console.log('🔗 [WORKSPACE-SECTION] Forwarding addDocumentNodes call for', files.length, 'files');
+        return workbenchFlowRef.current.addDocumentNodes(files);
+      } else {
+        console.warn('⚠️ [WORKSPACE-SECTION] WorkbenchFlow ref not available');
+      }
+    }
+  }), []);
+
   return (
     <div 
       ref={reactFlowWrapper} 
@@ -40,7 +62,7 @@ const WorkspaceSection: React.FC<WorkspaceSectionProps> = ({
         onModuleEdit={onModuleEdit}
         editingPromptNodeId={editingPromptNodeId}
         uploadedFiles={uploadedFiles}
-        ref={forwardedRef}
+        ref={workbenchFlowRef}
         reactFlowWrapper={reactFlowWrapper}
         onOpenSidebar={onOpenSidebar}
       />
