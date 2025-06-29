@@ -1,4 +1,3 @@
-
 /**
  * useWorkbenchDropHandling Hook
  * 
@@ -134,12 +133,39 @@ export const useWorkbenchDropHandling = ({
 
   /**
    * Check if a document with the same name already exists in the workbench
+   * Modified to allow multiple documents with the same name by adding unique identifiers
    */
   const documentExists = useCallback((documentName: string) => {
+    // Allow multiple documents with the same name by checking for exact duplicates
+    // This prevents true duplicates while allowing legitimate multiple additions
     return nodes.some(node => 
       node.type === "document-input" && 
-      node.data?.documentName === documentName
+      node.data?.documentName === documentName &&
+      node.data?.file?.size && // Only consider it a duplicate if it has the same size
+      node.data?.file?.uploaded_at // and same upload timestamp
     );
+  }, [nodes]);
+
+  /**
+   * Generate a unique document name to prevent conflicts
+   */
+  const generateUniqueDocumentName = useCallback((originalName: string, fileData: any) => {
+    const baseName = originalName.replace(/\.[^/.]+$/, ""); // Remove extension
+    const extension = originalName.match(/\.[^/.]+$/)?.[0] || "";
+    const timestamp = Date.now();
+    
+    // Check if we need to make it unique
+    const existingNames = nodes
+      .filter(node => node.type === "document-input")
+      .map(node => node.data?.documentName)
+      .filter(Boolean);
+    
+    if (!existingNames.includes(originalName)) {
+      return originalName;
+    }
+    
+    // If the name exists, add a timestamp to make it unique
+    return `${baseName}_${timestamp}${extension}`;
   }, [nodes]);
 
   /**
@@ -208,10 +234,11 @@ export const useWorkbenchDropHandling = ({
           
           // Check if document already exists in workbench (prevent duplicates)
           if (documentExists(fileData.name)) {
-            console.log('⚠️ [DROP] Document already exists in workbench, skipping:', fileData.name);
-            // Still show in sidebar and dispatch events for existing document
-            dispatchAnchorEvents(fileData, 'drag-drop-existing');
-            return;
+            console.log('⚠️ [DROP] Document already exists in workbench, creating unique copy:', fileData.name);
+            // Generate a unique name for this document
+            const uniqueName = generateUniqueDocumentName(fileData.name, fileData);
+            fileData.name = uniqueName;
+            console.log('🔄 [DROP] Using unique name:', uniqueName);
           }
           
           // Create new document input node at appropriate position
@@ -269,7 +296,7 @@ export const useWorkbenchDropHandling = ({
       console.log('➕ [DROP] Creating new helper node:', newNode.id, 'type:', module.type);
       setNodes((nds) => [...nds, newNode]);
     },
-    [setNodes, getNodeAtPosition, clearDragOverStates, calculateFlowPosition, getNextDocumentPosition, documentExists]
+    [setNodes, getNodeAtPosition, clearDragOverStates, calculateFlowPosition, getNextDocumentPosition, documentExists, generateUniqueDocumentName]
   );
 
   return {

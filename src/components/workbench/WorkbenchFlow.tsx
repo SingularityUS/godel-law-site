@@ -1,4 +1,3 @@
-
 /**
  * WorkbenchFlow Component
  * 
@@ -87,20 +86,46 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
 
   // Check if a document with the same name already exists
   const documentExists = useCallback((documentName: string) => {
+    // Allow multiple documents with the same name by checking for exact duplicates
+    // This prevents true duplicates while allowing legitimate multiple additions
     return nodes.some(node => 
       node.type === "document-input" && 
-      node.data?.documentName === documentName
+      node.data?.documentName === documentName &&
+      node.data?.file?.size && // Only consider it a duplicate if it has the same size
+      node.data?.file?.uploaded_at // and same upload timestamp
     );
+  }, [nodes]);
+
+  // Generate a unique document name to prevent conflicts
+  const generateUniqueDocumentName = useCallback((originalName: string, fileData: any) => {
+    const baseName = originalName.replace(/\.[^/.]+$/, ""); // Remove extension
+    const extension = originalName.match(/\.[^/.]+$/)?.[0] || "";
+    const timestamp = Date.now();
+    
+    // Check if we need to make it unique
+    const existingNames = nodes
+      .filter(node => node.type === "document-input")
+      .map(node => node.data?.documentName)
+      .filter(Boolean);
+    
+    if (!existingNames.includes(originalName)) {
+      return originalName;
+    }
+    
+    // If the name exists, add a timestamp to make it unique
+    return `${baseName}_${timestamp}${extension}`;
   }, [nodes]);
 
   // Method to add a single document node
   const addDocumentNode = useCallback((file: any) => {
     console.log('📄 [WORKBENCH-FLOW] Adding single document node:', file.name);
     
-    // Check for duplicates
+    // Check for duplicates and generate unique name if needed
     if (documentExists(file.name)) {
-      console.warn('⚠️ [WORKBENCH-FLOW] Document already exists, skipping:', file.name);
-      return;
+      console.log('⚠️ [WORKBENCH-FLOW] Document already exists, creating unique copy:', file.name);
+      const uniqueName = generateUniqueDocumentName(file.name, file);
+      file.name = uniqueName;
+      console.log('🔄 [WORKBENCH-FLOW] Using unique name:', uniqueName);
     }
     
     const pos = getNextDocumentPosition();
@@ -148,7 +173,7 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
       });
       window.dispatchEvent(completionEvent);
     }
-  }, [nodes, documentExists, getNextDocumentPosition, setNodes]);
+  }, [nodes, documentExists, generateUniqueDocumentName, getNextDocumentPosition, setNodes]);
 
   // Method to add multiple document nodes
   const addDocumentNodes = useCallback((files: any[]) => {
@@ -158,10 +183,12 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
     let addedCount = 0;
     
     files.forEach((file) => {
-      // Check for duplicates
+      // Check for duplicates and generate unique name if needed
       if (documentExists(file.name)) {
-        console.warn('⚠️ [WORKBENCH-FLOW] Document already exists, skipping:', file.name);
-        return;
+        console.log('⚠️ [WORKBENCH-FLOW] Document already exists, creating unique copy:', file.name);
+        const uniqueName = generateUniqueDocumentName(file.name, file);
+        file.name = uniqueName;
+        console.log('🔄 [WORKBENCH-FLOW] Using unique name:', uniqueName);
       }
       
       // Calculate position for this document (account for existing + new nodes)
@@ -236,7 +263,7 @@ const WorkbenchFlow = forwardRef<any, WorkbenchFlowProps>(function WorkbenchFlow
         }
       });
     }
-  }, [nodes, documentExists, setNodes]);
+  }, [nodes, documentExists, generateUniqueDocumentName, setNodes]);
 
   // Expose methods through the ref
   useImperativeHandle(ref, () => ({
